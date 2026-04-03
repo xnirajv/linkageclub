@@ -1,0 +1,105 @@
+export const navigation = {
+  main: [
+    {
+      name: 'Home',
+      href: '/',
+    },
+    {
+      name: 'Projects',
+      href: '/projects',
+    },
+    {
+      name: 'Jobs',
+      href: '/jobs',
+    },
+    {
+      name: 'Mentors',
+      href: '/mentors',
+    },
+    {
+      name: 'Community',
+      href: '/community',
+    },
+    {
+      name: 'About',
+      href: '/about',
+    },
+  ],
+  footer: {
+    company: [
+      { name: 'About Us', href: '/about' },
+      { name: 'Contact', href: '/contact' },
+      { name: 'Careers', href: '/careers' },
+      { name: 'Blog', href: '/blog' },
+    ],
+    resources: [
+      { name: 'Help Center', href: '/help' },
+      { name: 'Community Guidelines', href: '/community-guidelines' },
+      { name: 'Pricing', href: '/pricing' },
+      { name: 'API Documentation', href: '/docs/api' },
+    ],
+    legal: [
+      { name: 'Privacy Policy', href: '/legal/privacy' },
+      { name: 'Terms of Service', href: '/legal/terms' },
+      { name: 'Refund Policy', href: '/legal/refund' },
+      { name: 'Cookie Policy', href: '/legal/cookies' },
+    ],
+    social: [
+      { name: 'Twitter', href: 'https://twitter.com/skillbridge' },
+      { name: 'LinkedIn', href: 'https://linkedin.com/company/skillbridge' },
+      { name: 'GitHub', href: 'https://github.com/skillbridge' },
+      { name: 'Instagram', href: 'https://instagram.com/skillbridge' },
+    ],
+  },
+  dashboards: {
+    student: [
+      { name: 'Overview', href: '/dashboard/student', icon: 'LayoutDashboard' },
+      { name: 'Projects', href: '/dashboard/student/projects', icon: 'Briefcase' },
+      { name: 'Jobs', href: '/dashboard/student/jobs', icon: 'Building2' },
+      { name: 'Mentors', href: '/dashboard/student/mentors', icon: 'Users' },
+      { name: 'Assessments', href: '/dashboard/student/assessments', icon: 'FileCheck' },
+      { name: 'Community', href: '/dashboard/student/community', icon: 'MessageSquare' },
+      { name: 'Learning', href: '/dashboard/student/learn', icon: 'GraduationCap' },
+      { name: 'Profile', href: '/dashboard/student/profile', icon: 'User' },
+      { name: 'Settings', href: '/dashboard/student/settings', icon: 'Settings' },
+    ],
+    company: [
+      { name: 'Overview', href: '/dashboard/company', icon: 'LayoutDashboard' },
+      { name: 'Jobs', href: '/dashboard/company/jobs', icon: 'Briefcase' },
+      { name: 'Projects', href: '/dashboard/company/projects', icon: 'FolderKanban' },
+      { name: 'Applications', href: '/dashboard/company/applications', icon: 'FileText' },
+      { name: 'Talent Search', href: '/dashboard/company/talent-search', icon: 'Search' },
+      { name: 'Analytics', href: '/dashboard/company/analytics', icon: 'BarChart3' },
+      { name: 'Profile', href: '/dashboard/company/profile', icon: 'Building2' },
+      { name: 'Settings', href: '/dashboard/company/settings', icon: 'Settings' },
+    ],
+    mentor: [
+      { name: 'Overview', href: '/dashboard/mentor', icon: 'LayoutDashboard' },
+      { name: 'Sessions', href: '/dashboard/mentor/sessions', icon: 'Calendar' },
+      { name: 'Students', href: '/dashboard/mentor/students', icon: 'Users' },
+      { name: 'Resources', href: '/dashboard/mentor/resources', icon: 'BookOpen' },
+      { name: 'Earnings', href: '/dashboard/mentor/earnings', icon: 'DollarSign' },
+      { name: 'Availability', href: '/dashboard/mentor/availability', icon: 'Clock' },
+      { name: 'Profile', href: '/dashboard/mentor/profile', icon: 'User' },
+      { name: 'Settings', href: '/dashboard/mentor/settings', icon: 'Settings' },
+    ],
+    founder: [
+      { name: 'Overview', href: '/dashboard/founder', icon: 'LayoutDashboard' },
+      { name: 'Startup Profile', href: '/dashboard/founder/startup', icon: 'Rocket' },
+      { name: 'Co-Founder Match', href: '/dashboard/founder/cofounder-match', icon: 'UserPlus' },
+      { name: 'Team Building', href: '/dashboard/founder/team-building', icon: 'Users' },
+      { name: 'Investors', href: '/dashboard/founder/investors', icon: 'TrendingUp' },
+      { name: 'Settings', href: '/dashboard/founder/settings', icon: 'Settings' },
+    ],
+    admin: [
+      { name: 'Overview', href: '/dashboard/admin', icon: 'LayoutDashboard' },
+      { name: 'Users', href: '/dashboard/admin/users', icon: 'Users' },
+      { name: 'Projects', href: '/dashboard/admin/projects', icon: 'Briefcase' },
+      { name: 'Payments', href: '/dashboard/admin/payments', icon: 'CreditCard' },
+      { name: 'Moderation', href: '/dashboard/admin/moderation', icon: 'Shield' },
+      { name: 'Analytics', href: '/dashboard/admin/analytics', icon: 'BarChart3' },
+      { name: 'Assessments', href: '/dashboard/admin/assessments', icon: 'FileCheck' },
+      { name: 'Settings', href: '/dashboard/admin/settings', icon: 'Settings' },
+    ],
+  },
+};

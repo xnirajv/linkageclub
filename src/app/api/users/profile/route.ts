@@ -1,0 +1,110 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth/options';
+import User from '@/lib/db/models/user';
+import Mentor from '@/lib/db/models/mentor';
+import connectDB from '@/lib/db/connect';
+import { z } from 'zod';
+
+const profileSchema = z.object({
+  name: z.string().min(2).optional(),
+  bio: z.string().max(500).optional(),
+  location: z.string().optional(),
+  phone: z.string().optional(),
+  socialLinks: z.object({
+    linkedin: z.string().url().optional().or(z.literal('')),
+    github: z.string().url().optional().or(z.literal('')),
+    portfolio: z.string().url().optional().or(z.literal('')),
+    twitter: z.string().url().optional().or(z.literal('')),
+  }).optional(),
+  preferences: z.object({
+    emailNotifications: z.boolean().optional(),
+    pushNotifications: z.boolean().optional(),
+    newsletter: z.boolean().optional(),
+    theme: z.enum(['light', 'dark', 'system']).optional(),
+  }).optional(),
+});
+
+export async function GET() {
+  try {
+    const session = await getServerSession(authOptions);
+    
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    await connectDB();
+
+    const user = await User.findById(session.user.id)
+      .select('-password -emailVerificationToken -resetPasswordToken');
+
+    if (!user) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      );
+    }
+
+    // If user is a mentor, fetch mentor profile
+    let mentorProfile = null;
+    if (user.role === 'mentor') {
+      mentorProfile = await Mentor.findOne({ userId: user._id });
+    }
+
+    return NextResponse.json({
+      user,
+      mentorProfile,
+    });
+  } catch (error) {
+    console.error('Error fetching profile:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+    
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const body = await req.json();
+    const validation = profileSchema.safeParse(body);
+
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: 'Validation failed', details: validation.error.errors },
+        { status: 400 }
+      );
+    }
+
+    await connectDB();
+
+    const user = await User.findByIdAndUpdate(
+      session.user.id,
+      { $set: validation.data },
+      { new: true }
+    ).select('-password -emailVerificationToken -resetPasswordToken');
+
+    return NextResponse.json({
+      message: 'Profile updated successfully',
+      user,
+    });
+  } catch (error) {
+    console.error('Error updating profile:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}

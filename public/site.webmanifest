@@ -1,0 +1,16 @@
+{
+  "name": "InternHub",
+  "short_name": "InternHub",
+  "description": "India's AI-powered tech talent ecosystem for learning, hiring, mentorship, and real-world projects.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f6f1e7",
+  "theme_color": "#344a86",
+  "icons": [
+    {
+      "src": "/logo4.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

@@ -1,0 +1,356 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("MONGODB_URI")
+}
+
+model User {
+  id       String   @id @default(auto()) @map("_id") @db.ObjectId
+  email    String   @unique
+  password String?
+  name     String
+  role     UserRole @default(STUDENT)
+
+  avatar   String?
+  bio      String?
+  location String?
+  phone    String?
+
+  emailVerified Boolean @default(false)
+
+  skills Skill[]
+  badges Badge[]
+
+  projects        Project[]     @relation("CompanyProjects")
+  appliedProjects Application[] @relation("StudentApplications")
+
+  jobs            Job[]            @relation("CompanyJobs")
+  jobApplications JobApplication[] @relation("StudentJobApplications")
+
+  mentorProfile  Mentor?
+  founderProfile Founder?
+
+  sessionsBooked Session[] @relation("StudentSessions")
+
+  messagesSent     Message[] @relation("SenderMessages")
+  messagesReceived Message[] @relation("ReceiverMessages")
+
+  notifications Notification[]
+
+  posts    Post[]    @relation("UserPosts")
+  comments Comment[] @relation("UserComments")
+
+  assessments Assessment[] @relation("UserAssessments")
+  attempts    Attempt[]    @relation("UserAttempts")
+
+  payments         Payment[] @relation("UserPayments")
+  receivedPayments Payment[] @relation("RecipientPayments")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum UserRole {
+  STUDENT
+  COMPANY
+  MENTOR
+  FOUNDER
+  ADMIN
+}
+
+model Skill {
+  id    String     @id @default(auto()) @map("_id") @db.ObjectId
+  name  String
+  level SkillLevel @default(BEGINNER)
+
+  userId String @db.ObjectId
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([userId, name])
+}
+
+enum SkillLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+  EXPERT
+}
+
+model Badge {
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  description String?
+
+  userId String @db.ObjectId
+  user   User   @relation(fields: [userId], references: [id])
+
+  earnedAt DateTime @default(now())
+}
+
+model Project {
+  id          String @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  description String
+
+  companyId String @db.ObjectId
+  company   User   @relation("CompanyProjects", fields: [companyId], references: [id])
+
+  applications Application[]
+
+  status ProjectStatus @default(OPEN)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum ProjectStatus {
+  DRAFT
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+}
+
+model Job {
+  id          String @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  description String
+
+  companyId String @db.ObjectId
+  company   User   @relation("CompanyJobs", fields: [companyId], references: [id])
+
+  applications JobApplication[]
+
+  status JobStatus @default(PUBLISHED)
+
+  createdAt DateTime @default(now())
+}
+
+enum JobStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+}
+
+model Application {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  projectId String?  @db.ObjectId
+  project   Project? @relation(fields: [projectId], references: [id])
+
+  applicantId String @db.ObjectId
+  applicant   User   @relation("StudentApplications", fields: [applicantId], references: [id])
+
+  status ApplicationStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+}
+
+model JobApplication {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  jobId String @db.ObjectId
+  job   Job    @relation(fields: [jobId], references: [id])
+
+  applicantId String @db.ObjectId
+  applicant   User   @relation("StudentJobApplications", fields: [applicantId], references: [id])
+
+  resume String?
+
+  status ApplicationStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+
+  @@unique([jobId, applicantId])
+}
+
+enum ApplicationStatus {
+  PENDING
+  REVIEWED
+  ACCEPTED
+  REJECTED
+}
+
+model Mentor {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  userId String @unique @db.ObjectId
+  user   User   @relation(fields: [userId], references: [id])
+
+  hourlyRate Float
+
+  sessions Session[]
+
+  createdAt DateTime @default(now())
+}
+
+model Session {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  mentorId String @db.ObjectId
+  mentor   Mentor @relation(fields: [mentorId], references: [id])
+
+  studentId String @db.ObjectId
+  student   User   @relation("StudentSessions", fields: [studentId], references: [id])
+
+  date DateTime
+
+  status SessionStatus @default(SCHEDULED)
+
+  createdAt DateTime @default(now())
+}
+
+enum SessionStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+model Founder {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  userId String @unique @db.ObjectId
+  user   User   @relation(fields: [userId], references: [id])
+
+  startupName String
+}
+
+model Payment {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  transactionId String @unique
+
+  userId String @db.ObjectId
+  user   User   @relation("UserPayments", fields: [userId], references: [id])
+
+  recipientId String? @db.ObjectId
+  recipient   User?   @relation("RecipientPayments", fields: [recipientId], references: [id])
+
+  amount Float
+
+  status PaymentStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+model Notification {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  userId String @db.ObjectId
+  user   User   @relation(fields: [userId], references: [id])
+
+  title   String
+  message String
+
+  read Boolean @default(false)
+
+  createdAt DateTime @default(now())
+}
+
+model Message {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  senderId String @db.ObjectId
+  sender   User   @relation("SenderMessages", fields: [senderId], references: [id])
+
+  receiverId String @db.ObjectId
+  receiver   User   @relation("ReceiverMessages", fields: [receiverId], references: [id])
+
+  content String
+
+  createdAt DateTime @default(now())
+}
+
+model Post {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  authorId String @db.ObjectId
+  author   User   @relation("UserPosts", fields: [authorId], references: [id])
+
+  title   String
+  content String
+
+  comments Comment[]
+
+  createdAt DateTime @default(now())
+}
+
+model Comment {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  postId String @db.ObjectId
+  post   Post   @relation(fields: [postId], references: [id])
+
+  authorId String @db.ObjectId
+  author   User   @relation("UserComments", fields: [authorId], references: [id])
+
+  parentId String?  @db.ObjectId
+  parent   Comment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  replies Comment[] @relation("CommentReplies")
+
+  content String
+
+  createdAt DateTime @default(now())
+}
+
+model Assessment {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  title String
+
+  createdBy String @db.ObjectId
+  creator   User   @relation("UserAssessments", fields: [createdBy], references: [id])
+
+  attempts Attempt[]
+
+  createdAt DateTime @default(now())
+}
+
+model Attempt {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  assessmentId String     @db.ObjectId
+  assessment   Assessment @relation(fields: [assessmentId], references: [id])
+
+  userId String @db.ObjectId
+  user   User   @relation("UserAttempts", fields: [userId], references: [id])
+
+  score Int
+
+  createdAt DateTime @default(now())
+}
+
+model Settings {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  key   String @unique
+  value Json
+
+  createdAt DateTime @default(now())
+}
+
+model Analytics {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  type AnalyticsType
+  date DateTime
+
+  metrics Json
+
+  @@unique([type, date])
+}
+
+enum AnalyticsType {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
