@@ -71,7 +71,7 @@ export function SkillProgress({ skills, onVerify }: SkillProgressProps) {
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium">{skill.name}</span>
                   {skill.verified ? (
-                    <CheckCircle className="h-4 w-4 text-success-600" title="Verified" />
+                    <CheckCircle className="h-4 w-4 text-success-600"/>
                   ) : (
                     <span className="text-xs text-muted-foreground">(unverified)</span>
                   )}

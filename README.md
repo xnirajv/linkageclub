@@ -1,6 +1,6 @@
-# InternHub
+# LinkageClub
 
-InternHub is a Next.js 14 application with App Router, NextAuth, MongoDB, Prisma schema definitions, and a large API surface for jobs, projects, mentors, payments, community, and admin workflows.
+LinkageClub is a Next.js 14 application with App Router, NextAuth, MongoDB, Prisma schema definitions, and a large API surface for jobs, projects, mentors, payments, community, and admin workflows.
 
 ## Production status
 
@@ -69,7 +69,7 @@ npm run smoke-test
 - Port is controlled by `PORT`
 - Cross-origin API access is controlled by `ALLOWED_ORIGINS`
 - Legacy `/auth/*` and old marketing routes are redirected to the current App Router paths
-- A live launch checklist is available in [`LIVE_DEPLOYMENT_RUNBOOK.md`](C:/Users/Niraj%20Vankar/Downloads/files%20(11)/internhub_fixed_codebase/LIVE_DEPLOYMENT_RUNBOOK.md)
+- A live launch checklist is available in [`LIVE_DEPLOYMENT_RUNBOOK.md`](C:/Users/Niraj%20Vankar/Downloads/files%20(11)/LinkageClub_fixed_codebase/LIVE_DEPLOYMENT_RUNBOOK.md)
 
 ## Deployment options
 
