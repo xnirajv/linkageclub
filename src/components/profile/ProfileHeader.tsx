@@ -46,7 +46,7 @@ export function ProfileHeader({
               <div className="flex items-center gap-2 mb-2">
                 <h1 className="text-2xl md:text-3xl font-bold">{user.name}</h1>
                 {user.verification?.email && (
-                  <Shield className="h-5 w-5 text-primary-600" title="Verified" />
+                  <Shield className="h-5 w-5 text-primary-600"/>
                 )}
               </div>
               {user.bio && (
