@@ -11,12 +11,45 @@ const profileSchema = z.object({
   bio: z.string().max(500).optional(),
   location: z.string().optional(),
   phone: z.string().optional(),
+
+  skills: z.array(
+    z.object({
+      name: z.string(),
+      level: z.string(),
+      verified: z.boolean().optional(),
+    })
+  ).optional(),
+
+  education: z.array(
+    z.object({
+      institution: z.string(),
+      degree: z.string(),
+      field: z.string(),
+      startYear: z.string(),
+      endYear: z.string(),
+      grade: z.string().optional(),
+    })
+  ).optional(),
+
+  experience: z.array(
+    z.object({
+      title: z.string(),
+      company: z.string(),
+      location: z.string(),
+      startDate: z.string(),
+      endDate: z.string().optional(),
+      description: z.string().optional(),
+      current: z.boolean().optional(),
+    })
+  ).optional(),
+
   socialLinks: z.object({
     linkedin: z.string().url().optional().or(z.literal('')),
     github: z.string().url().optional().or(z.literal('')),
     portfolio: z.string().url().optional().or(z.literal('')),
     twitter: z.string().url().optional().or(z.literal('')),
   }).optional(),
+
   preferences: z.object({
     emailNotifications: z.boolean().optional(),
     pushNotifications: z.boolean().optional(),
