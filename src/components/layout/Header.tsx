@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { signOut, useSession } from 'next-auth/react';
+import { signOut } from 'next-auth/react';
 import { Bell, CreditCard, Loader2, LogOut, Menu, Search, Settings, User, Users } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -19,6 +19,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useProfile } from '@/hooks/useProfile'; // ✅ Add this import
 import { cn } from '@/lib/utils/cn';
 
 interface HeaderProps {
@@ -50,7 +51,8 @@ export function Header({ onMenuClick, className }: HeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { data: session } = useSession();
+  // ✅ Remove useSession, add useProfile
+  const { profile } = useProfile();
   const {
     notifications,
     unreadCount,
@@ -59,7 +61,13 @@ export function Header({ onMenuClick, className }: HeaderProps) {
     markAllAsRead,
   } = useNotifications();
   const [searchQuery, setSearchQuery] = React.useState(searchParams.get('q') || '');
-  const role = session?.user?.role || 'student';
+  
+  // ✅ Get role and user info from profile
+  const role = profile?.role || 'student';
+  const userName = profile?.name || 'User';
+  const userEmail = profile?.email || 'user@example.com';
+  const userAvatar = profile?.avatar || '';
+  
   const searchPlaceholder =
     role === 'company'
       ? 'Search projects, candidates, applications...'
@@ -187,7 +195,7 @@ export function Header({ onMenuClick, className }: HeaderProps) {
             )}
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link href={`/${['dashboard'].join('/')}/${role}`}>
+              <Link href={`/dashboard/${role}`}>
                 Open dashboard
               </Link>
             </DropdownMenuItem>
@@ -200,16 +208,16 @@ export function Header({ onMenuClick, className }: HeaderProps) {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="h-11 rounded-full px-2">
               <Avatar className="h-9 w-9">
-                <AvatarImage src={session?.user?.image || ''} />
-                <AvatarFallback>{session?.user?.name?.charAt(0) || 'U'}</AvatarFallback>
+                <AvatarImage src={userAvatar} />
+                <AvatarFallback>{userName.charAt(0) || 'U'}</AvatarFallback>
               </Avatar>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-60 rounded-3xl">
             <DropdownMenuLabel>
               <div className="flex flex-col">
-                <span className="text-sm font-medium text-charcoal-900 dark:text-white">{session?.user?.name}</span>
-                <span className="text-xs text-charcoal-500 dark:text-charcoal-400">{session?.user?.email}</span>
+                <span className="text-sm font-medium text-charcoal-900 dark:text-white">{userName}</span>
+                <span className="text-xs text-charcoal-500 dark:text-charcoal-400">{userEmail}</span>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />

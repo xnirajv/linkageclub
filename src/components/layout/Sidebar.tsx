@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { signOut, useSession } from 'next-auth/react';
+import { signOut } from 'next-auth/react';
 import {
   AlertCircle,
   Award,
@@ -31,6 +31,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import { cn } from '@/lib/utils/cn';
+import { useProfile } from '@/hooks/useProfile'; // ✅ Add this import
 
 interface SidebarItem {
   title: string;
@@ -164,9 +165,14 @@ const getSidebarConfig = (role: string): SidebarSection[] => {
 
 export function Sidebar({ role, className }: SidebarProps) {
   const pathname = usePathname();
-  const { data: session } = useSession();
+  // ✅ Remove useSession, add useProfile
+  const { profile } = useProfile();
   const sections = getSidebarConfig(role);
-  const companyName = role === 'company' ? session?.user?.name || 'Your Company' : session?.user?.name || 'User';
+  
+  // ✅ Get name from profile instead of session
+  const displayName = profile?.name || 'User';
+  const displayEmail = profile?.email || 'user@example.com';
+  const companyName = role === 'company' ? displayName || 'Your Company' : displayName;
 
   return (
     <aside
@@ -191,8 +197,8 @@ export function Sidebar({ role, className }: SidebarProps) {
 
           <div className="glass-card mt-5 rounded-[26px] p-4">
             <p className="text-xs uppercase tracking-[0.24em] text-charcoal-400 dark:text-charcoal-400">Signed in as</p>
-            <p className="mt-2 text-sm font-semibold text-charcoal-900 dark:text-white">{companyName}</p>
-            <p className="mt-1 truncate text-xs text-charcoal-500 dark:text-charcoal-400">{session?.user?.email}</p>
+            <p className="mt-2 text-sm font-semibold text-charcoal-900 dark:text-white">{displayName}</p>
+            <p className="mt-1 truncate text-xs text-charcoal-500 dark:text-charcoal-400">{displayEmail}</p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <div className="inline-flex rounded-full bg-secondary-50 px-3 py-1 text-xs font-semibold capitalize text-secondary-800 dark:bg-secondary-900/20 dark:text-secondary-200">
                 {role}
