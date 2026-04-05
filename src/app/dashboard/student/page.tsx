@@ -21,7 +21,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import type { Notification as NotificationType } from '@/types/notification';
 import type { Skill } from '@/types/user';
-import { useSession } from 'next-auth/react';
+// ✅ REMOVE useSession import - no longer needed
+// import { useSession } from 'next-auth/react';
 
 export default function StudentDashboardPage() {
   const router = useRouter();
@@ -35,7 +36,9 @@ export default function StudentDashboardPage() {
   const verifiedSkills = skills.filter((skill: Skill) => skill.verified).length;
   const trustScore = profile?.trustScore || authUser?.trustScore || 0;
   const unreadCount = notifications.filter((item: NotificationType) => !item.read).length;
-  const { data: session } = useSession();
+  
+  // ✅ Get name from profile instead of session
+  const displayName = profile?.name?.split(' ')[0] || authUser?.name?.split(' ')[0] || 'Student';
   
   const metrics = useMemo(
     () => [
@@ -116,7 +119,7 @@ export default function StudentDashboardPage() {
     <div className="space-y-6">
       <DashboardHero
         eyebrow="Student workspace"
-        title={`Welcome back, ${session?.user?.name?.split(' ')[0] || 'Student'}`}
+        title={`Welcome back, ${displayName}`}
         description="Track applications, strengthen your trust score, and move from learning into real opportunities with a calmer, premium workflow."
         actions={[
           { label: 'Browse projects', href: '/dashboard/student/projects', variant: 'default' },
