@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -83,6 +83,25 @@ export default function EditStudentProfilePage() {
     expectedCTC: profile?.expectedCTC || '',
     availability: profile?.availability || 'immediate',
   });
+
+  // Load education and experience from profile
+  useEffect(() => {
+    if (profile) {
+      setEducations(profile.education || []);
+      setExperiences(profile.experience || []);
+      setFormData({
+        name: profile.name || '',
+        bio: profile.bio || '',
+        location: profile.location || '',
+        phone: profile.phone || '',
+        linkedin: profile.socialLinks?.linkedin || '',
+        github: profile.socialLinks?.github || '',
+        portfolio: profile.socialLinks?.portfolio || '',
+        expectedCTC: (profile as any).expectedCTC || '',
+        availability: (profile as any).availability || 'immediate',
+      });
+    }
+  }, [profile]);
 
   const toggleSection = (section: keyof typeof expandedSections) => {
     setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));

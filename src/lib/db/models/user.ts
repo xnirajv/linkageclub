@@ -76,6 +76,25 @@ export interface IUser extends Document {
   verifiedBy?: mongoose.Types.ObjectId | string | null;
 
   isDeleted?: boolean;
+
+  // Education & Experience
+  education?: Array<{
+    institution: string;
+    degree: string;
+    field: string;
+    startYear: string;
+    endYear: string;
+    grade: string;
+  }>;
+  experience?: Array<{
+    title: string;
+    company: string;
+    location: string;
+    startDate: string;
+    endDate: string;
+    current: boolean;
+    description: string;
+  }>;
 }
 
 const userSchema = new Schema<IUser>(
@@ -184,22 +203,40 @@ const userSchema = new Schema<IUser>(
       type: Boolean,
       default: false,
     },
-
     banReason: {
       type: String,
     },
-
     banExpiresAt: {
       type: Date,
     },
-
     bannedBy: {
       type: String,
     },
-
     bannedAt: {
       type: Date,
     },
+    // Education & Experience fields
+    education: [
+      {
+        institution: { type: String, default: '' },
+        degree: { type: String, default: '' },
+        field: { type: String, default: '' },
+        startYear: { type: String, default: '' },
+        endYear: { type: String, default: '' },
+        grade: { type: String, default: '' },
+      },
+    ],
+    experience: [
+      {
+        title: { type: String, default: '' },
+        company: { type: String, default: '' },
+        location: { type: String, default: '' },
+        startDate: { type: String, default: '' },
+        endDate: { type: String, default: '' },
+        current: { type: Boolean, default: false },
+        description: { type: String, default: '' },
+      },
+    ],
   },
   {
     timestamps: true,

@@ -10,6 +10,25 @@ export interface Skill {
   title?:string;
 }
 
+export interface Education {
+  institution: string;
+  degree: string;
+  field: string;
+  startYear: string;
+  endYear: string;
+  grade: string;
+}
+
+export interface Experience {
+  title: string;
+  company: string;
+  location: string;
+  startDate: string;
+  endDate: string;
+  current: boolean;
+  description: string;
+}
+
 export interface Badge {
   name: string;
   description: string;
@@ -61,6 +80,8 @@ export interface User {
   trustScore: number;
   skills: Skill[];
   badges: Badge[];
+  education?: Education[];
+  experience?: Experience[];
   socialLinks: SocialLinks;
   preferences: UserPreferences;
   verification: UserVerification;

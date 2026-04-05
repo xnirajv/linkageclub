@@ -6,10 +6,10 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useProfile } from '@/hooks/useProfile';
-import { 
-  MapPin, 
-  Mail, 
-  Phone, 
+import {
+  MapPin,
+  Mail,
+  Phone,
   Calendar,
   Edit,
   Share2,
@@ -25,7 +25,8 @@ import {
   CheckCircle,
   Clock,
   User,
-  ExternalLink
+  ExternalLink,
+  GraduationCap
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatDate } from '@/lib/utils/format';
@@ -39,6 +40,25 @@ type ProfileSkill = {
 type ProfileBadge = {
   name: string;
   description?: string;
+};
+
+type Education = {
+  institution: string;
+  degree: string;
+  field: string;
+  startYear: string;
+  endYear: string;
+  grade: string;
+};
+
+type Experience = {
+  title: string;
+  company: string;
+  location: string;
+  startDate: string;
+  endDate: string;
+  current: boolean;
+  description: string;
 };
 
 export default function StudentProfilePage() {
@@ -71,15 +91,15 @@ export default function StudentProfilePage() {
           </p>
         </div>
         <div className="flex gap-2 self-end sm:self-auto">
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             className="gap-2 hover:bg-charcoal-100 dark:hover:bg-charcoal-800 transition-all duration-200"
           >
             <Share2 className="h-4 w-4" />
             Share Profile
           </Button>
-          <Button 
-            asChild 
+          <Button
+            asChild
             className="gap-2 bg-primary-600 hover:bg-primary-700 transition-all duration-200 shadow-sm hover:shadow-md"
           >
             <Link href="/dashboard/student/profile/edit">
@@ -95,7 +115,7 @@ export default function StudentProfilePage() {
         {/* Decorative Background */}
         <div className="absolute top-0 right-0 w-72 h-72 bg-primary-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
         <div className="absolute bottom-0 left-0 w-72 h-72 bg-purple-500/5 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
-        
+
         <div className="flex flex-col md:flex-row items-start gap-6 relative z-10">
           {/* Avatar with Glow Effect */}
           <div className="relative">
@@ -119,7 +139,7 @@ export default function StudentProfilePage() {
                 </Badge>
               )}
             </div>
-            
+
             <p className="text-charcoal-600 dark:text-charcoal-400 mb-4 max-w-2xl leading-relaxed">
               {profile?.bio || 'No bio provided yet. Click edit to add your bio.'}
             </p>
@@ -198,29 +218,35 @@ export default function StudentProfilePage() {
       {/* Profile Content Tabs - Enhanced */}
       <Tabs defaultValue="overview" className="space-y-6">
         <TabsList className="bg-charcoal-100 dark:bg-charcoal-800 p-1 rounded-xl w-full sm:w-auto">
-          <TabsTrigger 
-            value="overview" 
+          <TabsTrigger
+            value="overview"
             className="rounded-lg data-[state=active]:bg-card dark:data-[state=active]:bg-charcoal-900 data-[state=active]:shadow-sm transition-all duration-200"
           >
             Overview
           </TabsTrigger>
-          <TabsTrigger 
-            value="skills" 
+          <TabsTrigger
+            value="skills"
             className="rounded-lg data-[state=active]:bg-card dark:data-[state=active]:bg-charcoal-900 data-[state=active]:shadow-sm transition-all duration-200"
           >
             Skills & Badges
           </TabsTrigger>
-          <TabsTrigger 
-            value="projects" 
+          <TabsTrigger
+            value="projects"
             className="rounded-lg data-[state=active]:bg-card dark:data-[state=active]:bg-charcoal-900 data-[state=active]:shadow-sm transition-all duration-200"
           >
             Projects
           </TabsTrigger>
-          <TabsTrigger 
-            value="education" 
+          <TabsTrigger
+            value="education"
             className="rounded-lg data-[state=active]:bg-card dark:data-[state=active]:bg-charcoal-900 data-[state=active]:shadow-sm transition-all duration-200"
           >
             Education
+          </TabsTrigger>
+          <TabsTrigger
+            value="experience"
+            className="rounded-lg data-[state=active]:bg-card dark:data-[state=active]:bg-charcoal-900 data-[state=active]:shadow-sm transition-all duration-200"
+          >
+            Experience
           </TabsTrigger>
         </TabsList>
 
@@ -257,7 +283,7 @@ export default function StudentProfilePage() {
                   </h3>
                   <div className="flex flex-wrap gap-3">
                     {profile.socialLinks.linkedin && (
-                      <a 
+                      <a
                         href={profile.socialLinks.linkedin}
                         target="_blank"
                         rel="noopener noreferrer"
@@ -269,7 +295,7 @@ export default function StudentProfilePage() {
                       </a>
                     )}
                     {profile.socialLinks.github && (
-                      <a 
+                      <a
                         href={profile.socialLinks.github}
                         target="_blank"
                         rel="noopener noreferrer"
@@ -281,7 +307,7 @@ export default function StudentProfilePage() {
                       </a>
                     )}
                     {profile.socialLinks.portfolio && (
-                      <a 
+                      <a
                         href={profile.socialLinks.portfolio}
                         target="_blank"
                         rel="noopener noreferrer"
@@ -382,15 +408,14 @@ export default function StudentProfilePage() {
                     <div key={index} className="flex items-center justify-between p-3 rounded-xl bg-charcoal-100/50 dark:bg-charcoal-800/50 hover:bg-charcoal-100 dark:hover:bg-charcoal-800 transition-all duration-200">
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-charcoal-950 dark:text-white">{skill.name}</span>
-                        <Badge 
-                          variant="skill" 
-                          size="sm" 
-                          className={`capitalize ${
-                            skill.level === 'expert' ? 'bg-purple-100 text-purple-700' :
-                            skill.level === 'advanced' ? 'bg-orange-100 text-orange-700' :
-                            skill.level === 'intermediate' ? 'bg-blue-100 text-blue-700' :
-                            'bg-green-100 text-green-700'
-                          }`}
+                        <Badge
+                          variant="skill"
+                          size="sm"
+                          className={`capitalize ${skill.level === 'expert' ? 'bg-purple-100 text-purple-700' :
+                              skill.level === 'advanced' ? 'bg-orange-100 text-orange-700' :
+                                skill.level === 'intermediate' ? 'bg-blue-100 text-blue-700' :
+                                  'bg-green-100 text-green-700'
+                            }`}
                         >
                           {skill.level}
                         </Badge>
@@ -479,26 +504,134 @@ export default function StudentProfilePage() {
           </Card>
         </TabsContent>
 
-        {/* Education Tab - Enhanced */}
+        {/* Education Tab - Enhanced with real data */}
         <TabsContent value="education">
           <Card className="p-6 border-0 shadow-md">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-primary-500" />
+                <GraduationCap className="h-5 w-5 text-primary-500" />
                 Education
               </h3>
               <Button variant="outline" size="sm" className="gap-1" asChild>
                 <Link href="/dashboard/student/profile/edit#education">
                   <Edit className="h-3 w-3" />
-                  Add Education
+                  {(profile?.education?.length ?? 0) > 0 ? 'Edit Education' : 'Add Education'}
                 </Link>
               </Button>
             </div>
-            <div className="text-center py-12">
-              <Calendar className="h-12 w-12 text-charcoal-300 mx-auto mb-3" />
-              <p className="text-charcoal-500">Education details will appear here</p>
-              <p className="text-xs text-charcoal-400 mt-1">Add your educational background</p>
+
+            {profile?.education && profile.education.length > 0 ? (
+              <div className="space-y-4">
+                {(profile.education as Education[]).map((edu, index) => (
+                  <div
+                    key={index}
+                    className="p-4 rounded-xl border border-charcoal-100 dark:border-charcoal-700 bg-charcoal-100/40 dark:bg-charcoal-800/30 hover:shadow-md transition-all duration-200"
+                  >
+                    <div className="flex flex-wrap justify-between items-start gap-2 mb-2">
+                      <h4 className="font-semibold text-charcoal-950 dark:text-white text-lg">
+                        {edu.degree || 'Degree'} {edu.field && `in ${edu.field}`}
+                      </h4>
+                      {edu.grade && (
+                        <Badge variant="outline" className="bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400">
+                          Grade: {edu.grade}%
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-charcoal-700 dark:text-charcoal-300 font-medium">
+                      {edu.institution || 'Institution Name'}
+                    </p>
+                    {(edu.startYear || edu.endYear) && (
+                      <p className="text-sm text-charcoal-500 dark:text-charcoal-400 mt-1">
+                        {edu.startYear && edu.startYear}
+                        {edu.startYear && edu.endYear && ' — '}
+                        {edu.endYear && edu.endYear}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <GraduationCap className="h-12 w-12 text-charcoal-300 mx-auto mb-3" />
+                <p className="text-charcoal-500">No education added yet</p>
+                <p className="text-xs text-charcoal-400 mt-1">Add your educational background</p>
+                <Button variant="outline" size="sm" className="mt-3" asChild>
+                  <Link href="/dashboard/student/profile/edit#education">
+                    Add Education
+                  </Link>
+                </Button>
+              </div>
+            )}
+          </Card>
+        </TabsContent>
+
+        {/* Experience Tab - New tab with real data */}
+        <TabsContent value="experience">
+          <Card className="p-6 border-0 shadow-md">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <Briefcase className="h-5 w-5 text-primary-500" />
+                Work Experience
+              </h3>
+              <Button variant="outline" size="sm" className="gap-1" asChild>
+                <Link href="/dashboard/student/profile/edit#experience">
+                  <Edit className="h-3 w-3" />
+                  {(profile?.experience?.length ?? 0) > 0 ? 'Edit Experience' : 'Add Experience'}
+                </Link>
+              </Button>
             </div>
+
+            {profile?.experience && profile.experience.length > 0 ? (
+              <div className="space-y-4">
+                {(profile.experience as Experience[]).map((exp, index) => (
+                  <div
+                    key={index}
+                    className="p-4 rounded-xl border border-charcoal-100 dark:border-charcoal-700 bg-charcoal-100/40 dark:bg-charcoal-800/30 hover:shadow-md transition-all duration-200"
+                  >
+                    <div className="flex flex-wrap justify-between items-start gap-2 mb-2">
+                      <h4 className="font-semibold text-charcoal-950 dark:text-white text-lg">
+                        {exp.title || 'Position'} {exp.company && `@ ${exp.company}`}
+                      </h4>
+                      {exp.current && (
+                        <Badge variant="success" className="gap-1">
+                          <Clock className="h-3 w-3" />
+                          Current
+                        </Badge>
+                      )}
+                    </div>
+                    {exp.location && (
+                      <p className="text-sm text-charcoal-600 dark:text-charcoal-400 flex items-center gap-1 mb-2">
+                        <MapPin className="h-3 w-3" />
+                        {exp.location}
+                      </p>
+                    )}
+                    {(exp.startDate || exp.endDate) && (
+                      <p className="text-sm text-charcoal-500 dark:text-charcoal-400 mb-2">
+                        {exp.startDate && new Date(exp.startDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}
+                        {exp.startDate && (exp.endDate || exp.current) && ' — '}
+                        {exp.current ? 'Present' : exp.endDate && new Date(exp.endDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}
+                      </p>
+                    )}
+                    {exp.description && (
+                      <p className="text-sm text-charcoal-600 dark:text-charcoal-400 mt-2 leading-relaxed">
+                        {exp.description}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <Briefcase className="h-12 w-12 text-charcoal-300 mx-auto mb-3" />
+                <p className="text-charcoal-500">No work experience added yet</p>
+                <p className="text-xs text-charcoal-400 mt-1">Add your professional experience</p>
+                <Button variant="outline" size="sm" className="mt-3" asChild>
+                  <Link href="/dashboard/student/profile/edit#experience">
+                    Add Experience
+                  </Link>
+                </Button>
+              </div>
+            )}
           </Card>
         </TabsContent>
       </Tabs>
