@@ -17,15 +17,15 @@ export const authOptions: NextAuthOptions = {
   providers: [
     ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
       ? [GoogleProvider({
-          clientId: process.env.GOOGLE_CLIENT_ID,
-          clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-        })]
+        clientId: process.env.GOOGLE_CLIENT_ID,
+        clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      })]
       : []),
     ...(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET
       ? [GitHubProvider({
-          clientId: process.env.GITHUB_CLIENT_ID,
-          clientSecret: process.env.GITHUB_CLIENT_SECRET,
-        })]
+        clientId: process.env.GITHUB_CLIENT_ID,
+        clientSecret: process.env.GITHUB_CLIENT_SECRET,
+      })]
       : []),
     CredentialsProvider({
       name: 'credentials',
@@ -69,17 +69,20 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async jwt({ token, user, trigger, session }) {
+      // first login
       if (user) {
         token.id = user.id;
         token.role = (user as any).role;
         token.trustScore = (user as any).trustScore;
-        token.name = user.name; //add this
+        token.name = user.name; 
       }
-      if (trigger === 'update' && session) {
-        token.name = session.name; //add this
-        token = { ...token, ...session };
 
+      if (trigger === "update" && session) {
+        if (session.name) {
+          token.name = session.name; 
+        }
       }
+
       return token;
     },
     async session({ session, token }) {
@@ -87,7 +90,7 @@ export const authOptions: NextAuthOptions = {
         (session.user as any).id = token.id as string;
         (session.user as any).role = token.role as string;
         (session.user as any).trustScore = token.trustScore as number;
-        session.user.name = token.name as string; //add this
+        session.user.name = token.name as string; 
       }
       return session;
     },
