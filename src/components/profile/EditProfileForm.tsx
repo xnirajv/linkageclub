@@ -82,9 +82,7 @@ export function EditProfileForm({ user, onSuccess }: EditProfileFormProps) {
 
       if (response.ok) {
         await update({
-          user: {
             name: data.name
-          }
         });
 
         onSuccess?.();
