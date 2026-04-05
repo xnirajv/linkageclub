@@ -82,11 +82,13 @@ export function EditProfileForm({ user, onSuccess }: EditProfileFormProps) {
 
       if (response.ok) {
         await update({
+          user: {
             name: data.name
+          }
         });
 
         onSuccess?.();
-        router.refresh();
+        window.location.reload();
       }
     } catch (error) {
       console.error('Error updating profile:', error);
