@@ -73,9 +73,12 @@ export const authOptions: NextAuthOptions = {
         token.id = user.id;
         token.role = (user as any).role;
         token.trustScore = (user as any).trustScore;
+        token.name = user.name; //add this
       }
       if (trigger === 'update' && session) {
+        token.name = session.name; //add this
         token = { ...token, ...session };
+
       }
       return token;
     },
@@ -84,6 +87,7 @@ export const authOptions: NextAuthOptions = {
         (session.user as any).id = token.id as string;
         (session.user as any).role = token.role as string;
         (session.user as any).trustScore = token.trustScore as number;
+        session.user.name = token.name as string; //add this
       }
       return session;
     },

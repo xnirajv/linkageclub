@@ -10,6 +10,7 @@ import { Textarea } from '@/components/forms/Textarea';
 import { ImageUpload } from '@/components/shared/ImageUpload';
 import { User } from '@/types';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 
 const profileSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -35,6 +36,7 @@ export function EditProfileForm({ user, onSuccess }: EditProfileFormProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [avatar, setAvatar] = useState<File | null>(null);
+  const { update } = useSession();
 
   const {
     register,
@@ -79,6 +81,10 @@ export function EditProfileForm({ user, onSuccess }: EditProfileFormProps) {
       });
 
       if (response.ok) {
+        await update({
+          name: data.name
+        });
+
         onSuccess?.();
         router.refresh();
       }
