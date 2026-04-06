@@ -124,43 +124,47 @@ export default function PostProjectPage() {
   }
 
   async function publishProject() {
-    setIsSubmitting(true);
-    try {
-      const result = await createProject({
-        title: form.title,
-        description: form.description,
-        category: form.category,
-        skills: form.skills.filter(Boolean).map((name) => ({ name, level: form.experienceLevel, mandatory: true })),
-        budget: {
-          type: form.budgetType,
-          min: parseInt(form.budgetMin, 10) || 0,
-          max: parseInt(form.budgetMax, 10) || 0,
-          currency: 'INR',
-        },
-        duration: parseInt(form.duration, 10) || 0,
-        requirements: form.requirements.filter(Boolean),
-        experienceLevel: form.experienceLevel,
-        visibility: form.visibility,
-        milestones: form.milestones.filter((item) => item.title && item.amount > 0).map((item) => ({
-          title: item.title,
-          description: item.title,
-          amount: item.amount,
-          deadline: item.deadline,
-        })),
-      });
+  setIsSubmitting(true);
+  try {
+    const result = await createProject({
+      title: form.title,
+      description: form.description,
+      category: form.category,
+      skills: form.skills.filter(Boolean).map((name) => ({ 
+        name, 
+        level: form.experienceLevel, 
+        mandatory: true 
+      })),
+      budget: {
+        type: form.budgetType,
+        min: parseInt(form.budgetMin, 10) || 0,
+        max: parseInt(form.budgetMax, 10) || 0,
+        currency: 'INR', // ✅ Add this
+      },
+      duration: parseInt(form.duration, 10) || 0,
+      requirements: form.requirements.filter(Boolean),
+      experienceLevel: form.experienceLevel,
+      visibility: form.visibility,
+      milestones: form.milestones.filter((item) => item.title && item.amount > 0).map((item) => ({
+        title: item.title,
+        description: item.title, // ✅ Add description (same as title)
+        amount: item.amount,
+        deadline: item.deadline,
+      })),
+    });
 
-      if (result.success) {
-        router.push('/dashboard/company/my-projects');
-      } else {
-        window.alert(result.error || 'Failed to publish project.');
-      }
-    } catch (error) {
-      console.error(error);
-      window.alert('Failed to publish project.');
-    } finally {
-      setIsSubmitting(false);
+    if (result.success) {
+      router.push('/dashboard/company/my-projects');
+    } else {
+      window.alert(result.error || 'Failed to publish project.');
     }
+  } catch (error) {
+    console.error(error);
+    window.alert('Failed to publish project.');
+  } finally {
+    setIsSubmitting(false);
   }
+}
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">

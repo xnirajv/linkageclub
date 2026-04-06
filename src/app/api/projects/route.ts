@@ -78,6 +78,7 @@ const projectSchema = z.object({
     type: z.enum(['fixed', 'hourly', 'milestone']),
     min: z.number().min(0),
     max: z.number().min(0),
+    currency: z.string().default('INR'), 
   }),
   duration: z.number().min(1).max(365),
   milestones: z.array(z.object({
@@ -160,19 +161,19 @@ export async function GET(req: NextRequest) {
     // Map projects with match scores
     const projectsWithMatch: IProjectWithMatchScore[] = projects.map(project => {
       const projectObj = project.toObject() as IProjectWithMatchScore;
-      
+
       if (session && userSkills.length > 0 && project.skills && project.skills.length > 0) {
         // Extract project skill names
         const projectSkillNames = project.skills.map(s => s.name);
-        
+
         // Calculate matching skills
-        const matchingSkills = projectSkillNames.filter(skillName => 
+        const matchingSkills = projectSkillNames.filter(skillName =>
           userSkills.includes(skillName)
         );
-        
+
         // Calculate match score
         const matchScore = Math.round((matchingSkills.length / projectSkillNames.length) * 100);
-        
+
         // Add matchScore to the project object
         projectObj.matchScore = matchScore;
       }
@@ -201,7 +202,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session || session.user.role !== 'company') {
       return NextResponse.json(
         { error: 'Only companies can post projects' },
