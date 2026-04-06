@@ -8,6 +8,7 @@ import { z } from 'zod';
 
 const profileSchema = z.object({
   name: z.string().min(2).optional(),
+  headline: z.string().max(100).optional(),
   bio: z.string().max(500).optional(),
   location: z.string().optional(),
   phone: z.string().optional(),

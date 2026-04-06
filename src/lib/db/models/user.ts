@@ -5,6 +5,7 @@ export interface IUser extends Document {
   email: string;
   password?: string;
   name: string;
+  headline?:string;
   role: 'student' | 'company' | 'mentor' | 'founder' | 'admin';
   avatar?: string;
   bio?: string;
@@ -117,6 +118,11 @@ const userSchema = new Schema<IUser>(
       required: [true, 'Name is required'],
       trim: true,
       minlength: [2, 'Name must be at least 2 characters'],
+    },
+    headline:{
+      type: String,
+      default:"",
+      maxlength:[100, 'Headline cannot be more than 100 characters'],
     },
     role: {
       type: String,

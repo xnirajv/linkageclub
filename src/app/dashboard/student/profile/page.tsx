@@ -78,6 +78,43 @@ export default function StudentProfilePage() {
   const verifiedSkillsCount = (skills as ProfileSkill[] | undefined)?.filter((s) => s.verified).length || 0;
   const totalSkillsCount = skills?.length || 0;
 
+  // Add this helper function inside the component (before return)
+  const getDisplayText = () => {
+    // Priority 1: User's custom headline
+    if ((profile as any)?.headline) {
+      return (profile as any).headline;
+    }
+
+    // Priority 2: Experience (most recent current job)
+    if (profile?.experience && profile.experience.length > 0) {
+      const currentExp = profile.experience.find(exp => exp.current);
+      const latestExp = currentExp || profile.experience[0];
+      if (latestExp.title && latestExp.company) {
+        return `${latestExp.title} @ ${latestExp.company}`;
+      }
+      if (latestExp.title) {
+        return latestExp.title;
+      }
+    }
+
+    // Priority 3: Education (highest degree)
+    if (profile?.education && profile.education.length > 0) {
+      const highestEdu = profile.education[0]; // Assuming sorted by year
+      if (highestEdu.degree && highestEdu.institution) {
+        return `${highestEdu.degree} from ${highestEdu.institution}`;
+      }
+      if (highestEdu.degree) {
+        return highestEdu.degree;
+      }
+      if (highestEdu.institution) {
+        return `Studying at ${highestEdu.institution}`;
+      }
+    }
+
+    // Priority 4: Default
+    return 'Student';
+  };
+
   return (
     <div className="space-y-6 p-4 md:p-6 max-w-7xl mx-auto">
       {/* Header - Enhanced */}
@@ -141,9 +178,8 @@ export default function StudentProfilePage() {
             </div>
 
             <p className="text-charcoal-600 dark:text-charcoal-400 mb-4 max-w-2xl leading-relaxed">
-              {profile?.bio || 'No bio provided yet. Click edit to add your bio.'}
+              {getDisplayText()}
             </p>
-
             <div className="flex flex-wrap gap-4 text-sm text-charcoal-500 dark:text-charcoal-400">
               {profile?.location && (
                 <span className="flex items-center gap-1.5 hover:text-primary-600 transition-colors">
@@ -412,9 +448,9 @@ export default function StudentProfilePage() {
                           variant="skill"
                           size="sm"
                           className={`capitalize ${skill.level === 'expert' ? 'bg-purple-100 text-purple-700' :
-                              skill.level === 'advanced' ? 'bg-orange-100 text-orange-700' :
-                                skill.level === 'intermediate' ? 'bg-blue-100 text-blue-700' :
-                                  'bg-green-100 text-green-700'
+                            skill.level === 'advanced' ? 'bg-orange-100 text-orange-700' :
+                              skill.level === 'intermediate' ? 'bg-blue-100 text-blue-700' :
+                                'bg-green-100 text-green-700'
                             }`}
                         >
                           {skill.level}

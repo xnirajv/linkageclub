@@ -9,15 +9,15 @@ import { Textarea } from '@/components/forms/Textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useProfile } from '@/hooks/useProfile';
-import { 
-  ArrowLeft, 
-  Upload, 
-  Save, 
-  Plus, 
-  X, 
-  User, 
-  MapPin, 
-  Phone, 
+import {
+  ArrowLeft,
+  Upload,
+  Save,
+  Plus,
+  X,
+  User,
+  MapPin,
+  Phone,
   Mail,
   Briefcase,
   GraduationCap,
@@ -71,17 +71,19 @@ export default function EditStudentProfilePage() {
     career: true,
     social: true,
   });
-  
+
+  // State mein headline add karo (around line 60)
   const [formData, setFormData] = useState({
     name: profile?.name || '',
+    headline: (profile as any)?.headline || '',
     bio: profile?.bio || '',
     location: profile?.location || '',
     phone: profile?.phone || '',
     linkedin: profile?.socialLinks?.linkedin || '',
     github: profile?.socialLinks?.github || '',
     portfolio: profile?.socialLinks?.portfolio || '',
-    expectedCTC: profile?.expectedCTC || '',
-    availability: profile?.availability || 'immediate',
+    expectedCTC: (profile as any)?.expectedCTC || '',
+    availability: (profile as any)?.availability || 'immediate',
   });
 
   // Load education and experience from profile
@@ -91,6 +93,7 @@ export default function EditStudentProfilePage() {
       setExperiences(profile.experience || []);
       setFormData({
         name: profile.name || '',
+        headline: (profile as any).headline || '',
         bio: profile.bio || '',
         location: profile.location || '',
         phone: profile.phone || '',
@@ -179,30 +182,31 @@ export default function EditStudentProfilePage() {
   };
 
   const handleSubmit = async () => {
-    setIsSubmitting(true);
-    try {
-      await updateProfile({
-        name: formData.name,
-        bio: formData.bio,
-        location: formData.location,
-        phone: formData.phone,
-        socialLinks: {
-          linkedin: formData.linkedin,
-          github: formData.github,
-          portfolio: formData.portfolio,
-        },
-        expectedCTC: formData.expectedCTC,
-        availability: formData.availability,
-        education: educations,
-        experience: experiences,
-      });
-      router.push('/dashboard/student/profile');
-    } catch (error) {
-      console.error('Error updating profile:', error);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  setIsSubmitting(true);
+  try {
+    await updateProfile({
+      name: formData.name,
+      headline: formData.headline,
+      bio: formData.bio,
+      location: formData.location,
+      phone: formData.phone,
+      socialLinks: {
+        linkedin: formData.linkedin,
+        github: formData.github,
+        portfolio: formData.portfolio,
+      },
+      expectedCTC: formData.expectedCTC,
+      availability: formData.availability,
+      education: educations,
+      experience: experiences,
+    });
+    router.push('/dashboard/student/profile');
+  } catch (error) {
+    console.error('Error updating profile:', error);
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   const verifiedSkillsCount = profile?.skills?.filter((s: any) => s.verified).length || 0;
   const totalSkillsCount = profile?.skills?.length || 0;
@@ -319,7 +323,7 @@ export default function EditStudentProfilePage() {
               <ChevronDown className="h-5 w-5 text-charcoal-400 group-hover:text-charcoal-600 transition-colors" />
             )}
           </button>
-          
+
           {expandedSections.basic && (
             <div className="space-y-4 mt-4 pt-2">
               <div>
@@ -334,6 +338,23 @@ export default function EditStudentProfilePage() {
                   required
                   className="rounded-lg border-charcoal-200 focus:border-primary-300 focus:ring-primary-200"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1.5 text-charcoal-700 dark:text-charcoal-300">
+                  Professional Headline
+                </label>
+                <Input
+                  name="headline"
+                  value={formData.headline}
+                  onChange={handleInputChange}
+                  placeholder="e.g., Full Stack Developer | React Expert | Open to Work"
+                  className="rounded-lg"
+                  maxLength={100}
+                />
+                <p className="text-xs text-charcoal-400 mt-1">
+                  A short tagline that describes your professional identity (max 100 chars)
+                </p>
               </div>
 
               <div>
@@ -408,7 +429,7 @@ export default function EditStudentProfilePage() {
               <ChevronDown className="h-5 w-5 text-charcoal-400 group-hover:text-charcoal-600 transition-colors" />
             )}
           </button>
-          
+
           {expandedSections.skills && (
             <div className="space-y-4 mt-4 pt-2">
               <div className="flex gap-2">
@@ -419,9 +440,9 @@ export default function EditStudentProfilePage() {
                   onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddSkill())}
                   className="rounded-lg"
                 />
-                <Button 
-                  type="button" 
-                  onClick={handleAddSkill} 
+                <Button
+                  type="button"
+                  onClick={handleAddSkill}
                   variant="outline"
                   className="gap-1"
                 >
@@ -434,11 +455,10 @@ export default function EditStudentProfilePage() {
                 {profile?.skills?.map((skill: any, index: number) => (
                   <div
                     key={index}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm transition-all duration-200 ${
-                      skill.verified 
-                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                        : 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400'
-                    }`}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm transition-all duration-200 ${skill.verified
+                      ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                      : 'bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400'
+                      }`}
                   >
                     <span>{skill.name}</span>
                     {skill.verified ? (
@@ -455,7 +475,7 @@ export default function EditStudentProfilePage() {
                   </div>
                 ))}
               </div>
-              
+
               {profile?.skills?.length === 0 && (
                 <div className="text-center py-6">
                   <Sparkles className="h-10 w-10 text-charcoal-300 mx-auto mb-2" />
@@ -484,10 +504,10 @@ export default function EditStudentProfilePage() {
               )}
             </button>
             {expandedSections.education && (
-              <Button 
-                type="button" 
-                variant="outline" 
-                size="sm" 
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
                 onClick={handleAddEducation}
                 className="gap-1"
               >
@@ -586,10 +606,10 @@ export default function EditStudentProfilePage() {
               )}
             </button>
             {expandedSections.experience && (
-              <Button 
-                type="button" 
-                variant="outline" 
-                size="sm" 
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
                 onClick={handleAddExperience}
                 className="gap-1"
               >
@@ -701,7 +721,7 @@ export default function EditStudentProfilePage() {
               <ChevronDown className="h-5 w-5 text-charcoal-400 group-hover:text-charcoal-600 transition-colors" />
             )}
           </button>
-          
+
           {expandedSections.career && (
             <div className="space-y-4 mt-4 pt-2">
               <div>
@@ -754,7 +774,7 @@ export default function EditStudentProfilePage() {
               <ChevronDown className="h-5 w-5 text-charcoal-400 group-hover:text-charcoal-600 transition-colors" />
             )}
           </button>
-          
+
           {expandedSections.social && (
             <div className="space-y-4 mt-4 pt-2">
               <div>

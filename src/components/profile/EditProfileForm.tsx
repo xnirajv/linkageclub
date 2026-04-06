@@ -109,6 +109,8 @@ export function EditProfileForm({ user, onSuccess }: EditProfileFormProps) {
         <label className="block text-sm font-medium mb-2">Name</label>
         <Input {...register('name')} error={errors.name?.message} />
       </div>
+      
+
 
       <div>
         <label className="block text-sm font-medium mb-2">Bio</label>
