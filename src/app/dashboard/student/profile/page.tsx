@@ -526,7 +526,7 @@ export default function StudentProfilePage() {
                 Projects
               </h3>
               <Button variant="outline" size="sm" className="gap-1" asChild>
-                <Link href="/dashboard/student/projects">
+                <Link href="/dashboard/student/projects/my-applications">
                   Browse Projects
                   <ExternalLink className="h-3 w-3" />
                 </Link>

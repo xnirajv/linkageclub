@@ -90,8 +90,11 @@ export function useProjects(options: UseProjectsOptions = {}) {
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        return { success: false, error: errorText || 'Failed to apply' };
+        const data = await response.json().catch(() => ({}));
+        return {
+          success: false,
+          error: data.error || 'Failed to apply'
+        };
       }
 
       mutate();
@@ -108,7 +111,7 @@ export function useProjects(options: UseProjectsOptions = {}) {
       });
 
       if (!response.ok) throw new Error('Failed to save');
-      
+
       mutate();
       return { success: true };
     } catch (error) {
@@ -128,20 +131,20 @@ export function useProjects(options: UseProjectsOptions = {}) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to create project');
       }
-      
+
       const data = await response.json();
       mutate();
-      
-      return { 
-        success: true, 
+
+      return {
+        success: true,
         project: data.project,
-        id: data.project?._id 
+        id: data.project?._id
       };
     } catch (error) {
       console.error('Error creating project:', error);
-      return { 
-        success: false, 
-        error: (error as Error).message 
+      return {
+        success: false,
+        error: (error as Error).message
       };
     }
   }, [mutate]);

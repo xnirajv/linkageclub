@@ -54,13 +54,13 @@ export function ApplyModal({ project, isOpen, onClose }: ApplyModalProps) {
         attachments: [],
       });
 
-      if (result.success) {
+      if (!result.success) {
+        setError(result.error || 'Failed to submit proposal');
+      } else {
         setSuccess(true);
         setTimeout(() => {
           onClose();
         }, 1500);
-      } else {
-        setError(result.error || 'Failed to submit proposal');
       }
     } catch (err) {
       setError((err as Error).message);
@@ -140,8 +140,8 @@ export function ApplyModal({ project, isOpen, onClose }: ApplyModalProps) {
           <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button 
-            onClick={handleSubmit} 
+          <Button
+            onClick={handleSubmit}
             disabled={isSubmitting || success || !coverLetter.trim() || !proposedAmount}
           >
             {isSubmitting ? 'Submitting...' : success ? 'Submitted!' : 'Submit Proposal'}
