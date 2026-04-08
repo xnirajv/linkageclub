@@ -16,12 +16,12 @@ export interface IProject extends Document {
     max: number;
     currency: string;
   };
-  duration: number; // in days
+  duration: number;
   milestones: Array<{
     title: string;
     description: string;
     amount: number;
-    deadline: number; // days from start
+    deadline: number;
     status: 'pending' | 'in_progress' | 'completed' | 'approved';
   }>;
   requirements: string[];

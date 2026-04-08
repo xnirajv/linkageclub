@@ -24,7 +24,6 @@ export function ProjectDetails({ project }: ProjectDetailsProps) {
     ? `₹${project.budget.min.toLocaleString()}–₹${project.budget.max.toLocaleString()} (${project.budget.type})`
     : 'Not specified';
 
-  // ✅ Using helper functions - No errors!
   const companyName = getCompanyName(project);
   const companyAvatar = getCompanyAvatar(project);
 

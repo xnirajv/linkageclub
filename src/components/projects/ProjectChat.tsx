@@ -92,7 +92,7 @@ export function ProjectChat({ projectId, companyId }: ProjectChatProps) {
                 className={`max-w-[70%] rounded-lg p-3 ${
                   message.senderId === 'freelancer'
                     ? 'bg-primary-600 text-white'
-                    : 'bg-charcoal-100 text-charcoal-950'
+                    : 'bg-gray-100 text-gray-950'
                 }`}
               >
                 <p className="text-sm">{message.content}</p>

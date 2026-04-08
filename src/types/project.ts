@@ -1,5 +1,3 @@
-// /src/types/project.ts - FIXED VERSION
-
 import { User } from './user';
 
 export type ProjectStatus = 'active' | 'draft' | 'open' | 'in_progress' | 'completed' | 'cancelled';
@@ -59,7 +57,7 @@ export interface Project {
   _id: string;
   title: string;
   description: string;
-  companyId: string | User;  // ✅ companyId use karo
+  companyId: string | User;
   category: string;
   skills: ProjectSkill[];
   budget: Budget;
@@ -83,7 +81,7 @@ export interface Project {
   updatedAt: Date;
   
   // Populated fields (backend se aane par)
-  company?: User;  // ✅ populated company data yahan aayega
+  company?: User;
   matchScore?: number;
   isSaved?: boolean;
   hasApplied?: boolean;
@@ -101,4 +99,11 @@ export function getCompanyName(project: Project): string {
 
 export function getCompanyAvatar(project: Project): string | undefined {
   return project.company?.avatar;
+}
+
+export function getCompanyId(project: Project): string {
+  if (typeof project.companyId === 'string') {
+    return project.companyId;
+  }
+  return project.companyId?._id || '';
 }
