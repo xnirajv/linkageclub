@@ -49,6 +49,10 @@ export interface IApplication extends Document {
   lastUpdated: Date;
   createdAt: Date;
   updatedAt: Date;
+
+  matchScore?: number;  // ✅ Add this
+  matchedSkills?: string[];  // ✅ Add this
+  missingSkills?: string[];
 }
 
 const applicationSchema = new Schema<IApplication>(
@@ -91,6 +95,9 @@ const applicationSchema = new Schema<IApplication>(
       required: true,
     },
     attachments: [String],
+    matchScore: { type: Number, default: 0 },
+    matchedSkills: [{ type: String }],
+    missingSkills: [{ type: String }],
     
     // Job specific
     resume: String,

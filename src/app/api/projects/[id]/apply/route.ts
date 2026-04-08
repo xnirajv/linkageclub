@@ -8,7 +8,7 @@ import Notification from '@/lib/db/models/notification';
 import connectDB from '@/lib/db/connect';
 import { z } from 'zod';
 import { uploadFile } from '@/lib/utils/upload';
-import { sendNewApplicationEmail } from '@/lib/email/application'; // Fix: import correct function
+import { sendNewApplicationEmail } from '@/lib/email/application';
 import mongoose from 'mongoose';
 
 const applySchema = z.object({
@@ -34,7 +34,6 @@ export async function POST(
       );
     }
 
-    // Only students can apply
     if (session.user.role !== 'student') {
       return NextResponse.json(
         { error: 'Only students can apply to projects' },
@@ -42,21 +41,17 @@ export async function POST(
       );
     }
 
-    const formData = await req.formData();
-    const proposedAmount = Number(formData.get('proposedAmount'));
-    const proposedDuration = Number(formData.get('proposedDuration'));
-    const coverLetter = formData.get('coverLetter') as string;
-    const portfolio = formData.get('portfolio') as string;
-    const additionalInfo = formData.get('additionalInfo') as string;
-    const attachments = formData.getAll('attachments') as File[];
+    // ✅ FIX: Parse JSON instead of FormData
+    const body = await req.json();
+    const { proposedAmount, proposedDuration, coverLetter, portfolio, additionalInfo, attachments } = body;
 
-    // Validate input
     const validation = applySchema.safeParse({
       proposedAmount,
       proposedDuration,
       coverLetter,
       portfolio,
       additionalInfo,
+      attachments: attachments || [],
     });
 
     if (!validation.success) {
@@ -68,7 +63,6 @@ export async function POST(
 
     await connectDB();
 
-    // Get project details
     const project = await Project.findById(params.id)
       .populate('companyId', 'name email') as any;
 
@@ -79,7 +73,6 @@ export async function POST(
       );
     }
 
-    // Check if project is still accepting applications
     if (project.status !== 'open') {
       return NextResponse.json(
         { error: 'This project is no longer accepting applications' },
@@ -87,7 +80,6 @@ export async function POST(
       );
     }
 
-    // Check if user has already applied
     const existingApplication = await Application.findOne({
       projectId: project._id,
       applicantId: session.user.id,
@@ -100,7 +92,6 @@ export async function POST(
       );
     }
 
-    // Validate proposed amount against budget
     if (proposedAmount < project.budget.min || proposedAmount > project.budget.max) {
       return NextResponse.json(
         { error: `Proposed amount must be between ${project.budget.min} and ${project.budget.max}` },
@@ -108,7 +99,6 @@ export async function POST(
       );
     }
 
-    // Validate proposed duration
     if (proposedDuration > project.duration) {
       return NextResponse.json(
         { error: `Proposed duration cannot exceed ${project.duration} days` },
@@ -116,10 +106,8 @@ export async function POST(
       );
     }
 
-    // Get user profile to check skills match
     const user = await User.findById(session.user.id).select('skills') as any;
 
-    // Calculate match score
     const userSkills = user?.skills?.map((s: any) => {
       if (typeof s === 'string') return s;
       if (s?.name) return s.name;
@@ -141,11 +129,9 @@ export async function POST(
       ? Math.round((matchedSkills.length / requiredSkills.length) * 100)
       : 0;
 
-    // Handle attachments upload
     const attachmentUrls: string[] = [];
     if (attachments && attachments.length > 0) {
-      // Validate total size (max 10MB)
-      const totalSize = attachments.reduce((sum, file) => sum + file.size, 0);
+      const totalSize = attachments.reduce((sum: number, file: any) => sum + (file.size || 0), 0);
       if (totalSize > 10 * 1024 * 1024) {
         return NextResponse.json(
           { error: 'Total attachment size must be less than 10MB' },
@@ -159,7 +145,6 @@ export async function POST(
       }
     }
 
-    // Create application
     const application = await Application.create({
       type: 'project',
       projectId: project._id,
@@ -178,7 +163,6 @@ export async function POST(
       submittedAt: new Date(),
     });
 
-    // Add to project's applications array
     project.applications.push({
       userId: new mongoose.Types.ObjectId(session.user.id),
       applicationId: application._id,
@@ -192,7 +176,6 @@ export async function POST(
     project.applicationsCount = project.applications.length;
     await project.save();
 
-    // Create notification for company
     await Notification.create({
       userId: project.companyId._id,
       type: 'new_application',
@@ -212,7 +195,6 @@ export async function POST(
       priority: 'high',
     });
 
-    // Send email to company - Fix: use sendNewApplicationEmail
     try {
       await sendNewApplicationEmail(
         project.companyId.email,
@@ -224,7 +206,6 @@ export async function POST(
       console.error('Failed to send email to company:', emailError);
     }
 
-    // Create notification for applicant
     await Notification.create({
       userId: new mongoose.Types.ObjectId(session.user.id),
       type: 'application_submitted',
@@ -245,7 +226,7 @@ export async function POST(
       application: {
         id: application._id,
         status: application.status,
-        matchScore: (application as any).matchScore, // Use type assertion
+        matchScore: application.matchScore,
         proposedAmount: application.proposedAmount,
         proposedDuration: application.proposedDuration,
       },
@@ -259,7 +240,6 @@ export async function POST(
   }
 }
 
-// Get application status for this project
 export async function GET(
   _req: NextRequest,
   { params }: { params: { id: string } }
