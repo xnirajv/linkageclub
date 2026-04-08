@@ -32,8 +32,18 @@ export function SaveButton({ projectId, isSaved = false, onSave }: SaveButtonPro
   };
 
   return (
-    <Button variant="outline" size="icon" onClick={handleSave} isLoading={isLoading} title={saved ? 'Unsave' : 'Save'}>
-      <Bookmark className={cn('h-4 w-4', saved && 'fill-primary-600 text-primary-600')} />
+    <Button 
+      variant="outline" 
+      size="icon" 
+      onClick={handleSave} 
+      disabled={isLoading}
+      title={saved ? 'Unsave' : 'Save'}
+    >
+      {isLoading ? (
+        <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      ) : (
+        <Bookmark className={cn('h-4 w-4', saved && 'fill-primary-600 text-primary-600')} />
+      )}
     </Button>
   );
 }

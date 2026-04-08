@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,40 +21,57 @@ interface Message {
   timestamp: Date;
 }
 
-export function ProjectChat({  }: ProjectChatProps) {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      _id: '1',
-      senderId: 'company',
-      senderName: 'Company Rep',
-      content: 'Welcome to the project! Let me know if you have any questions.',
-      timestamp: new Date(Date.now() - 3600000),
-    },
-    {
-      _id: '2',
-      senderId: 'freelancer',
-      senderName: 'You',
-      content: 'Thanks! I\'ll review the requirements and get back to you.',
-      timestamp: new Date(Date.now() - 1800000),
-    },
-  ]);
-  
+export function ProjectChat({ projectId, companyId }: ProjectChatProps) {
+  const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
 
-  const handleSendMessage = () => {
+  useEffect(() => {
+    const fetchMessages = async () => {
+      try {
+        const res = await fetch(`/api/projects/${projectId}/messages`);
+        if (res.ok) {
+          const data = await res.json();
+          setMessages(data);
+        }
+      } catch (error) {
+        console.error('Failed to load messages:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchMessages();
+  }, [projectId]);
+
+  const handleSendMessage = async () => {
     if (!newMessage.trim()) return;
     
-    const message: Message = {
-      _id: Date.now().toString(),
-      senderId: 'freelancer',
-      senderName: 'You',
-      content: newMessage,
-      timestamp: new Date(),
-    };
-    
-    setMessages([...messages, message]);
-    setNewMessage('');
+    try {
+      const res = await fetch(`/api/projects/${projectId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: newMessage, companyId }),
+      });
+      
+      if (res.ok) {
+        const message = await res.json();
+        setMessages(prev => [...prev, message]);
+        setNewMessage('');
+      }
+    } catch (error) {
+      console.error('Failed to send message:', error);
+    }
   };
+
+  if (isLoading) {
+    return (
+      <Card className="h-[600px] flex flex-col">
+        <CardContent className="py-12 text-center">
+          Loading messages...
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="h-[600px] flex flex-col">
@@ -69,7 +86,7 @@ export function ProjectChat({  }: ProjectChatProps) {
               className={`flex items-start gap-3 ${message.senderId === 'freelancer' ? 'flex-row-reverse' : ''}`}
             >
               <Avatar className="h-8 w-8">
-                <AvatarFallback>{message.senderName[0]}</AvatarFallback>
+                <AvatarFallback>{message.senderName?.[0] || '?'}</AvatarFallback>
               </Avatar>
               <div
                 className={`max-w-[70%] rounded-lg p-3 ${
@@ -80,7 +97,7 @@ export function ProjectChat({  }: ProjectChatProps) {
               >
                 <p className="text-sm">{message.content}</p>
                 <p className="text-xs mt-1 opacity-70">
-                  {message.timestamp.toLocaleTimeString()}
+                  {new Date(message.timestamp).toLocaleTimeString()}
                 </p>
               </div>
             </div>
@@ -92,7 +109,7 @@ export function ProjectChat({  }: ProjectChatProps) {
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             placeholder="Type your message..."
-            onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+            onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
           />
           <Button onClick={handleSendMessage}>
             <Send className="h-4 w-4" />

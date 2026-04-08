@@ -16,8 +16,15 @@ const BUDGET_RANGES = [
   { label: '₹70K+', min: 70000, max: 9999999 },
 ];
 
+export interface FilterState {
+  category?: string;
+  experienceLevel?: string;
+  minBudget?: number;
+  maxBudget?: number;
+}
+
 interface ProjectFiltersProps {
-  onFilterChange: (filters: any) => void;
+  onFilterChange: (filters: FilterState) => void;
   className?: string;
 }
 
@@ -29,7 +36,7 @@ export function ProjectFilters({ onFilterChange, className }: ProjectFiltersProp
 
   const activeCount = (selectedCategory ? 1 : 0) + (selectedLevel ? 1 : 0) + (selectedBudget ? 1 : 0);
 
-  const apply = (cat: string, lvl: string, bgt: string) => {
+  const applyFilters = (cat: string, lvl: string, bgt: string) => {
     const budgetRange = BUDGET_RANGES.find((r) => r.label === bgt);
     onFilterChange({
       category: cat || undefined,
@@ -39,14 +46,22 @@ export function ProjectFilters({ onFilterChange, className }: ProjectFiltersProp
     });
   };
 
-  const toggle = <T extends string>(val: T, current: T, setter: (v: T) => void, cat: string, lvl: string, bgt: string) => {
-    const updated = current === val ? ('' as T) : val;
-    setter(updated);
-    apply(
-      setter === setSelectedCategory ? (updated as string) : cat,
-      setter === setSelectedLevel ? (updated as string) : lvl,
-      setter === setSelectedBudget ? (updated as string) : bgt,
-    );
+  const handleCategoryClick = (cat: string) => {
+    const newCat = selectedCategory === cat ? '' : cat;
+    setSelectedCategory(newCat);
+    applyFilters(newCat, selectedLevel, selectedBudget);
+  };
+
+  const handleLevelClick = (lvl: string) => {
+    const newLvl = selectedLevel === lvl ? '' : lvl;
+    setSelectedLevel(newLvl);
+    applyFilters(selectedCategory, newLvl, selectedBudget);
+  };
+
+  const handleBudgetClick = (bgt: string) => {
+    const newBgt = selectedBudget === bgt ? '' : bgt;
+    setSelectedBudget(newBgt);
+    applyFilters(selectedCategory, selectedLevel, newBgt);
   };
 
   const clearAll = () => {
@@ -62,26 +77,28 @@ export function ProjectFilters({ onFilterChange, className }: ProjectFiltersProp
         <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)} className="gap-2">
           <SlidersHorizontal className="h-4 w-4" />
           Filters
-          {activeCount > 0 && <Badge variant="default" size="sm">{activeCount}</Badge>}
+          {activeCount > 0 && <Badge variant="default">{activeCount}</Badge>}
         </Button>
 
         {selectedCategory && (
-          <Badge variant="skill" className="gap-1 cursor-pointer" onClick={() => toggle(selectedCategory, selectedCategory, setSelectedCategory, '', selectedLevel, selectedBudget)}>
+          <Badge variant="secondary" className="gap-1 cursor-pointer" onClick={() => handleCategoryClick(selectedCategory)}>
             {selectedCategory} <X className="h-3 w-3" />
           </Badge>
         )}
         {selectedLevel && (
-          <Badge variant="skill" className="gap-1 cursor-pointer capitalize" onClick={() => toggle(selectedLevel, selectedLevel, setSelectedLevel, selectedCategory, '', selectedBudget)}>
+          <Badge variant="secondary" className="gap-1 cursor-pointer capitalize" onClick={() => handleLevelClick(selectedLevel)}>
             {selectedLevel} <X className="h-3 w-3" />
           </Badge>
         )}
         {selectedBudget && (
-          <Badge variant="skill" className="gap-1 cursor-pointer" onClick={() => toggle(selectedBudget, selectedBudget, setSelectedBudget, selectedCategory, selectedLevel, '')}>
+          <Badge variant="secondary" className="gap-1 cursor-pointer" onClick={() => handleBudgetClick(selectedBudget)}>
             {selectedBudget} <X className="h-3 w-3" />
           </Badge>
         )}
         {activeCount > 0 && (
-          <Button variant="ghost" size="sm" onClick={clearAll} className="text-error-600">Clear all</Button>
+          <Button variant="ghost" size="sm" onClick={clearAll} className="text-red-600">
+            Clear all
+          </Button>
         )}
       </div>
 
@@ -96,7 +113,7 @@ export function ProjectFilters({ onFilterChange, className }: ProjectFiltersProp
                     key={cat}
                     variant={selectedCategory === cat ? 'default' : 'outline'}
                     className="cursor-pointer"
-                    onClick={() => toggle(cat, selectedCategory, setSelectedCategory, cat, selectedLevel, selectedBudget)}
+                    onClick={() => handleCategoryClick(cat)}
                   >
                     {cat}
                   </Badge>
@@ -112,7 +129,7 @@ export function ProjectFilters({ onFilterChange, className }: ProjectFiltersProp
                     key={lvl}
                     variant={selectedLevel === lvl ? 'default' : 'outline'}
                     className="cursor-pointer capitalize"
-                    onClick={() => toggle(lvl, selectedLevel, setSelectedLevel, selectedCategory, lvl, selectedBudget)}
+                    onClick={() => handleLevelClick(lvl)}
                   >
                     {lvl}
                   </Badge>
@@ -128,7 +145,7 @@ export function ProjectFilters({ onFilterChange, className }: ProjectFiltersProp
                     key={range.label}
                     variant={selectedBudget === range.label ? 'default' : 'outline'}
                     className="cursor-pointer"
-                    onClick={() => toggle(range.label, selectedBudget, setSelectedBudget, selectedCategory, selectedLevel, range.label)}
+                    onClick={() => handleBudgetClick(range.label)}
                   >
                     {range.label}
                   </Badge>

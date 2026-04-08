@@ -13,7 +13,6 @@ interface UseProjectsOptions {
   search?: string;
 }
 
-// Project creation data interface
 interface CreateProjectData {
   title: string;
   description: string;
@@ -39,6 +38,11 @@ interface CreateProjectData {
     amount: number;
     deadline: number;
   }>;
+}
+
+interface ApplyResult {
+  success: boolean;
+  error?: string;
 }
 
 interface ProjectsResponse {
@@ -77,7 +81,7 @@ export function useProjects(options: UseProjectsOptions = {}) {
     setFilters(prev => ({ ...prev, page: (prev.page || 1) + 1 }));
   }, []);
 
-  const applyToProject = useCallback(async (projectId: string, application: any) => {
+  const applyToProject = useCallback(async (projectId: string, application: any): Promise<ApplyResult> => {
     try {
       const response = await fetch(`/api/projects/${projectId}/apply`, {
         method: 'POST',
@@ -85,9 +89,12 @@ export function useProjects(options: UseProjectsOptions = {}) {
         body: JSON.stringify(application),
       });
 
-      if (!response.ok) throw new Error('Failed to apply');
+      if (!response.ok) {
+        const errorText = await response.text();
+        return { success: false, error: errorText || 'Failed to apply' };
+      }
 
-      mutate(); // Refresh projects
+      mutate();
       return { success: true };
     } catch (error) {
       return { success: false, error: (error as Error).message };
@@ -102,14 +109,13 @@ export function useProjects(options: UseProjectsOptions = {}) {
 
       if (!response.ok) throw new Error('Failed to save');
       
-      mutate(); // Refresh projects
+      mutate();
       return { success: true };
     } catch (error) {
       return { success: false, error: (error as Error).message };
     }
   }, [mutate]);
 
-  // ✅ NEW: Create project method
   const createProject = useCallback(async (projectData: CreateProjectData) => {
     try {
       const response = await fetch('/api/projects', {
@@ -124,8 +130,6 @@ export function useProjects(options: UseProjectsOptions = {}) {
       }
       
       const data = await response.json();
-      
-      // Refresh projects list
       mutate();
       
       return { 
@@ -152,7 +156,7 @@ export function useProjects(options: UseProjectsOptions = {}) {
     loadMore,
     applyToProject,
     saveProject,
-    createProject, // ✅ Now included!
+    createProject,
     mutate,
   };
 }
@@ -173,7 +177,7 @@ export function useProject(id: string) {
 
       if (!response.ok) throw new Error('Failed to update');
 
-      mutate(); // Refresh project
+      mutate();
       return { success: true };
     } catch (error) {
       return { success: false, error: (error as Error).message };

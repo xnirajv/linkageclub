@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Project } from '@/types/project';
+import { Project, getCompanyName, getCompanyAvatar } from '@/types/project';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -24,24 +24,25 @@ export function ProjectDetails({ project }: ProjectDetailsProps) {
     ? `₹${project.budget.min.toLocaleString()}–₹${project.budget.max.toLocaleString()} (${project.budget.type})`
     : 'Not specified';
 
+  // ✅ Using helper functions - No errors!
+  const companyName = getCompanyName(project);
+  const companyAvatar = getCompanyAvatar(project);
+
   return (
     <div className="space-y-6">
-      {/* Header */}
       <Card>
         <CardContent className="p-6">
           <div className="flex flex-col md:flex-row md:items-start gap-4">
             <Avatar className="h-16 w-16">
-              <AvatarImage src={(project.company as any)?.avatar} />
+              <AvatarImage src={companyAvatar} />
               <AvatarFallback><Building className="h-8 w-8" /></AvatarFallback>
             </Avatar>
 
             <div className="flex-1">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <h1 className="text-2xl font-bold text-charcoal-950 dark:text-white">{project.title}</h1>
-                  <p className="text-charcoal-600 dark:text-charcoal-400 mt-1">
-                    {(project.company as any)?.companyName || 'Company'}
-                  </p>
+                  <h1 className="text-2xl font-bold text-gray-950 dark:text-white">{project.title}</h1>
+                  <p className="text-gray-600 dark:text-gray-400 mt-1">{companyName}</p>
                 </div>
                 <div className="flex gap-2">
                   <SaveButton projectId={project._id} isSaved={project.isSaved} />
@@ -54,7 +55,7 @@ export function ProjectDetails({ project }: ProjectDetailsProps) {
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-4 mt-4 text-sm text-charcoal-600 dark:text-charcoal-400">
+              <div className="flex flex-wrap gap-4 mt-4 text-sm text-gray-600 dark:text-gray-400">
                 <span className="flex items-center gap-1">
                   <IndianRupee className="h-4 w-4" /> {budgetText}
                 </span>
@@ -71,7 +72,7 @@ export function ProjectDetails({ project }: ProjectDetailsProps) {
               </div>
 
               <div className="flex flex-wrap gap-2 mt-3">
-                <Badge variant={project.status === 'open' ? 'success' : 'secondary'}>
+                <Badge variant={project.status === 'open' ? 'default' : 'secondary'}>
                   {project.status}
                 </Badge>
                 <Badge variant="outline" className="capitalize">{project.experienceLevel}</Badge>
@@ -82,23 +83,21 @@ export function ProjectDetails({ project }: ProjectDetailsProps) {
         </CardContent>
       </Card>
 
-      {/* Description */}
       <Card>
         <CardHeader><CardTitle>Project Description</CardTitle></CardHeader>
         <CardContent>
-          <p className="text-charcoal-700 dark:text-charcoal-300 whitespace-pre-line">{project.description}</p>
+          <p className="text-gray-700 dark:text-gray-300 whitespace-pre-line">{project.description}</p>
         </CardContent>
       </Card>
 
-      {/* Requirements */}
       {project.requirements?.length > 0 && (
         <Card>
           <CardHeader><CardTitle>Requirements</CardTitle></CardHeader>
           <CardContent>
             <ul className="space-y-2">
               {project.requirements.map((item, i) => (
-                <li key={i} className="flex items-start gap-2 text-charcoal-700 dark:text-charcoal-300">
-                  <CheckCircle className="h-4 w-4 text-success-600 mt-0.5 flex-shrink-0" />
+                <li key={i} className="flex items-start gap-2 text-gray-700 dark:text-gray-300">
+                  <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
                   {item}
                 </li>
               ))}
@@ -107,7 +106,6 @@ export function ProjectDetails({ project }: ProjectDetailsProps) {
         </Card>
       )}
 
-      {/* Milestones */}
       {project.milestones?.length > 0 && (
         <Card>
           <CardHeader><CardTitle>Milestones</CardTitle></CardHeader>
@@ -135,14 +133,13 @@ export function ProjectDetails({ project }: ProjectDetailsProps) {
         </Card>
       )}
 
-      {/* Skills */}
       {project.skills?.length > 0 && (
         <Card>
           <CardHeader><CardTitle>Skills Required</CardTitle></CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-2">
               {project.skills.map((skill) => (
-                <Badge key={skill.name} variant={skill.mandatory ? 'default' : 'skill'}>
+                <Badge key={skill.name} variant={skill.mandatory ? 'default' : 'secondary'}>
                   {skill.name} {skill.mandatory && '*'}
                 </Badge>
               ))}
@@ -152,7 +149,6 @@ export function ProjectDetails({ project }: ProjectDetailsProps) {
         </Card>
       )}
 
-      {/* Tags */}
       {project.tags?.length > 0 && (
         <Card>
           <CardContent className="p-4">

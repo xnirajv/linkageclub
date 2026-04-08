@@ -21,8 +21,9 @@ export function ProjectGrid({
   columns = 2,
 }: ProjectGridProps) {
   if (isLoading) {
+    const gridClass = columns === 1 ? 'grid-cols-1' : columns === 3 ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1 md:grid-cols-2';
     return (
-      <div className={`grid grid-cols-1 md:grid-cols-${columns} gap-6`}>
+      <div className={`grid ${gridClass} gap-6`}>
         {Array.from({ length: 4 }).map((_, i) => (
           <Skeleton key={i} className="h-64 w-full rounded-lg" />
         ))}

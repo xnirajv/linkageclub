@@ -1,6 +1,8 @@
+// /src/types/project.ts - FIXED VERSION
+
 import { User } from './user';
 
-export type ProjectStatus = 'active' |'draft' | 'open' | 'in_progress' | 'completed' | 'cancelled';
+export type ProjectStatus = 'active' | 'draft' | 'open' | 'in_progress' | 'completed' | 'cancelled';
 export type ProjectVisibility = 'public' | 'private';
 export type BudgetType = 'fixed' | 'hourly' | 'milestone';
 export type ExperienceLevel = 'beginner' | 'intermediate' | 'advanced';
@@ -23,9 +25,9 @@ export interface Milestone {
   title: string;
   description?: string;
   amount: number;
-  deadline: number; // days from start
-  feedback?:string;
-  filesRequired?:boolean
+  deadline: number;
+  feedback?: string;
+  filesRequired?: boolean;
   status: 'pending' | 'in_progress' | 'completed' | 'approved' | 'rejected';
   submissions?: Array<{
     work: string;
@@ -57,12 +59,12 @@ export interface Project {
   _id: string;
   title: string;
   description: string;
-  companyId: User | string;
+  companyId: string | User;  // ✅ companyId use karo
   category: string;
   skills: ProjectSkill[];
   budget: Budget;
   duration: number;
-  deadline?:string;
+  deadline?: string;
   milestones: Milestone[];
   requirements: string[];
   experienceLevel: ExperienceLevel;
@@ -75,16 +77,28 @@ export interface Project {
   reviews: ProjectReview[];
   tags: string[];
   views: number;
-  teamSize?:number;
+  teamSize?: number;
   applicationsCount: number;
   createdAt: Date;
   updatedAt: Date;
   
-  // Populated fields
-  company?: User;
+  // Populated fields (backend se aane par)
+  company?: User;  // ✅ populated company data yahan aayega
   matchScore?: number;
   isSaved?: boolean;
   hasApplied?: boolean;
 }
 
 export type IProject = Project;
+
+// ✅ Helper functions
+export function getCompanyName(project: Project): string {
+  if (project.company) {
+    return project.company.companyName || project.company.name || 'Company';
+  }
+  return 'Company';
+}
+
+export function getCompanyAvatar(project: Project): string | undefined {
+  return project.company?.avatar;
+}

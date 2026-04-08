@@ -26,7 +26,7 @@ export function ShareButton({ projectId, title }: ShareButtonProps) {
 
   return (
     <Button variant="outline" size="sm" onClick={handleShare} className="gap-2">
-      {copied ? <Check className="h-4 w-4 text-success-600" /> : <Share2 className="h-4 w-4" />}
+      {copied ? <Check className="h-4 w-4 text-green-600" /> : <Share2 className="h-4 w-4" />}
       {copied ? 'Copied!' : 'Share'}
     </Button>
   );
