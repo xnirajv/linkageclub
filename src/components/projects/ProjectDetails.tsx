@@ -9,7 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { SaveButton } from './SaveButton';
 import { ApplyModal } from './ApplyModal';
 import {
-  IndianRupee, Calendar, Users, CheckCircle, Building, Clock, Tag
+  IndianRupee, Calendar, Users, CheckCircle, Building, Clock, Tag,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -21,7 +21,7 @@ export function ProjectDetails({ project }: ProjectDetailsProps) {
   const [showApplyModal, setShowApplyModal] = useState(false);
 
   const budgetText = project.budget
-    ? `₹${project.budget.min.toLocaleString()}–₹${project.budget.max.toLocaleString()} (${project.budget.type})`
+    ? `Rs. ${project.budget.min.toLocaleString()} - Rs. ${project.budget.max.toLocaleString()} (${project.budget.type})`
     : 'Not specified';
 
   const companyName = getCompanyName(project);
@@ -31,7 +31,7 @@ export function ProjectDetails({ project }: ProjectDetailsProps) {
     <div className="space-y-6">
       <Card>
         <CardContent className="p-6">
-          <div className="flex flex-col md:flex-row md:items-start gap-4">
+          <div className="flex flex-col gap-4 md:flex-row md:items-start">
             <Avatar className="h-16 w-16">
               <AvatarImage src={companyAvatar} />
               <AvatarFallback><Building className="h-8 w-8" /></AvatarFallback>
@@ -41,7 +41,7 @@ export function ProjectDetails({ project }: ProjectDetailsProps) {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <h1 className="text-2xl font-bold text-gray-950 dark:text-white">{project.title}</h1>
-                  <p className="text-gray-600 dark:text-gray-400 mt-1">{companyName}</p>
+                  <p className="mt-1 text-gray-600 dark:text-gray-400">{companyName}</p>
                 </div>
                 <div className="flex gap-2">
                   <SaveButton projectId={project._id} isSaved={project.isSaved} />
@@ -54,7 +54,7 @@ export function ProjectDetails({ project }: ProjectDetailsProps) {
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-4 mt-4 text-sm text-gray-600 dark:text-gray-400">
+              <div className="mt-4 flex flex-wrap gap-4 text-sm text-gray-600 dark:text-gray-400">
                 <span className="flex items-center gap-1">
                   <IndianRupee className="h-4 w-4" /> {budgetText}
                 </span>
@@ -70,7 +70,7 @@ export function ProjectDetails({ project }: ProjectDetailsProps) {
                 </span>
               </div>
 
-              <div className="flex flex-wrap gap-2 mt-3">
+              <div className="mt-3 flex flex-wrap gap-2">
                 <Badge variant={project.status === 'open' ? 'default' : 'secondary'}>
                   {project.status}
                 </Badge>
@@ -85,7 +85,7 @@ export function ProjectDetails({ project }: ProjectDetailsProps) {
       <Card>
         <CardHeader><CardTitle>Project Description</CardTitle></CardHeader>
         <CardContent>
-          <p className="text-gray-700 dark:text-gray-300 whitespace-pre-line">{project.description}</p>
+          <p className="whitespace-pre-line text-gray-700 dark:text-gray-300">{project.description}</p>
         </CardContent>
       </Card>
 
@@ -96,7 +96,7 @@ export function ProjectDetails({ project }: ProjectDetailsProps) {
             <ul className="space-y-2">
               {project.requirements.map((item, i) => (
                 <li key={i} className="flex items-start gap-2 text-gray-700 dark:text-gray-300">
-                  <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                  <CheckCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-green-600" />
                   {item}
                 </li>
               ))}
@@ -111,19 +111,19 @@ export function ProjectDetails({ project }: ProjectDetailsProps) {
           <CardContent>
             <div className="space-y-4">
               {project.milestones.map((milestone, i) => (
-                <div key={i} className="flex items-start gap-3 p-3 border rounded-lg">
-                  <div className="flex-shrink-0 w-7 h-7 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 text-sm font-semibold">
+                <div key={i} className="flex items-start gap-3 rounded-lg border p-3">
+                  <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-primary-100 text-sm font-semibold text-primary-700">
                     {i + 1}
                   </div>
                   <div className="flex-1">
                     <div className="flex items-start justify-between">
                       <h4 className="font-medium">{milestone.title}</h4>
-                      <span className="text-sm text-muted-foreground">₹{milestone.amount.toLocaleString()}</span>
+                      <span className="text-sm text-muted-foreground">Rs. {milestone.amount.toLocaleString()}</span>
                     </div>
                     {milestone.description && (
-                      <p className="text-sm text-muted-foreground mt-1">{milestone.description}</p>
+                      <p className="mt-1 text-sm text-muted-foreground">{milestone.description}</p>
                     )}
-                    <p className="text-xs text-muted-foreground mt-1">Due in {milestone.deadline} days</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Due in {milestone.deadline} days</p>
                   </div>
                 </div>
               ))}
@@ -143,7 +143,7 @@ export function ProjectDetails({ project }: ProjectDetailsProps) {
                 </Badge>
               ))}
             </div>
-            <p className="text-xs text-muted-foreground mt-2">* Mandatory</p>
+            <p className="mt-2 text-xs text-muted-foreground">* Mandatory</p>
           </CardContent>
         </Card>
       )}
@@ -151,7 +151,7 @@ export function ProjectDetails({ project }: ProjectDetailsProps) {
       {project.tags?.length > 0 && (
         <Card>
           <CardContent className="p-4">
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex flex-wrap items-center gap-2">
               <Tag className="h-4 w-4 text-muted-foreground" />
               {project.tags.map((tag) => (
                 <Badge key={tag} variant="outline">{tag}</Badge>

@@ -1,5 +1,5 @@
 import useSWR from 'swr';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetcher } from '@/lib/api/client';
 
 interface UseProjectsOptions {
@@ -56,6 +56,36 @@ interface ProjectResponse {
 
 export function useProjects(options: UseProjectsOptions = {}) {
   const [filters, setFilters] = useState(options);
+  const previousOptionsRef = useRef(options);
+
+  useEffect(() => {
+    const previousOptions = previousOptionsRef.current;
+    const keys = Array.from(new Set([
+      ...Object.keys(previousOptions),
+      ...Object.keys(options),
+    ])) as Array<keyof UseProjectsOptions>;
+    const hasChanged = keys.some((key) => {
+      const previousValue = previousOptions[key];
+      const nextValue = options[key];
+
+      if (Array.isArray(previousValue) || Array.isArray(nextValue)) {
+        return JSON.stringify(previousValue ?? []) !== JSON.stringify(nextValue ?? []);
+      }
+
+      return previousValue !== nextValue;
+    });
+
+    if (!hasChanged) {
+      return;
+    }
+
+    previousOptionsRef.current = options;
+    setFilters((current) => ({
+      ...current,
+      ...options,
+      page: options.page ?? 1,
+    }));
+  }, [options]);
 
   const queryParams = new URLSearchParams();
   Object.entries(filters).forEach(([key, value]) => {

@@ -7,7 +7,6 @@ import User from '@/lib/db/models/user';
 import Notification from '@/lib/db/models/notification';
 import connectDB from '@/lib/db/connect';
 import { z } from 'zod';
-import { uploadFile } from '@/lib/utils/upload';
 import { sendNewApplicationEmail } from '@/lib/email/application';
 import mongoose from 'mongoose';
 
@@ -129,21 +128,9 @@ export async function POST(
       ? Math.round((matchedSkills.length / requiredSkills.length) * 100)
       : 0;
 
-    const attachmentUrls: string[] = [];
-    if (attachments && attachments.length > 0) {
-      const totalSize = attachments.reduce((sum: number, file: any) => sum + (file.size || 0), 0);
-      if (totalSize > 10 * 1024 * 1024) {
-        return NextResponse.json(
-          { error: 'Total attachment size must be less than 10MB' },
-          { status: 400 }
-        );
-      }
-
-      for (const file of attachments) {
-        const url = await uploadFile(file, `projects/${project._id}/applications/${session.user.id}`);
-        attachmentUrls.push(url);
-      }
-    }
+    const attachmentUrls = Array.isArray(attachments)
+      ? attachments.filter((item: unknown): item is string => typeof item === 'string' && item.trim().length > 0)
+      : [];
 
     const application = await Application.create({
       type: 'project',
@@ -190,7 +177,7 @@ export async function POST(
         proposedDuration,
         matchScore,
       },
-      link: `/dashboard/company/projects/${project._id}/applications`,
+      link: `/dashboard/company/my-projects/${project._id}/applications`,
       category: 'application',
       priority: 'high',
     });

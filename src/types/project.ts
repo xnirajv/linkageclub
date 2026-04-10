@@ -79,8 +79,6 @@ export interface Project {
   applicationsCount: number;
   createdAt: Date;
   updatedAt: Date;
-  
-  // Populated fields (backend se aane par)
   company?: User;
   matchScore?: number;
   isSaved?: boolean;
@@ -89,16 +87,28 @@ export interface Project {
 
 export type IProject = Project;
 
-// ✅ Helper functions
-export function getCompanyName(project: Project): string {
+function getResolvedCompany(project: Project): User | undefined {
   if (project.company) {
-    return project.company.companyName || project.company.name || 'Company';
+    return project.company;
+  }
+
+  if (project.companyId && typeof project.companyId !== 'string') {
+    return project.companyId;
+  }
+
+  return undefined;
+}
+
+export function getCompanyName(project: Project): string {
+  const company = getResolvedCompany(project);
+  if (company) {
+    return company.companyName || company.name || 'Company';
   }
   return 'Company';
 }
 
 export function getCompanyAvatar(project: Project): string | undefined {
-  return project.company?.avatar;
+  return getResolvedCompany(project)?.avatar;
 }
 
 export function getCompanyId(project: Project): string {

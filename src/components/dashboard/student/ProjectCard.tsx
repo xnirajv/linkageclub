@@ -14,6 +14,8 @@ interface ProjectCardProps {
 }
 
 export function ProjectCard({ project, hasApplied, onApply, isApplying }: ProjectCardProps) {
+  const isOpen = project.status === 'open' || project.status === 'active';
+
   const getDaysLeft = (deadline?: string) => {
     if (!deadline) return null;
     const today = new Date();
@@ -32,7 +34,7 @@ export function ProjectCard({ project, hasApplied, onApply, isApplying }: Projec
         <div className="flex items-start justify-between gap-2">
           <CardTitle className="line-clamp-2 text-base">{project.title}</CardTitle>
           <div className="flex flex-col items-end gap-1">
-            <Badge variant={project.status === 'active' ? 'default' : 'secondary'}>
+            <Badge variant={isOpen ? 'default' : 'secondary'}>
               {project.status}
             </Badge>
             {hasApplied && (
@@ -98,7 +100,7 @@ export function ProjectCard({ project, hasApplied, onApply, isApplying }: Projec
           <Button 
             className="flex-1" 
             onClick={() => onApply(project._id)}
-            disabled={isApplying || project.status !== 'active'}
+            disabled={isApplying || !isOpen}
           >
             {isApplying ? 'Applying...' : 'Apply'}
           </Button>
