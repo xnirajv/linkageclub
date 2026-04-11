@@ -89,6 +89,18 @@ export function ApplicationsList({ applications, isLoading, type }: Applications
     return null;
   };
 
+  const getDetailsHref = (app: Application) => {
+    if (app.type === 'project' && app.projectId?._id) {
+      return `/dashboard/student/projects/${app.projectId._id}`;
+    }
+
+    if (app.type === 'job' && app.jobId?._id) {
+      return `/dashboard/student/jobs/${app.jobId._id}`;
+    }
+
+    return '/dashboard/student/projects/my-applications';
+  };
+
   return (
     <div className="space-y-4">
       {applications.map((app) => (
@@ -117,9 +129,9 @@ export function ApplicationsList({ applications, isLoading, type }: Applications
 
               <div className="flex gap-2 mt-4">
                 <Button size="sm" variant="outline" asChild>
-                  <Link href={`/dashboard/student/applications/${app._id}`}>
+                  <Link href={getDetailsHref(app)}>
                     <Eye className="mr-2 h-4 w-4" />
-                    View Details
+                    View Posting
                   </Link>
                 </Button>
               </div>

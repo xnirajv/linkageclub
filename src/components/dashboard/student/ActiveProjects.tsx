@@ -9,8 +9,8 @@ import { Clock, ChevronRight, Briefcase, FolderOpen } from 'lucide-react';
 import Link from 'next/link';
 
 interface Milestone {
-  _id: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'approved';
+  _id?: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'approved' | 'rejected';
 }
 
 interface Project {

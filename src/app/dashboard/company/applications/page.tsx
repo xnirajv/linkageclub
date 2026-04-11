@@ -2,17 +2,19 @@
 
 import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Filter, MessageSquare, Search, Sparkles } from 'lucide-react';
+import {
+  CheckCircle2, Filter, MessageSquare, Search, Sparkles, UserRoundX,
+} from 'lucide-react';
 import { useApplications } from '@/hooks/useApplications';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 
 type CompanyApplication = {
-  _id?: string;
+  _id: string;
   status?: string;
-  expectedBudget?: number;
-  estimatedDuration?: number;
+  proposedAmount?: number;
+  proposedDuration?: number;
   submittedAt?: string;
   createdAt?: string;
   applicantId?: { name?: string; trustScore?: number };
@@ -20,11 +22,19 @@ type CompanyApplication = {
   jobId?: { title?: string };
 };
 
-const statusTabs = ['all', 'pending', 'shortlisted', 'interview', 'rejected'] as const;
+const statusTabs = ['all', 'pending', 'shortlisted', 'accepted', 'rejected'] as const;
 type StatusTab = typeof statusTabs[number];
 
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(value);
+function formatCurrency(value?: number) {
+  if (!value) {
+    return 'Negotiable';
+  }
+
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0,
+  }).format(value);
 }
 
 function relativeLabel(value?: string) {
@@ -35,10 +45,12 @@ function relativeLabel(value?: string) {
 }
 
 export default function CompanyApplicationsPage() {
-  const { applications = [], isLoading } = useApplications({ role: 'company' });
+  const { applications = [], isLoading, errorMessage, updateStatus } = useApplications({ role: 'company', limit: 100 });
   const typedApplications = applications as CompanyApplication[];
   const [query, setQuery] = useState('');
   const [tab, setTab] = useState<StatusTab>('all');
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   const displayApplications = useMemo(() => {
     return typedApplications.filter((application) => {
@@ -56,8 +68,22 @@ export default function CompanyApplicationsPage() {
     all: typedApplications.length,
     pending: typedApplications.filter((item) => item.status === 'pending').length,
     shortlisted: typedApplications.filter((item) => item.status === 'shortlisted').length,
-    interview: typedApplications.filter((item) => item.status === 'interview').length,
+    accepted: typedApplications.filter((item) => item.status === 'accepted').length,
     rejected: typedApplications.filter((item) => item.status === 'rejected').length,
+  };
+
+  const handleStatusChange = async (applicationId: string, status: 'shortlisted' | 'accepted' | 'rejected') => {
+    if (updatingId) {
+      return;
+    }
+
+    setUpdatingId(applicationId);
+    setActionError(null);
+    const result = await updateStatus(applicationId, status);
+    if (!result.success) {
+      setActionError(result.error || 'Failed to update status.');
+    }
+    setUpdatingId(null);
   };
 
   return (
@@ -68,14 +94,22 @@ export default function CompanyApplicationsPage() {
           Applications Management
         </div>
         <h1 className="mt-4 text-3xl font-semibold text-charcoal-950 dark:text-white">Applications</h1>
-        <p className="mt-2 text-sm leading-7 text-charcoal-500 dark:text-charcoal-400">Review new candidates, shortlist strong profiles, and move the company hiring pipeline forward with cleaner context.</p>
+        <p className="mt-2 text-sm leading-7 text-charcoal-500 dark:text-charcoal-400">
+          Review new candidates, shortlist strong profiles, and move the company hiring pipeline forward with cleaner context.
+        </p>
       </div>
+
+      {(actionError || errorMessage) && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          {actionError || errorMessage}
+        </div>
+      )}
 
       <Card className="border-none bg-card/80 dark:bg-charcoal-900/72">
         <CardContent className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-charcoal-400" />
-            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by applicant or project..." className="pl-9" />
+            <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by applicant or project..." className="pl-9" />
           </div>
           <Button variant="outline">
             <Filter className="mr-2 h-4 w-4" />
@@ -112,11 +146,11 @@ export default function CompanyApplicationsPage() {
           {!isLoading && displayApplications.map((application) => {
             const applicant = application.applicantId?.name || 'Candidate';
             const title = application.projectId?.title || application.jobId?.title || 'Opportunity';
-            const trustScore = application.applicantId?.trustScore || 84;
-            const amount = application.expectedBudget || 55000;
-            const days = application.estimatedDuration || 28;
+            const trustScore = application.applicantId?.trustScore || 0;
+            const amount = application.proposedAmount;
+            const days = application.proposedDuration;
             return (
-              <div key={application._id || `${applicant}-${title}`} className="rounded-[28px] border border-primary-100/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(225,221,214,0.55))] p-5 dark:border-white/10 dark:bg-charcoal-950/40">
+              <div key={application._id} className="rounded-[28px] border border-primary-100/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(225,221,214,0.55))] p-5 dark:border-white/10 dark:bg-charcoal-950/40">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div className="space-y-3">
                     <div className="flex items-center gap-3">
@@ -132,18 +166,42 @@ export default function CompanyApplicationsPage() {
                       <div>Trust Score: {trustScore}%</div>
                       <div>Status: {application.status || 'pending'}</div>
                       <div>Proposed: {formatCurrency(amount)}</div>
-                      <div>Timeline: {days} days</div>
+                      <div>Timeline: {days ? `${days} days` : 'N/A'}</div>
                       <div>{relativeLabel(application.submittedAt || application.createdAt)}</div>
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2 lg:w-[240px] lg:flex-col">
                     <Button asChild size="sm">
-                      <Link href={application._id ? `/dashboard/company/applications/${application._id}` : '/dashboard/company/applications'}>
+                      <Link href={`/dashboard/company/applications/${application._id}`}>
                         View Full Application
                       </Link>
                     </Button>
-                    <Button size="sm" variant="outline">Shortlist</Button>
-                    <Button size="sm" variant="outline">Reject</Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleStatusChange(application._id, 'shortlisted')}
+                      disabled={updatingId === application._id || application.status === 'shortlisted'}
+                    >
+                      {updatingId === application._id ? 'Updating...' : 'Shortlist'}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleStatusChange(application._id, 'accepted')}
+                      disabled={updatingId === application._id || application.status === 'accepted'}
+                    >
+                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                      Accept
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleStatusChange(application._id, 'rejected')}
+                      disabled={updatingId === application._id || application.status === 'rejected'}
+                    >
+                      <UserRoundX className="mr-2 h-4 w-4" />
+                      Reject
+                    </Button>
                     <Button asChild size="sm" variant="outline">
                       <Link href="/dashboard/messages">
                         <MessageSquare className="mr-2 h-4 w-4" />

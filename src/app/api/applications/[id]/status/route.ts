@@ -1,61 +1,37 @@
-import { NextRequest, NextResponse } from 'next/server';
+import mongoose from 'mongoose';
+import { NextRequest } from 'next/server';
 import { getServerSession } from 'next-auth';
+import { z } from 'zod';
 import { authOptions } from '@/lib/auth/options';
 import Application from '@/lib/db/models/application';
 import Project from '@/lib/db/models/project';
 import Job from '@/lib/db/models/job';
 import Notification from '@/lib/db/models/notification';
 import connectDB from '@/lib/db/connect';
-import { z } from 'zod';
 import { sendApplicationStatusEmail } from '@/lib/email/application';
-import mongoose from 'mongoose';
-
-// Define interfaces for populated documents
-interface PopulatedProject {
-  _id: mongoose.Types.ObjectId;
-  title: string;
-}
-
-interface PopulatedJob {
-  _id: mongoose.Types.ObjectId;
-  title: string;
-}
-
-interface PopulatedUser {
-  _id: mongoose.Types.ObjectId;
-  name: string;
-  email: string;
-}
-
-// Define status history interface
-interface StatusHistoryItem {
-  status: string;
-  timestamp: Date;
-  notes?: string;
-  updatedBy?: mongoose.Types.ObjectId | string;
-}
-
-// Extend the Application type with an interface (not a type alias)
-interface PopulatedApplication extends mongoose.Document {
-  _id: mongoose.Types.ObjectId;
-  applicantId: PopulatedUser;
-  companyId: PopulatedUser;
-  projectId?: PopulatedProject | null;
-  jobId?: PopulatedJob | null;
-  type: 'project' | 'job';
-  status: string;
-  reviewNotes?: string;
-  reviewedBy?: mongoose.Types.ObjectId | string;
-  reviewedAt?: Date;
-  createdAt: Date;
-  statusHistory?: StatusHistoryItem[];
-  // save() is inherited from mongoose.Document
-}
+import { errors, handleAPIError, successResponse } from '@/lib/api/errors';
 
 const statusUpdateSchema = z.object({
-  status: z.enum(['pending', 'reviewed', 'shortlisted', 'accepted', 'rejected', 'withdrawn']),
-  notes: z.string().optional(),
+  status: z.enum([
+    'pending',
+    'reviewed',
+    'shortlisted',
+    'interview_scheduled',
+    'interview_completed',
+    'interview_cancelled',
+    'accepted',
+    'rejected',
+    'withdrawn',
+  ]),
+  notes: z.string().trim().max(2000).optional(),
   sendEmail: z.boolean().default(true),
+});
+
+const batchUpdateSchema = z.object({
+  applicationIds: z.array(z.string()).min(1),
+  status: statusUpdateSchema.shape.status,
+  notes: z.string().trim().max(2000).optional(),
+  sendEmail: z.boolean().default(false),
 });
 
 export async function PATCH(
@@ -64,108 +40,94 @@ export async function PATCH(
 ) {
   try {
     const session = await getServerSession(authOptions);
-
     if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      throw errors.unauthorized();
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(params.id)) {
+      throw errors.invalidInput('application id');
     }
 
     const body = await req.json();
     const validation = statusUpdateSchema.safeParse(body);
-
     if (!validation.success) {
-      return NextResponse.json(
-        { error: 'Validation failed', details: validation.error.errors },
-        { status: 400 }
-      );
+      throw errors.badRequest(validation.error.errors[0]?.message || 'Validation failed');
     }
 
     await connectDB();
 
     const application = await Application.findById(params.id)
-      .populate('applicantId', 'name email role isActive createdAt updatedAt')
-      .populate('companyId', 'name email role isActive createdAt updatedAt')
-      .populate('projectId')
-      .populate('jobId') as unknown as PopulatedApplication;
+      .populate('applicantId', 'name email')
+      .populate('companyId', 'name email')
+      .populate('projectId', 'title')
+      .populate('jobId', 'title');
 
     if (!application) {
-      return NextResponse.json(
-        { error: 'Application not found' },
-        { status: 404 }
-      );
+      throw errors.notFound('Application');
     }
 
-    // Check authorization
-    const isApplicant = application.applicantId._id.toString() === session.user.id;
-    const isCompany = application.companyId._id.toString() === session.user.id;
+    const isApplicant = application.applicantId?._id?.toString() === session.user.id;
+    const isCompany = application.companyId?._id?.toString() === session.user.id;
     const isAdmin = session.user.role === 'admin';
 
-    // Only company, admin, or applicant (for withdrawal) can update status
     if (validation.data.status === 'withdrawn') {
       if (!isApplicant && !isAdmin) {
-        return NextResponse.json(
-          { error: 'Only the applicant can withdraw their application' },
-          { status: 401 }
-        );
+        throw errors.forbidden();
       }
-    } else {
-      if (!isCompany && !isAdmin) {
-        return NextResponse.json(
-          { error: 'Only the company can update application status' },
-          { status: 401 }
-        );
-      }
+    } else if (!isCompany && !isAdmin) {
+      throw errors.forbidden();
     }
 
-    // Prevent status changes that don't make sense
-    if (application.status === 'accepted' && validation.data.status !== 'withdrawn') {
-      return NextResponse.json(
-        { error: 'Cannot change status of accepted application' },
-        { status: 400 }
-      );
+    const immutableStatuses = new Set(['accepted', 'rejected', 'withdrawn']);
+    if (immutableStatuses.has(application.status) && application.status !== validation.data.status) {
+      throw errors.badRequest(`Cannot change status of ${application.status} application`);
     }
 
-    if (application.status === 'rejected' && validation.data.status !== 'withdrawn') {
-      return NextResponse.json(
-        { error: 'Cannot change status of rejected application' },
-        { status: 400 }
-      );
-    }
-
-    // Update status
     const oldStatus = application.status;
     application.status = validation.data.status;
-
-    if (validation.data.notes) {
-      application.reviewNotes = validation.data.notes;
-    }
-
-    application.reviewedBy = new mongoose.Types.ObjectId(session.user.id);
+    application.reviewNotes = validation.data.notes || application.reviewNotes;
     application.reviewedAt = new Date();
+    application.reviewedBy = new mongoose.Types.ObjectId(session.user.id);
+    application.statusHistory = [
+      ...(application.statusHistory || []),
+      {
+        status: validation.data.status,
+        timestamp: new Date(),
+        notes: validation.data.notes,
+        updatedBy: new mongoose.Types.ObjectId(session.user.id),
+      },
+    ];
 
     await application.save();
 
-    // Get the title safely
-    const positionTitle = application.type === 'project'
-      ? (application.projectId as any)?.title
-      : (application.jobId as any)?.title;
+    if (application.type === 'project' && application.projectId?._id) {
+      await Project.updateOne(
+        {
+          _id: application.projectId._id,
+          'applications.userId': application.applicantId._id,
+        },
+        {
+          $set: {
+            'applications.$.status': validation.data.status,
+            'applications.$.reviewedAt': new Date(),
+            'applications.$.reviewNotes': validation.data.notes,
+          },
+        }
+      );
 
-    // Handle project status changes if accepted
-    if (validation.data.status === 'accepted' && application.type === 'project') {
-      await Project.findByIdAndUpdate((application.projectId as any)?._id, {
-        status: 'in_progress',
-        selectedApplicant: application.applicantId._id,
-        startDate: new Date(),
-      });
+      if (validation.data.status === 'accepted') {
+        await Project.findByIdAndUpdate(application.projectId._id, {
+          status: 'in_progress',
+          selectedApplicant: application.applicantId._id,
+          startDate: new Date(),
+        });
+      }
     }
 
-    // Handle job status changes if accepted
-    if (validation.data.status === 'accepted' && application.type === 'job') {
-      const job = await Job.findById((application.jobId as any)?._id);
+    if (application.type === 'job' && validation.data.status === 'accepted' && application.jobId?._id) {
+      const job = await Job.findById(application.jobId._id);
       if (job) {
-        const hiredCount = job.applications?.filter((a: any) => a.status === 'hired').length || 0;
+        const hiredCount = job.applications?.filter((item: { status?: string }) => item.status === 'hired').length || 0;
         if (hiredCount >= (job.openings || 1)) {
           job.status = 'filled';
           await job.save();
@@ -173,205 +135,159 @@ export async function PATCH(
       }
     }
 
-    // Determine recipient
-    const recipientId = isCompany ? application.applicantId._id : application.companyId._id;
+    const projectDoc = application.projectId as { _id?: mongoose.Types.ObjectId; title?: string } | null;
+    const jobDoc = application.jobId as { _id?: mongoose.Types.ObjectId; title?: string } | null;
+    const title = application.type === 'project' ? projectDoc?.title || 'project' : jobDoc?.title || 'job';
 
-    // Create notification
-    const notification = await Notification.create({
-      userId: recipientId,
-      type: 'application_status',
-      title: `Application ${validation.data.status}`,
-      message: `Your application for ${positionTitle || 'position'} has been ${validation.data.status}`,
-      data: {
-        applicationId: application._id,
-        oldStatus,
-        newStatus: validation.data.status,
-        notes: validation.data.notes,
-      },
-      category: 'application',
-      priority: validation.data.status === 'accepted' || validation.data.status === 'rejected' ? 'high' : 'medium',
-    });
+    try {
+      await Notification.create({
+        userId: isCompany ? application.applicantId._id : application.companyId._id,
+        type: 'application_status',
+        title: `Application ${validation.data.status}`,
+        message: `Your application for ${title} is now ${validation.data.status}`,
+        data: {
+          applicationId: application._id,
+          oldStatus,
+          newStatus: validation.data.status,
+          notes: validation.data.notes,
+        },
+        category: 'application',
+        priority: ['accepted', 'rejected'].includes(validation.data.status) ? 'high' : 'medium',
+      });
 
-    // Send email notification if requested
-    if (validation.data.sendEmail) {
-      try {
-        // Determine which user to send email to
-        const recipientUser = isCompany ? application.applicantId : application.companyId;
-
+      if (validation.data.sendEmail) {
+        const recipient = isCompany ? application.applicantId : application.companyId;
         await sendApplicationStatusEmail(
-          recipientUser as any, // The user object from populate matches IUser structure
-          positionTitle || 'position',
+          recipient as never,
+          title,
           validation.data.status,
           validation.data.notes
         );
-      } catch (emailError) {
-        console.error('Failed to send status email:', emailError);
-        // Don't fail the request if email fails
       }
+    } catch (sideEffectError) {
+      console.error('Application status side effect failed:', sideEffectError);
     }
 
-    // Track status change for analytics
-    console.log(`Application ${application._id} status changed from ${oldStatus} to ${validation.data.status} by ${session.user.id}`);
-
-    return NextResponse.json({
-      message: 'Application status updated successfully',
+    return successResponse({
       application: {
-        id: application._id,
+        _id: application._id.toString(),
         status: application.status,
         reviewedAt: application.reviewedAt,
         reviewedBy: application.reviewedBy,
-        notes: application.reviewNotes,
+        reviewNotes: application.reviewNotes,
       },
-      notification: notification._id,
     });
   } catch (error) {
-    console.error('Error updating application status:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return handleAPIError(error);
   }
 }
 
-// Get status history
 export async function GET(
   _req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
     const session = await getServerSession(authOptions);
-
     if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      throw errors.unauthorized();
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(params.id)) {
+      throw errors.invalidInput('application id');
     }
 
     await connectDB();
 
     const application = await Application.findById(params.id)
-      .select('status statusHistory reviewedAt reviewedBy reviewNotes applicantId companyId createdAt') as unknown as PopulatedApplication;
+      .select('status statusHistory reviewedAt reviewedBy reviewNotes applicantId companyId createdAt')
+      .lean();
 
     if (!application) {
-      return NextResponse.json(
-        { error: 'Application not found' },
-        { status: 404 }
-      );
+      throw errors.notFound('Application');
     }
 
-    // Check authorization
-    const isApplicant = application.applicantId?._id.toString() === session.user.id;
-    const isCompany = application.companyId?._id.toString() === session.user.id;
+    const isApplicant = application.applicantId?.toString() === session.user.id;
+    const isCompany = application.companyId?.toString() === session.user.id;
     const isAdmin = session.user.role === 'admin';
-
     if (!isApplicant && !isCompany && !isAdmin) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      throw errors.forbidden();
     }
 
-    // Build status history
-    const statusHistory = application.statusHistory || [
-      {
-        status: application.status,
-        timestamp: application.reviewedAt || application.createdAt,
-        notes: application.reviewNotes,
-        updatedBy: application.reviewedBy,
-      },
-    ];
-
-    return NextResponse.json({
+    return successResponse({
       currentStatus: application.status,
-      history: statusHistory,
-      lastReviewed: application.reviewedAt,
-      notes: application.reviewNotes,
+      history: application.statusHistory || [],
+      reviewedAt: application.reviewedAt,
+      reviewNotes: application.reviewNotes,
     });
   } catch (error) {
-    console.error('Error fetching status history:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return handleAPIError(error);
   }
 }
 
-// Batch status update for multiple applications
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-
     if (!session || session.user.role !== 'company') {
-      return NextResponse.json(
-        { error: 'Only companies can perform batch updates' },
-        { status: 401 }
-      );
+      throw errors.unauthorized();
     }
 
     const body = await req.json();
-    const { applicationIds, status, notes } = body;
-
-    if (!applicationIds || !Array.isArray(applicationIds) || applicationIds.length === 0) {
-      return NextResponse.json(
-        { error: 'Application IDs are required' },
-        { status: 400 }
-      );
+    const validation = batchUpdateSchema.safeParse(body);
+    if (!validation.success) {
+      throw errors.badRequest(validation.error.errors[0]?.message || 'Validation failed');
     }
 
     await connectDB();
 
-    // Verify all applications belong to this company
     const applications = await Application.find({
-      _id: { $in: applicationIds },
+      _id: { $in: validation.data.applicationIds },
       companyId: session.user.id,
-    });
+    }).select('_id applicantId statusHistory');
 
-    if (applications.length !== applicationIds.length) {
-      return NextResponse.json(
-        { error: 'Some applications do not belong to your company' },
-        { status: 403 }
-      );
+    if (applications.length !== validation.data.applicationIds.length) {
+      throw errors.forbidden();
     }
 
-    // Update all applications
-    const updateResult = await Application.updateMany(
-      { _id: { $in: applicationIds } },
-      {
-        $set: {
-          status,
-          reviewedBy: new mongoose.Types.ObjectId(session.user.id),
-          reviewedAt: new Date(),
-          reviewNotes: notes,
-        },
-      }
+    const now = new Date();
+    await Promise.all(
+      applications.map(async (application) => {
+        application.status = validation.data.status;
+        application.reviewNotes = validation.data.notes;
+        application.reviewedAt = now;
+        application.reviewedBy = new mongoose.Types.ObjectId(session.user.id);
+        application.statusHistory = [
+          ...(application.statusHistory || []),
+          {
+            status: validation.data.status,
+            timestamp: now,
+            notes: validation.data.notes,
+            updatedBy: new mongoose.Types.ObjectId(session.user.id),
+          },
+        ];
+        await application.save();
+      })
     );
 
-    // Create notifications for all applicants
-    const notifications = applications.map(app => ({
-      userId: app.applicantId,
-      type: 'application_status',
-      title: `Application ${status}`,
-      message: `Your application has been ${status}`,
-      data: {
-        applicationId: app._id,
-        newStatus: status,
-        notes,
-      },
-      category: 'application',
-    }));
+    await Notification.insertMany(
+      applications.map((application) => ({
+        userId: application.applicantId,
+        type: 'application_status',
+        title: `Application ${validation.data.status}`,
+        message: `Your application status is now ${validation.data.status}`,
+        data: {
+          applicationId: application._id,
+          newStatus: validation.data.status,
+          notes: validation.data.notes,
+        },
+        category: 'application',
+      }))
+    );
 
-    await Notification.insertMany(notifications);
-
-    return NextResponse.json({
-      message: `Successfully updated ${updateResult.modifiedCount} applications`,
-      modifiedCount: updateResult.modifiedCount,
+    return successResponse({
+      updated: applications.length,
+      status: validation.data.status,
     });
   } catch (error) {
-    console.error('Error batch updating applications:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return handleAPIError(error);
   }
 }

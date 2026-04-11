@@ -1,9 +1,20 @@
-import { NextRequest, NextResponse } from 'next/server';
+import mongoose from 'mongoose';
+import { NextRequest } from 'next/server';
 import { getServerSession } from 'next-auth';
+import { z } from 'zod';
 import { authOptions } from '@/lib/auth/options';
+import connectDB from '@/lib/db/connect';
 import Project from '@/lib/db/models/project';
 import Application from '@/lib/db/models/application';
-import connectDB from '@/lib/db/connect';
+import { errors, handleAPIError, successResponse } from '@/lib/api/errors';
+
+const querySchema = z.object({
+  status: z
+    .enum(['pending', 'reviewed', 'shortlisted', 'interview_scheduled', 'interview_completed', 'interview_cancelled', 'accepted', 'rejected', 'withdrawn'])
+    .optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+});
 
 export async function GET(
   req: NextRequest,
@@ -11,70 +22,69 @@ export async function GET(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    
     if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      throw errors.unauthorized();
     }
+
+    if (!mongoose.Types.ObjectId.isValid(params.id)) {
+      throw errors.invalidInput('project id');
+    }
+
+    const queryParams = querySchema.parse({
+      status: req.nextUrl.searchParams.get('status') ?? undefined,
+      page: req.nextUrl.searchParams.get('page') ?? undefined,
+      limit: req.nextUrl.searchParams.get('limit') ?? undefined,
+    });
 
     await connectDB();
 
-    const project = await Project.findById(params.id);
-
+    const project = await Project.findById(params.id).select('companyId title');
     if (!project) {
-      return NextResponse.json(
-        { error: 'Project not found' },
-        { status: 404 }
-      );
+      throw errors.notFound('Project');
     }
 
-    // Check if user owns the project
     if (project.companyId.toString() !== session.user.id && session.user.role !== 'admin') {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      throw errors.forbidden();
     }
 
-    const searchParams = req.nextUrl.searchParams;
-    const status = searchParams.get('status');
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '20');
-
-    const query: any = {
+    const filter: Record<string, unknown> = {
       projectId: params.id,
+      type: 'project',
     };
 
-    if (status) {
-      query.status = status;
+    if (queryParams.status) {
+      filter.status = queryParams.status;
     }
 
-    const skip = (page - 1) * limit;
+    const skip = (queryParams.page - 1) * queryParams.limit;
 
-    const applications = await Application.find(query)
-      .populate('applicantId', 'name avatar trustScore skills')
-      .sort({ submittedAt: -1 })
-      .skip(skip)
-      .limit(limit);
+    const [applications, total] = await Promise.all([
+      Application.find(filter)
+        .populate('applicantId', 'name email avatar trustScore skills location')
+        .sort({ submittedAt: -1 })
+        .skip(skip)
+        .limit(queryParams.limit)
+        .lean(),
+      Application.countDocuments(filter),
+    ]);
 
-    const total = await Application.countDocuments(query);
-
-    return NextResponse.json({
-      applications,
+    return successResponse({
+      project: {
+        _id: project._id.toString(),
+        title: project.title,
+      },
+      applications: applications.map((application) => ({
+        ...application,
+        _id: application._id.toString(),
+      })),
       pagination: {
-        page,
-        limit,
+        page: queryParams.page,
+        limit: queryParams.limit,
         total,
-        pages: Math.ceil(total / limit),
+        pages: Math.ceil(total / queryParams.limit),
       },
     });
   } catch (error) {
-    console.error('Error fetching applications:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return handleAPIError(error);
   }
 }

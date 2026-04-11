@@ -165,7 +165,7 @@ export default function StudentDashboardPage() {
             action={{ label: 'View all', href: '/dashboard/student/projects' }}
           >
             <RecommendedProjects
-              projects={projects}
+              projects={projects as any}
               isLoading={projectsLoading}
               onDismiss={(id) => console.log('Dismissed project:', id)}
             />
@@ -177,7 +177,7 @@ export default function StudentDashboardPage() {
             action={{ label: 'Open projects', href: '/dashboard/student/projects' }}
           >
             <ActiveProjects
-              projects={projects.filter((project: any) => project.status === 'active')}
+              projects={projects.filter((project: any) => project.status === 'active') as any}
               emptyMessage="No active projects yet. Browse opportunities to get started."
             />
           </DashboardSection>

@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document, Model } from 'mongoose';
+import mongoose, { Document, Model, Schema } from 'mongoose';
 
 export interface IApplication extends Document {
   type: 'project' | 'job';
@@ -6,24 +6,27 @@ export interface IApplication extends Document {
   jobId?: mongoose.Types.ObjectId;
   applicantId: mongoose.Types.ObjectId;
   companyId: mongoose.Types.ObjectId;
-  
-  // Project specific
   proposedAmount?: number;
   proposedDuration?: number;
   coverLetter: string;
   attachments: string[];
-  
-  // Job specific
+  portfolio?: string;
+  additionalInfo?: string;
   resume?: string;
   answers?: Array<{ question: string; answer: string }>;
-  
-  // Common
-  status: 'pending' | 'reviewed' | 'shortlisted' | 'interview_scheduled' | 'interview_completed' | 'interview_cancelled' | 'accepted' | 'rejected' | 'withdrawn';
+  status:
+    | 'pending'
+    | 'reviewed'
+    | 'shortlisted'
+    | 'interview_scheduled'
+    | 'interview_completed'
+    | 'interview_cancelled'
+    | 'accepted'
+    | 'rejected'
+    | 'withdrawn';
   reviewedBy?: mongoose.Types.ObjectId;
   reviewedAt?: Date;
   reviewNotes?: string;
-  
-  // Interview
   interview?: {
     scheduled: boolean;
     date?: Date;
@@ -33,8 +36,6 @@ export interface IApplication extends Document {
     feedback?: string;
     rating?: number;
   };
-  
-  // Communication
   messages: Array<{
     senderId: mongoose.Types.ObjectId;
     content: string;
@@ -43,16 +44,19 @@ export interface IApplication extends Document {
     readAt?: Date;
     createdAt: Date;
   }>;
-  
-  // Timeline
   submittedAt: Date;
   lastUpdated: Date;
   createdAt: Date;
   updatedAt: Date;
-
-  matchScore?: number;  // ✅ Add this
-  matchedSkills?: string[];  // ✅ Add this
+  matchScore?: number;
+  matchedSkills?: string[];
   missingSkills?: string[];
+  statusHistory?: Array<{
+    status: string;
+    timestamp: Date;
+    notes?: string;
+    updatedBy?: mongoose.Types.ObjectId;
+  }>;
 }
 
 const applicationSchema = new Schema<IApplication>(
@@ -80,8 +84,6 @@ const applicationSchema = new Schema<IApplication>(
       ref: 'User',
       required: true,
     },
-    
-    // Project specific
     proposedAmount: {
       type: Number,
       min: 0,
@@ -94,12 +96,21 @@ const applicationSchema = new Schema<IApplication>(
       type: String,
       required: true,
     },
-    attachments: [String],
+    attachments: {
+      type: [String],
+      default: [],
+    },
+    portfolio: String,
+    additionalInfo: String,
     matchScore: { type: Number, default: 0 },
-    matchedSkills: [{ type: String }],
-    missingSkills: [{ type: String }],
-    
-    // Job specific
+    matchedSkills: {
+      type: [String],
+      default: [],
+    },
+    missingSkills: {
+      type: [String],
+      default: [],
+    },
     resume: String,
     answers: [
       {
@@ -107,11 +118,19 @@ const applicationSchema = new Schema<IApplication>(
         answer: String,
       },
     ],
-    
-    // Common
     status: {
       type: String,
-      enum: ['pending', 'reviewed', 'shortlisted', 'interview_scheduled', 'interview_completed', 'interview_cancelled', 'accepted', 'rejected', 'withdrawn'],
+      enum: [
+        'pending',
+        'reviewed',
+        'shortlisted',
+        'interview_scheduled',
+        'interview_completed',
+        'interview_cancelled',
+        'accepted',
+        'rejected',
+        'withdrawn',
+      ],
       default: 'pending',
     },
     reviewedBy: {
@@ -120,8 +139,6 @@ const applicationSchema = new Schema<IApplication>(
     },
     reviewedAt: Date,
     reviewNotes: String,
-    
-    // Interview
     interview: {
       scheduled: { type: Boolean, default: false },
       date: Date,
@@ -138,19 +155,19 @@ const applicationSchema = new Schema<IApplication>(
         max: 5,
       },
     },
-    
-    // Communication
-    messages: [
-      {
-        senderId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-        content: { type: String, required: true },
-        attachments: [String],
-        read: { type: Boolean, default: false },
-        readAt: Date,
-        createdAt: { type: Date, default: Date.now },
-      },
-    ],
-    
+    messages: {
+      type: [
+        {
+          senderId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+          content: { type: String, required: true },
+          attachments: [String],
+          read: { type: Boolean, default: false },
+          readAt: Date,
+          createdAt: { type: Date, default: Date.now },
+        },
+      ],
+      default: [],
+    },
     submittedAt: {
       type: Date,
       default: Date.now,
@@ -159,37 +176,71 @@ const applicationSchema = new Schema<IApplication>(
       type: Date,
       default: Date.now,
     },
+    statusHistory: {
+      type: [
+        {
+          status: { type: String, required: true },
+          timestamp: { type: Date, default: Date.now },
+          notes: String,
+          updatedBy: {
+            type: Schema.Types.ObjectId,
+            ref: 'User',
+          },
+        },
+      ],
+      default: [],
+    },
   },
   {
     timestamps: true,
   }
 );
 
-// Indexes
 applicationSchema.index({ applicantId: 1 });
 applicationSchema.index({ companyId: 1 });
 applicationSchema.index({ projectId: 1 });
 applicationSchema.index({ jobId: 1 });
 applicationSchema.index({ status: 1 });
 applicationSchema.index({ submittedAt: -1 });
+applicationSchema.index(
+  { applicantId: 1, projectId: 1, type: 1 },
+  { unique: true, partialFilterExpression: { type: 'project', projectId: { $exists: true } } }
+);
+applicationSchema.index(
+  { applicantId: 1, jobId: 1, type: 1 },
+  { unique: true, partialFilterExpression: { type: 'job', jobId: { $exists: true } } }
+);
 
-// Update lastUpdated on message or status change
 applicationSchema.pre('save', function (next) {
   this.lastUpdated = new Date();
+
+  if (this.isNew && (!this.statusHistory || this.statusHistory.length === 0)) {
+    this.statusHistory = [
+      {
+        status: this.status,
+        timestamp: this.submittedAt || new Date(),
+      },
+    ];
+  }
+
   next();
 });
 
-// Ensure only one of projectId or jobId is set
 applicationSchema.pre('validate', function (next) {
   if (this.type === 'project' && !this.projectId) {
     next(new Error('Project ID is required for project applications'));
-  } else if (this.type === 'job' && !this.jobId) {
-    next(new Error('Job ID is required for job applications'));
-  } else {
-    next();
+    return;
   }
+
+  if (this.type === 'job' && !this.jobId) {
+    next(new Error('Job ID is required for job applications'));
+    return;
+  }
+
+  next();
 });
 
-const Application: Model<IApplication> = mongoose.models.Application || mongoose.model<IApplication>('Application', applicationSchema);
+const Application: Model<IApplication> =
+  mongoose.models.Application || mongoose.model<IApplication>('Application', applicationSchema);
 
 export default Application;

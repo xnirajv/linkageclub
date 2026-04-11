@@ -12,7 +12,7 @@ interface Milestone {
   description?: string;
   amount: number;
   deadline: number;
-  status: 'pending' | 'in_progress' | 'completed' | 'approved';
+  status: 'pending' | 'in_progress' | 'completed' | 'approved' | 'rejected';
 }
 
 interface MilestoneTrackerProps {

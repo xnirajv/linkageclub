@@ -28,7 +28,7 @@ type CompanyProject = {
   title?: string;
   status?: string;
   duration?: number;
-  createdAt?: string;
+  createdAt?: string | Date;
   applicationsCount?: number;
   budget?: { min?: number; max?: number };
   milestones?: Array<{ title?: string }>;
@@ -72,7 +72,7 @@ function formatCurrency(amount: number) {
   }).format(amount);
 }
 
-function formatRelative(dateValue?: string) {
+function formatRelative(dateValue?: string | Date) {
   if (!dateValue) return 'Recently';
   const now = Date.now();
   const value = new Date(dateValue).getTime();
@@ -89,7 +89,7 @@ export default function CompanyDashboardPage() {
   const { projects = [], isLoading: projectsLoading } = useProjects({ limit: 12 });
   const { applications = [], isLoading: applicationsLoading } = useApplications({ role: 'company', limit: 100 });
 
-  const typedProjects = projects as CompanyProject[];
+  const typedProjects = projects as unknown as CompanyProject[];
   const typedApplications = applications as CompanyApplication[];
   const companyName = (user as { company?: { name?: string } } | null)?.company?.name || 'TechCorp Solutions';
   const firstName = user?.name?.split(' ')[0] || 'Rahul';

@@ -1,78 +1,94 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getServerSession } from 'next-auth';
+import { z } from 'zod';
 import { authOptions } from '@/lib/auth/options';
 import Application from '@/lib/db/models/application';
 import connectDB from '@/lib/db/connect';
+import { errors, handleAPIError, successResponse } from '@/lib/api/errors';
+
+const listQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+  type: z.enum(['project', 'job', 'all']).default('all'),
+  status: z.string().optional(),
+  role: z.enum(['applicant', 'company']).optional(),
+  projectId: z.string().optional(),
+  jobId: z.string().optional(),
+});
 
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
     if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      throw errors.unauthorized();
     }
+
+    const queryParams = listQuerySchema.parse({
+      page: req.nextUrl.searchParams.get('page') ?? undefined,
+      limit: req.nextUrl.searchParams.get('limit') ?? undefined,
+      type: req.nextUrl.searchParams.get('type') ?? undefined,
+      status: req.nextUrl.searchParams.get('status') ?? undefined,
+      role: req.nextUrl.searchParams.get('role') ?? undefined,
+      projectId: req.nextUrl.searchParams.get('projectId') ?? undefined,
+      jobId: req.nextUrl.searchParams.get('jobId') ?? undefined,
+    });
 
     await connectDB();
 
-    const searchParams = req.nextUrl.searchParams;
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '20');
-    const type = searchParams.get('type'); // project, job, all
-    const status = searchParams.get('status');
-    const role = searchParams.get('role'); // applicant, company
+    const query: Record<string, unknown> = {};
 
-    let query: any = {};
-
-    if (role === 'applicant') {
+    if (queryParams.role === 'applicant') {
       query.applicantId = session.user.id;
-    } else if (role === 'company') {
+    } else if (queryParams.role === 'company') {
       query.companyId = session.user.id;
     } else {
-      // If no role specified, show both where user is either applicant or company
-      query.$or = [
-        { applicantId: session.user.id },
-        { companyId: session.user.id },
-      ];
+      query.$or = [{ applicantId: session.user.id }, { companyId: session.user.id }];
     }
 
-    if (type && type !== 'all') {
-      query.type = type;
+    if (queryParams.type !== 'all') {
+      query.type = queryParams.type;
     }
 
-    if (status) {
-      query.status = status;
+    if (queryParams.status) {
+      query.status = queryParams.status;
     }
 
-    const skip = (page - 1) * limit;
+    if (queryParams.projectId) {
+      query.projectId = queryParams.projectId;
+    }
 
-    const applications = await Application.find(query)
-      .populate('applicantId', 'name avatar trustScore')
-      .populate('companyId', 'name avatar companyName')
-      .populate('projectId', 'title budget')
-      .populate('jobId', 'title salary')
-      .sort({ submittedAt: -1 })
-      .skip(skip)
-      .limit(limit);
+    if (queryParams.jobId) {
+      query.jobId = queryParams.jobId;
+    }
 
-    const total = await Application.countDocuments(query);
+    const skip = (queryParams.page - 1) * queryParams.limit;
 
-    return NextResponse.json({
-      applications,
+    const [applications, total] = await Promise.all([
+      Application.find(query)
+        .populate('applicantId', 'name avatar trustScore location')
+        .populate('companyId', 'name avatar companyName')
+        .populate('projectId', 'title budget category')
+        .populate('jobId', 'title salary')
+        .sort({ submittedAt: -1 })
+        .skip(skip)
+        .limit(queryParams.limit)
+        .lean(),
+      Application.countDocuments(query),
+    ]);
+
+    return successResponse({
+      applications: applications.map((application) => ({
+        ...application,
+        _id: application._id.toString(),
+      })),
       pagination: {
-        page,
-        limit,
+        page: queryParams.page,
+        limit: queryParams.limit,
         total,
-        pages: Math.ceil(total / limit),
+        pages: Math.ceil(total / queryParams.limit),
       },
     });
   } catch (error) {
-    console.error('Error fetching applications:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return handleAPIError(error);
   }
 }

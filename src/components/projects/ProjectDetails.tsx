@@ -1,17 +1,17 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Project, getCompanyName, getCompanyAvatar } from '@/types/project';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import React, { useEffect, useState } from 'react';
+import { formatDistanceToNow } from 'date-fns';
+import {
+  Building, Calendar, CheckCircle, Clock, IndianRupee, Tag, Users,
+} from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Project, getCompanyAvatar, getCompanyName } from '@/types/project';
 import { SaveButton } from './SaveButton';
 import { ApplyModal } from './ApplyModal';
-import {
-  IndianRupee, Calendar, Users, CheckCircle, Building, Clock, Tag,
-} from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
 
 interface ProjectDetailsProps {
   project: Project;
@@ -19,13 +19,18 @@ interface ProjectDetailsProps {
 
 export function ProjectDetails({ project }: ProjectDetailsProps) {
   const [showApplyModal, setShowApplyModal] = useState(false);
+  const [localProject, setLocalProject] = useState(project);
 
-  const budgetText = project.budget
-    ? `Rs. ${project.budget.min.toLocaleString()} - Rs. ${project.budget.max.toLocaleString()} (${project.budget.type})`
+  useEffect(() => {
+    setLocalProject(project);
+  }, [project]);
+
+  const budgetText = localProject.budget
+    ? `Rs. ${localProject.budget.min.toLocaleString()} - Rs. ${localProject.budget.max.toLocaleString()} (${localProject.budget.type})`
     : 'Not specified';
 
-  const companyName = getCompanyName(project);
-  const companyAvatar = getCompanyAvatar(project);
+  const companyName = getCompanyName(localProject);
+  const companyAvatar = getCompanyAvatar(localProject);
 
   return (
     <div className="space-y-6">
@@ -40,16 +45,20 @@ export function ProjectDetails({ project }: ProjectDetailsProps) {
             <div className="flex-1">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <h1 className="text-2xl font-bold text-gray-950 dark:text-white">{project.title}</h1>
+                  <h1 className="text-2xl font-bold text-gray-950 dark:text-white">{localProject.title}</h1>
                   <p className="mt-1 text-gray-600 dark:text-gray-400">{companyName}</p>
                 </div>
                 <div className="flex gap-2">
-                  <SaveButton projectId={project._id} isSaved={project.isSaved} />
+                  <SaveButton
+                    projectId={localProject._id}
+                    isSaved={localProject.isSaved}
+                    onSave={(saved) => setLocalProject((current) => ({ ...current, isSaved: saved }))}
+                  />
                   <Button
                     onClick={() => setShowApplyModal(true)}
-                    disabled={project.hasApplied || project.status !== 'open'}
+                    disabled={localProject.hasApplied || localProject.status !== 'open'}
                   >
-                    {project.hasApplied ? 'Applied' : project.status !== 'open' ? 'Closed' : 'Apply Now'}
+                    {localProject.hasApplied ? 'Applied' : localProject.status !== 'open' ? 'Closed' : 'Apply Now'}
                   </Button>
                 </div>
               </div>
@@ -59,23 +68,26 @@ export function ProjectDetails({ project }: ProjectDetailsProps) {
                   <IndianRupee className="h-4 w-4" /> {budgetText}
                 </span>
                 <span className="flex items-center gap-1">
-                  <Calendar className="h-4 w-4" /> {project.duration} days
+                  <Calendar className="h-4 w-4" /> {localProject.duration} days
                 </span>
                 <span className="flex items-center gap-1">
-                  <Users className="h-4 w-4" /> {project.applicationsCount} applicants
+                  <Users className="h-4 w-4" /> {localProject.applicationsCount} applicants
                 </span>
                 <span className="flex items-center gap-1">
                   <Clock className="h-4 w-4" />
-                  {formatDistanceToNow(new Date(project.createdAt), { addSuffix: true })}
+                  {formatDistanceToNow(new Date(localProject.createdAt), { addSuffix: true })}
                 </span>
               </div>
 
               <div className="mt-3 flex flex-wrap gap-2">
-                <Badge variant={project.status === 'open' ? 'default' : 'secondary'}>
-                  {project.status}
+                <Badge variant={localProject.status === 'open' ? 'default' : 'secondary'}>
+                  {localProject.status}
                 </Badge>
-                <Badge variant="outline" className="capitalize">{project.experienceLevel}</Badge>
-                <Badge variant="outline">{project.category}</Badge>
+                <Badge variant="outline" className="capitalize">{localProject.experienceLevel}</Badge>
+                <Badge variant="outline">{localProject.category}</Badge>
+                {typeof localProject.matchScore === 'number' && (
+                  <Badge variant="outline">Match {localProject.matchScore}%</Badge>
+                )}
               </div>
             </div>
           </div>
@@ -85,17 +97,17 @@ export function ProjectDetails({ project }: ProjectDetailsProps) {
       <Card>
         <CardHeader><CardTitle>Project Description</CardTitle></CardHeader>
         <CardContent>
-          <p className="whitespace-pre-line text-gray-700 dark:text-gray-300">{project.description}</p>
+          <p className="whitespace-pre-line text-gray-700 dark:text-gray-300">{localProject.description}</p>
         </CardContent>
       </Card>
 
-      {project.requirements?.length > 0 && (
+      {localProject.requirements?.length > 0 && (
         <Card>
           <CardHeader><CardTitle>Requirements</CardTitle></CardHeader>
           <CardContent>
             <ul className="space-y-2">
-              {project.requirements.map((item, i) => (
-                <li key={i} className="flex items-start gap-2 text-gray-700 dark:text-gray-300">
+              {localProject.requirements.map((item, index) => (
+                <li key={index} className="flex items-start gap-2 text-gray-700 dark:text-gray-300">
                   <CheckCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-green-600" />
                   {item}
                 </li>
@@ -105,15 +117,15 @@ export function ProjectDetails({ project }: ProjectDetailsProps) {
         </Card>
       )}
 
-      {project.milestones?.length > 0 && (
+      {localProject.milestones?.length > 0 && (
         <Card>
           <CardHeader><CardTitle>Milestones</CardTitle></CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {project.milestones.map((milestone, i) => (
-                <div key={i} className="flex items-start gap-3 rounded-lg border p-3">
+              {localProject.milestones.map((milestone, index) => (
+                <div key={index} className="flex items-start gap-3 rounded-lg border p-3">
                   <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-primary-100 text-sm font-semibold text-primary-700">
-                    {i + 1}
+                    {index + 1}
                   </div>
                   <div className="flex-1">
                     <div className="flex items-start justify-between">
@@ -132,12 +144,12 @@ export function ProjectDetails({ project }: ProjectDetailsProps) {
         </Card>
       )}
 
-      {project.skills?.length > 0 && (
+      {localProject.skills?.length > 0 && (
         <Card>
           <CardHeader><CardTitle>Skills Required</CardTitle></CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-2">
-              {project.skills.map((skill) => (
+              {localProject.skills.map((skill) => (
                 <Badge key={skill.name} variant={skill.mandatory ? 'default' : 'secondary'}>
                   {skill.name} {skill.mandatory && '*'}
                 </Badge>
@@ -148,12 +160,12 @@ export function ProjectDetails({ project }: ProjectDetailsProps) {
         </Card>
       )}
 
-      {project.tags?.length > 0 && (
+      {localProject.tags?.length > 0 && (
         <Card>
           <CardContent className="p-4">
             <div className="flex flex-wrap items-center gap-2">
               <Tag className="h-4 w-4 text-muted-foreground" />
-              {project.tags.map((tag) => (
+              {localProject.tags.map((tag) => (
                 <Badge key={tag} variant="outline">{tag}</Badge>
               ))}
             </div>
@@ -162,9 +174,16 @@ export function ProjectDetails({ project }: ProjectDetailsProps) {
       )}
 
       <ApplyModal
-        project={project}
+        project={localProject}
         isOpen={showApplyModal}
         onClose={() => setShowApplyModal(false)}
+        onApplied={() => {
+          setLocalProject((current) => ({
+            ...current,
+            hasApplied: true,
+            applicationsCount: current.applicationsCount + 1,
+          }));
+        }}
       />
     </div>
   );

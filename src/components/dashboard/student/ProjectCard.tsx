@@ -15,6 +15,7 @@ interface ProjectCardProps {
 
 export function ProjectCard({ project, hasApplied, onApply, isApplying }: ProjectCardProps) {
   const isOpen = project.status === 'open' || project.status === 'active';
+  const applied = hasApplied ?? project.hasApplied ?? false;
 
   const getDaysLeft = (deadline?: string) => {
     if (!deadline) return null;
@@ -37,7 +38,7 @@ export function ProjectCard({ project, hasApplied, onApply, isApplying }: Projec
             <Badge variant={isOpen ? 'default' : 'secondary'}>
               {project.status}
             </Badge>
-            {hasApplied && (
+            {applied && (
               <Badge variant="success" className="text-xs flex items-center gap-1">
                 <CheckCircle className="h-3 w-3" />
                 Applied
@@ -96,7 +97,7 @@ export function ProjectCard({ project, hasApplied, onApply, isApplying }: Projec
             Details
           </Button>
         </Link>
-        {!hasApplied && onApply ? (
+        {!applied && onApply ? (
           <Button 
             className="flex-1" 
             onClick={() => onApply(project._id)}
@@ -104,7 +105,7 @@ export function ProjectCard({ project, hasApplied, onApply, isApplying }: Projec
           >
             {isApplying ? 'Applying...' : 'Apply'}
           </Button>
-        ) : hasApplied && (
+        ) : applied && (
           <Button variant="secondary" className="flex-1" disabled>
             Applied
           </Button>

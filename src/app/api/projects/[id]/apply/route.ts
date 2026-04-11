@@ -1,23 +1,45 @@
-import { NextRequest, NextResponse } from 'next/server';
+import mongoose from 'mongoose';
+import { NextRequest } from 'next/server';
 import { getServerSession } from 'next-auth';
+import { z } from 'zod';
+import { MongoServerError } from 'mongodb';
 import { authOptions } from '@/lib/auth/options';
+import connectDB from '@/lib/db/connect';
 import Project from '@/lib/db/models/project';
 import Application from '@/lib/db/models/application';
 import User from '@/lib/db/models/user';
 import Notification from '@/lib/db/models/notification';
-import connectDB from '@/lib/db/connect';
-import { z } from 'zod';
 import { sendNewApplicationEmail } from '@/lib/email/application';
-import mongoose from 'mongoose';
+import { errors, handleAPIError, successResponse } from '@/lib/api/errors';
 
 const applySchema = z.object({
-  proposedAmount: z.number().min(0),
-  proposedDuration: z.number().min(1),
-  coverLetter: z.string().min(20).max(2000),
+  proposedAmount: z.number().finite().min(0),
+  proposedDuration: z.number().int().min(1),
+  coverLetter: z.string().trim().min(20).max(2000),
   portfolio: z.string().url().optional(),
-  attachments: z.array(z.string()).optional(),
-  additionalInfo: z.string().optional(),
+  attachments: z.array(z.string().trim().min(1)).max(5).optional().default([]),
+  additionalInfo: z.string().trim().max(2000).optional(),
 });
+
+function getSkillNames(skills: unknown): string[] {
+  if (!Array.isArray(skills)) {
+    return [];
+  }
+
+  return skills
+    .map((skill) => {
+      if (typeof skill === 'string') {
+        return skill;
+      }
+
+      if (skill && typeof skill === 'object' && 'name' in skill) {
+        return String((skill as { name?: unknown }).name || '');
+      }
+
+      return '';
+    })
+    .filter(Boolean);
+}
 
 export async function POST(
   req: NextRequest,
@@ -25,205 +47,167 @@ export async function POST(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    
     if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      throw errors.unauthorized();
     }
 
     if (session.user.role !== 'student') {
-      return NextResponse.json(
-        { error: 'Only students can apply to projects' },
-        { status: 403 }
-      );
+      throw errors.forbidden();
     }
 
-    // ✅ FIX: Parse JSON instead of FormData
+    if (!mongoose.Types.ObjectId.isValid(params.id)) {
+      throw errors.invalidInput('project id');
+    }
+
     const body = await req.json();
-    const { proposedAmount, proposedDuration, coverLetter, portfolio, additionalInfo, attachments } = body;
-
-    const validation = applySchema.safeParse({
-      proposedAmount,
-      proposedDuration,
-      coverLetter,
-      portfolio,
-      additionalInfo,
-      attachments: attachments || [],
-    });
-
+    const validation = applySchema.safeParse(body);
     if (!validation.success) {
-      return NextResponse.json(
-        { error: 'Validation failed', details: validation.error.errors },
-        { status: 400 }
-      );
+      throw errors.badRequest(validation.error.errors[0]?.message || 'Validation failed');
     }
 
     await connectDB();
 
-    const project = await Project.findById(params.id)
-      .populate('companyId', 'name email') as any;
-
+    const project = await Project.findById(params.id).populate('companyId', 'name email').lean();
     if (!project) {
-      return NextResponse.json(
-        { error: 'Project not found' },
-        { status: 404 }
-      );
+      throw errors.notFound('Project');
     }
+
+    const company = project.companyId as { _id: mongoose.Types.ObjectId; email?: string; name?: string };
 
     if (project.status !== 'open') {
-      return NextResponse.json(
-        { error: 'This project is no longer accepting applications' },
-        { status: 400 }
-      );
+      throw errors.badRequest('This project is no longer accepting applications');
     }
 
-    const existingApplication = await Application.findOne({
-      projectId: project._id,
-      applicantId: session.user.id,
-    });
-
-    if (existingApplication) {
-      return NextResponse.json(
-        { error: 'You have already applied to this project' },
-        { status: 400 }
-      );
+    if (company && company._id?.toString() === session.user.id) {
+      throw errors.badRequest('You cannot apply to your own project');
     }
+
+    const { proposedAmount, proposedDuration, coverLetter, portfolio, attachments, additionalInfo } = validation.data;
 
     if (proposedAmount < project.budget.min || proposedAmount > project.budget.max) {
-      return NextResponse.json(
-        { error: `Proposed amount must be between ${project.budget.min} and ${project.budget.max}` },
-        { status: 400 }
-      );
+      throw errors.badRequest(`Proposed amount must be between ${project.budget.min} and ${project.budget.max}`);
     }
 
     if (proposedDuration > project.duration) {
-      return NextResponse.json(
-        { error: `Proposed duration cannot exceed ${project.duration} days` },
-        { status: 400 }
-      );
+      throw errors.badRequest(`Proposed duration cannot exceed ${project.duration} days`);
     }
 
-    const user = await User.findById(session.user.id).select('skills') as any;
+    const [user] = await Promise.all([
+      User.findById(session.user.id).select('skills name').lean(),
+    ]);
 
-    const userSkills = user?.skills?.map((s: any) => {
-      if (typeof s === 'string') return s;
-      if (s?.name) return s.name;
-      return '';
-    }).filter(Boolean) || [];
-    
-    const requiredSkills = project.skills
-      .filter((s: any) => s.mandatory)
-      .map((s: any) => s.name);
+    const userSkills = getSkillNames(user?.skills);
+    const requiredSkills = (Array.isArray(project.skills) ? project.skills : [])
+      .filter((skill) => skill.mandatory)
+      .map((skill) => skill.name);
+    const matchedSkills = requiredSkills.filter((skill) => userSkills.includes(skill));
+    const missingSkills = requiredSkills.filter((skill) => !userSkills.includes(skill));
+    const matchScore = requiredSkills.length > 0 ? Math.round((matchedSkills.length / requiredSkills.length) * 100) : 0;
 
-    const matchedSkills = requiredSkills.filter((skill: string) => 
-      userSkills.includes(skill)
-    );
-    const missingSkills = requiredSkills.filter((skill: string) => 
-      !userSkills.includes(skill)
-    );
-
-    const matchScore = requiredSkills.length > 0
-      ? Math.round((matchedSkills.length / requiredSkills.length) * 100)
-      : 0;
-
-    const attachmentUrls = Array.isArray(attachments)
-      ? attachments.filter((item: unknown): item is string => typeof item === 'string' && item.trim().length > 0)
-      : [];
-
-    const application = await Application.create({
-      type: 'project',
-      projectId: project._id,
-      applicantId: new mongoose.Types.ObjectId(session.user.id),
-      companyId: project.companyId._id,
-      proposedAmount,
-      proposedDuration,
-      coverLetter,
-      portfolio,
-      attachments: attachmentUrls,
-      additionalInfo,
-      status: 'pending',
-      matchScore,
-      matchedSkills,
-      missingSkills,
-      submittedAt: new Date(),
-    });
-
-    project.applications.push({
-      userId: new mongoose.Types.ObjectId(session.user.id),
-      applicationId: application._id,
-      proposedAmount,
-      proposedDuration,
-      coverLetter,
-      attachments: attachmentUrls,
-      status: 'pending',
-      submittedAt: new Date(),
-    });
-    project.applicationsCount = project.applications.length;
-    await project.save();
-
-    await Notification.create({
-      userId: project.companyId._id,
-      type: 'new_application',
-      title: 'New Project Application',
-      message: `${session.user.name} has applied to ${project.title}`,
-      data: {
-        projectId: project._id,
-        applicationId: application._id,
-        applicantId: session.user.id,
-        applicantName: session.user.name,
+    let application;
+    try {
+      application = await Application.create({
+        type: 'project',
+        projectId: new mongoose.Types.ObjectId(params.id),
+        applicantId: new mongoose.Types.ObjectId(session.user.id),
+        companyId: new mongoose.Types.ObjectId(company._id),
         proposedAmount,
         proposedDuration,
+        coverLetter,
+        portfolio,
+        attachments,
+        additionalInfo,
+        status: 'pending',
         matchScore,
-      },
-      link: `/dashboard/company/my-projects/${project._id}/applications`,
-      category: 'application',
-      priority: 'high',
-    });
+        matchedSkills,
+        missingSkills,
+        submittedAt: new Date(),
+      });
+    } catch (error) {
+      if (error instanceof MongoServerError && error.code === 11000) {
+        throw errors.conflict('You have already applied to this project');
+      }
+      throw error;
+    }
+
+    await Project.updateOne(
+      { _id: params.id, 'applications.userId': { $ne: session.user.id } },
+      {
+        $push: {
+          applications: {
+            userId: new mongoose.Types.ObjectId(session.user.id),
+            proposedAmount,
+            proposedDuration,
+            coverLetter,
+            attachments,
+            status: 'pending',
+            submittedAt: new Date(),
+          },
+        },
+        $inc: { applicationsCount: 1 },
+      }
+    );
 
     try {
-      await sendNewApplicationEmail(
-        project.companyId.email,
-        session.user.name,
-        project.title,
-        application._id.toString()
-      );
-    } catch (emailError) {
-      console.error('Failed to send email to company:', emailError);
+      await Notification.create({
+        userId: project.companyId._id,
+        type: 'new_application',
+        title: 'New Project Application',
+        message: `${session.user.name} has applied to ${project.title}`,
+        data: {
+          projectId: project._id,
+          applicationId: application._id,
+          applicantId: session.user.id,
+          applicantName: session.user.name,
+          proposedAmount,
+          proposedDuration,
+          matchScore,
+        },
+        link: `/dashboard/company/my-projects/${project._id}/applications`,
+        category: 'application',
+        priority: 'high',
+      });
+
+      await Notification.create({
+        userId: new mongoose.Types.ObjectId(session.user.id),
+        type: 'application_submitted',
+        title: 'Application Submitted',
+        message: `Your application for ${project.title} has been submitted successfully`,
+        data: {
+          projectId: project._id,
+          applicationId: application._id,
+        },
+        link: '/dashboard/student/projects/my-applications',
+        category: 'application',
+      });
+
+      if (company.email) {
+        await sendNewApplicationEmail(
+          company.email,
+          session.user.name,
+          project.title,
+          application._id.toString()
+        );
+      }
+    } catch (sideEffectError) {
+      console.error('Project application side effect failed:', sideEffectError);
     }
 
-    await Notification.create({
-      userId: new mongoose.Types.ObjectId(session.user.id),
-      type: 'application_submitted',
-      title: 'Application Submitted',
-      message: `Your application for ${project.title} has been submitted successfully`,
-      data: {
-        projectId: project._id,
-        applicationId: application._id,
-        proposedAmount,
-        proposedDuration,
+    return successResponse(
+      {
+        application: {
+          _id: application._id,
+          status: application.status,
+          matchScore: application.matchScore,
+          proposedAmount: application.proposedAmount,
+          proposedDuration: application.proposedDuration,
+          hasApplied: true,
+        },
       },
-      link: `/dashboard/student/projects/my-applications`,
-      category: 'application',
-    });
-
-    return NextResponse.json({
-      message: 'Application submitted successfully',
-      application: {
-        id: application._id,
-        status: application.status,
-        matchScore: application.matchScore,
-        proposedAmount: application.proposedAmount,
-        proposedDuration: application.proposedDuration,
-      },
-    });
-  } catch (error) {
-    console.error('Error applying to project:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
+      201
     );
+  } catch (error) {
+    return handleAPIError(error);
   }
 }
 
@@ -233,12 +217,12 @@ export async function GET(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    
     if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      throw errors.unauthorized();
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(params.id)) {
+      throw errors.invalidInput('project id');
     }
 
     await connectDB();
@@ -246,24 +230,21 @@ export async function GET(
     const application = await Application.findOne({
       projectId: params.id,
       applicantId: session.user.id,
-    }).select('status submittedAt proposedAmount proposedDuration matchScore') as any;
+      type: 'project',
+    })
+      .select('status submittedAt proposedAmount proposedDuration matchScore')
+      .lean();
 
-    return NextResponse.json({
-      hasApplied: !!application,
-      application: application ? {
-        id: application._id,
-        status: application.status,
-        submittedAt: application.submittedAt,
-        proposedAmount: application.proposedAmount,
-        proposedDuration: application.proposedDuration,
-        matchScore: application.matchScore,
-      } : null,
+    return successResponse({
+      hasApplied: Boolean(application),
+      application: application
+        ? {
+            ...application,
+            _id: application._id.toString(),
+          }
+        : null,
     });
   } catch (error) {
-    console.error('Error checking application status:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return handleAPIError(error);
   }
 }

@@ -1,6 +1,21 @@
 import useSWR from 'swr';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { fetcher } from '@/lib/api/client';
+import { useSWRConfig } from 'swr';
+import apiClient, { fetcher } from '@/lib/api/client';
+import { Project } from '@/types/project';
+
+interface ApiEnvelope<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+}
+
+interface Pagination {
+  page: number;
+  limit: number;
+  total: number;
+  pages: number;
+}
 
 interface UseProjectsOptions {
   page?: number;
@@ -11,6 +26,7 @@ interface UseProjectsOptions {
   maxBudget?: number;
   experienceLevel?: string;
   search?: string;
+  status?: string;
 }
 
 interface CreateProjectData {
@@ -34,36 +50,131 @@ interface CreateProjectData {
   visibility: 'public' | 'private';
   milestones?: Array<{
     title: string;
-    description: string;
+    description?: string;
     amount: number;
     deadline: number;
   }>;
 }
 
-interface ApplyResult {
+interface ApplyPayload {
+  proposedAmount: number;
+  proposedDuration: number;
+  coverLetter: string;
+  attachments?: string[];
+  portfolio?: string;
+  additionalInfo?: string;
+}
+
+interface ActionResult<T = undefined> {
   success: boolean;
+  data?: T;
   error?: string;
 }
 
-interface ProjectsResponse {
-  projects?: any[];
-  pagination?: any;
+interface ProjectsPayload {
+  projects: Project[];
+  pagination: Pagination;
 }
 
-interface ProjectResponse {
-  project?: any;
+interface ProjectPayload {
+  project: Project;
+}
+
+async function revalidateProjectKeys(
+  mutate: ReturnType<typeof useSWRConfig>['mutate'],
+  projectId?: string
+) {
+  await mutate(
+    (key) =>
+      typeof key === 'string' &&
+      (key.startsWith('/api/projects') ||
+        key.startsWith('/api/applications') ||
+        (projectId ? key.includes(projectId) : false)),
+    undefined,
+    { revalidate: true }
+  );
+}
+
+export function useProjectActions() {
+  const { mutate } = useSWRConfig();
+
+  const applyToProject = useCallback(
+    async (projectId: string, application: ApplyPayload): Promise<ActionResult<{ application: unknown }>> => {
+      try {
+        const response = await apiClient.post<ApiEnvelope<{ application: unknown }>>(
+          `/api/projects/${projectId}/apply`,
+          application
+        );
+        await revalidateProjectKeys(mutate, projectId);
+        return {
+          success: true,
+          data: response.data,
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to apply',
+        };
+      }
+    },
+    [mutate]
+  );
+
+  const saveProject = useCallback(
+    async (projectId: string): Promise<ActionResult<{ saved: boolean; projectId: string }>> => {
+      try {
+        const response = await apiClient.post<ApiEnvelope<{ saved: boolean; projectId: string }>>(
+          `/api/projects/${projectId}/save`
+        );
+        await revalidateProjectKeys(mutate, projectId);
+        return {
+          success: true,
+          data: response.data,
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to save project',
+        };
+      }
+    },
+    [mutate]
+  );
+
+  const createProject = useCallback(
+    async (projectData: CreateProjectData): Promise<ActionResult<{ project: Project }>> => {
+      try {
+        const response = await apiClient.post<ApiEnvelope<{ project: Project }>>('/api/projects', projectData);
+        await revalidateProjectKeys(mutate);
+        return {
+          success: true,
+          data: response.data,
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to create project',
+        };
+      }
+    },
+    [mutate]
+  );
+
+  return {
+    applyToProject,
+    saveProject,
+    createProject,
+  };
 }
 
 export function useProjects(options: UseProjectsOptions = {}) {
-  const [filters, setFilters] = useState(options);
+  const [filters, setFilters] = useState<UseProjectsOptions>(options);
   const previousOptionsRef = useRef(options);
+  const actions = useProjectActions();
 
   useEffect(() => {
     const previousOptions = previousOptionsRef.current;
-    const keys = Array.from(new Set([
-      ...Object.keys(previousOptions),
-      ...Object.keys(options),
-    ])) as Array<keyof UseProjectsOptions>;
+    const keys = Array.from(new Set([...Object.keys(previousOptions), ...Object.keys(options)])) as Array<keyof UseProjectsOptions>;
     const hasChanged = keys.some((key) => {
       const previousValue = previousOptions[key];
       const nextValue = options[key];
@@ -80,147 +191,93 @@ export function useProjects(options: UseProjectsOptions = {}) {
     }
 
     previousOptionsRef.current = options;
-    setFilters((current) => ({
-      ...current,
+    setFilters({
       ...options,
       page: options.page ?? 1,
-    }));
+    });
   }, [options]);
 
   const queryParams = new URLSearchParams();
   Object.entries(filters).forEach(([key, value]) => {
-    if (value !== undefined && value !== null) {
-      if (Array.isArray(value)) {
-        value.forEach(v => queryParams.append(key, v));
-      } else {
-        queryParams.append(key, value.toString());
-      }
+    if (value === undefined || value === null || value === '') {
+      return;
     }
+
+    if (Array.isArray(value)) {
+      value.forEach((item) => queryParams.append(key, item));
+      return;
+    }
+
+    queryParams.append(key, value.toString());
   });
 
-  const { data, error, mutate } = useSWR<ProjectsResponse>(
+  const { data, error, mutate } = useSWR<ApiEnvelope<ProjectsPayload>>(
     `/api/projects?${queryParams.toString()}`,
     fetcher
   );
 
   const applyFilters = useCallback((newFilters: Partial<UseProjectsOptions>) => {
-    setFilters(prev => ({ ...prev, ...newFilters, page: 1 }));
+    setFilters((current) => ({
+      ...current,
+      ...newFilters,
+      page: 1,
+    }));
   }, []);
 
   const loadMore = useCallback(() => {
-    setFilters(prev => ({ ...prev, page: (prev.page || 1) + 1 }));
+    setFilters((current) => ({
+      ...current,
+      page: (current.page || 1) + 1,
+    }));
   }, []);
 
-  const applyToProject = useCallback(async (projectId: string, application: any): Promise<ApplyResult> => {
-    try {
-      const response = await fetch(`/api/projects/${projectId}/apply`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(application),
-      });
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        return {
-          success: false,
-          error: data.error || 'Failed to apply'
-        };
-      }
-
-      mutate();
-      return { success: true };
-    } catch (error) {
-      return { success: false, error: (error as Error).message };
-    }
-  }, [mutate]);
-
-  const saveProject = useCallback(async (projectId: string) => {
-    try {
-      const response = await fetch(`/api/projects/${projectId}/save`, {
-        method: 'POST',
-      });
-
-      if (!response.ok) throw new Error('Failed to save');
-
-      mutate();
-      return { success: true };
-    } catch (error) {
-      return { success: false, error: (error as Error).message };
-    }
-  }, [mutate]);
-
-  const createProject = useCallback(async (projectData: CreateProjectData) => {
-    try {
-      const response = await fetch('/api/projects', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(projectData),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create project');
-      }
-
-      const data = await response.json();
-      mutate();
-
-      return {
-        success: true,
-        project: data.project,
-        id: data.project?._id
-      };
-    } catch (error) {
-      console.error('Error creating project:', error);
-      return {
-        success: false,
-        error: (error as Error).message
-      };
-    }
-  }, [mutate]);
-
   return {
-    projects: data?.projects || [],
-    pagination: data?.pagination,
+    projects: data?.data?.projects || [],
+    pagination: data?.data?.pagination,
     isLoading: !error && !data,
     isError: error,
+    errorMessage: error instanceof Error ? error.message : data?.error,
     filters,
     applyFilters,
     loadMore,
-    applyToProject,
-    saveProject,
-    createProject,
+    applyToProject: actions.applyToProject,
+    saveProject: actions.saveProject,
+    createProject: actions.createProject,
     mutate,
   };
 }
 
 export function useProject(id: string) {
-  const { data, error, mutate } = useSWR<ProjectResponse>(
+  const { mutate: globalMutate } = useSWRConfig();
+  const { data, error, mutate } = useSWR<ApiEnvelope<ProjectPayload>>(
     id ? `/api/projects/${id}` : null,
     fetcher
   );
 
-  const updateProject = useCallback(async (updates: any) => {
-    try {
-      const response = await fetch(`/api/projects/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates),
-      });
-
-      if (!response.ok) throw new Error('Failed to update');
-
-      mutate();
-      return { success: true };
-    } catch (error) {
-      return { success: false, error: (error as Error).message };
-    }
-  }, [id, mutate]);
+  const updateProject = useCallback(
+    async (updates: Partial<Project>): Promise<ActionResult<{ project: Project }>> => {
+      try {
+        const response = await apiClient.patch<ApiEnvelope<{ project: Project }>>(`/api/projects/${id}`, updates);
+        await revalidateProjectKeys(globalMutate, id);
+        return {
+          success: true,
+          data: response.data,
+        };
+      } catch (actionError) {
+        return {
+          success: false,
+          error: actionError instanceof Error ? actionError.message : 'Failed to update project',
+        };
+      }
+    },
+    [globalMutate, id]
+  );
 
   return {
-    project: data?.project,
+    project: data?.data?.project,
     isLoading: !error && !data,
     isError: error,
+    errorMessage: error instanceof Error ? error.message : data?.error,
     updateProject,
     mutate,
   };
