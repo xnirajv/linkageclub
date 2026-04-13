@@ -9,12 +9,16 @@ import { useProject } from '@/hooks/useProjects';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
+type ApplicantRef = { _id?: string; name?: string; trustScore?: number; location?: string };
+
 type ProjectApplication = {
   _id: string;
   status?: string;
   proposedAmount?: number;
-  applicantId?: { _id?: string; name?: string; trustScore?: number; location?: string };
+  applicantId?: ApplicantRef;
 };
+
+type SelectedApplicant = string | ApplicantRef;
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('en-IN', {
@@ -41,13 +45,12 @@ export default function CompanyProjectDetailPage() {
       return typedApplications.find((application) => application.status === 'accepted') || null;
     }
 
+    const selected = project.selectedApplicant as SelectedApplicant;
+    const selectedId = typeof selected === 'string' ? selected : selected?._id;
+
     return (
       typedApplications.find(
-        (application) =>
-          application.applicantId?._id ===
-          (typeof project.selectedApplicant === 'string'
-            ? project.selectedApplicant
-            : project.selectedApplicant?._id)
+        (application) => application.applicantId?._id === selectedId
       ) || null
     );
   }, [project?.selectedApplicant, typedApplications]);
