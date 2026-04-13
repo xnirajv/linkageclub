@@ -11,20 +11,32 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/forms/Textarea';
 
 export default function CompanySettingsPage() {
-  const { profile, updateProfile, uploadAvatar } = useProfile();
+  const { profile, updateProfile, updateSettings, uploadAvatar } = useProfile();
   const [companyName, setCompanyName] = useState('');
   const [bio, setBio] = useState('');
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [pushNotifications, setPushNotifications] = useState(true);
+  const [newsletter, setNewsletter] = useState(false);
   const [twoFactorAuth, setTwoFactorAuth] = useState(false);
+  const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   useEffect(() => {
     setCompanyName(profile?.name || '');
     setBio(profile?.bio || '');
+    setEmailNotifications(profile?.preferences?.emailNotifications ?? true);
+    setPushNotifications(profile?.preferences?.pushNotifications ?? true);
+    setNewsletter(profile?.preferences?.newsletter ?? false);
+    setTwoFactorAuth(profile?.verification?.phone ?? false);
   }, [profile]);
 
   return (
     <div className="space-y-6">
+      {status && (
+        <div className={`rounded-2xl border p-4 text-sm ${status.type === 'success' ? 'border-green-200 bg-green-50 text-green-700' : 'border-red-200 bg-red-50 text-red-700'}`}>
+          {status.message}
+        </div>
+      )}
+
       <div>
         <h1 className="text-3xl font-semibold text-charcoal-950 dark:text-white">Settings</h1>
         <p className="mt-2 text-sm leading-7 text-charcoal-500 dark:text-charcoal-400">Control company account settings, notification preferences, security posture, and shortcut access to billing and team management.</p>
@@ -39,8 +51,16 @@ export default function CompanySettingsPage() {
               <Textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={5} placeholder="Company description" />
               <div className="flex flex-wrap gap-3">
                 <Button onClick={async () => {
-                  await updateProfile({ name: companyName, bio });
-                  window.alert('Profile settings saved.');
+                  setStatus(null);
+                  try {
+                    await updateProfile({ name: companyName.trim(), bio: bio.trim() });
+                    setStatus({ type: 'success', message: 'Account profile updated successfully.' });
+                  } catch (error) {
+                    setStatus({
+                      type: 'error',
+                      message: error instanceof Error ? error.message : 'Failed to update account profile.',
+                    });
+                  }
                 }}>
                   <Save className="mr-2 h-4 w-4" />
                   Save Changes
@@ -52,8 +72,15 @@ export default function CompanySettingsPage() {
                   input.onchange = async () => {
                     const file = input.files?.[0];
                     if (file) {
-                      await uploadAvatar(file);
-                      window.alert('Logo upload complete.');
+                      try {
+                        await uploadAvatar(file);
+                        setStatus({ type: 'success', message: 'Logo uploaded successfully.' });
+                      } catch (error) {
+                        setStatus({
+                          type: 'error',
+                          message: error instanceof Error ? error.message : 'Failed to upload logo.',
+                        });
+                      }
                     }
                   };
                   input.click();
@@ -69,7 +96,28 @@ export default function CompanySettingsPage() {
             <CardContent className="space-y-4">
               <ToggleRow label="Email notifications" value={emailNotifications} onChange={setEmailNotifications} />
               <ToggleRow label="Push notifications" value={pushNotifications} onChange={setPushNotifications} />
-              <ToggleRow label="Weekly digest" value={true} onChange={() => undefined} disabled />
+              <ToggleRow label="Weekly digest" value={newsletter} onChange={setNewsletter} />
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  setStatus(null);
+                  try {
+                    await updateSettings({
+                      emailNotifications,
+                      pushNotifications,
+                      newsletter,
+                    });
+                    setStatus({ type: 'success', message: 'Notification preferences saved.' });
+                  } catch (error) {
+                    setStatus({
+                      type: 'error',
+                      message: error instanceof Error ? error.message : 'Failed to save notification preferences.',
+                    });
+                  }
+                }}
+              >
+                Save Preferences
+              </Button>
             </CardContent>
           </Card>
 

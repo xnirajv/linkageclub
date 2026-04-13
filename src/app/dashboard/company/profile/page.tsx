@@ -1,8 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
-import Link from 'next/link';
-import { Award, Building2, Calendar, Edit, Globe, Instagram, Linkedin, Mail, MapPin, Share2, ShieldCheck, Twitter, Users, Upload, Check, AlertCircle } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Award, Building2, Calendar, Edit, Globe, Instagram, Linkedin, MapPin, Share2, ShieldCheck, Twitter, Users, Upload, Check, AlertCircle } from 'lucide-react';
 import { useProfile } from '@/hooks/useProfile';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,29 +9,29 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export default function CompanyProfilePage() {
-  const { profile, isLoading } = useProfile();
+  const { profile, isLoading, isUpdating, updateProfile, uploadAvatar } = useProfile();
   const [activeTab, setActiveTab] = useState('basic');
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
 
-  // Form state
   const [formData, setFormData] = useState(() => {
     const p = profile as any;
     return {
-      companyName: p?.name || 'TechCorp Solutions',
+      companyName: p?.name || p?.companyName || 'TechCorp Solutions',
       website: p?.website || 'https://techcorp.com',
-      email: p?.email || 'hello@techcorp.com',
-      phone: p?.phone || '+91 XXXXX XXXXX',
       location: p?.location || 'Bangalore, India',
       foundedYear: String(p?.foundedYear || '2022'),
       companySize: p?.companySize || '11-50',
       industry: p?.industry || 'Technology',
       bio: p?.bio || 'Building innovative digital products and hiring outcomes.',
-      logo: p?.logo || '',
+      logo: p?.logo || p?.avatar || '',
       banner: p?.banner || '',
-      twitter: p?.social?.twitter || '',
-      linkedin: p?.social?.linkedin || '',
-      instagram: p?.social?.instagram || '',
+      twitter: p?.socialLinks?.twitter || '',
+      linkedin: p?.socialLinks?.linkedin || '',
+      instagram: p?.socialLinks?.instagram || '',
     };
   });
 
@@ -40,20 +39,104 @@ export default function CompanyProfilePage() {
     return <div className="rounded-[28px] bg-card/80 p-8 text-sm text-charcoal-500 dark:bg-charcoal-900/72 dark:text-charcoal-400">Loading profile...</div>;
   }
 
+  useEffect(() => {
+    const p = profile as any;
+    if (!p) {
+      return;
+    }
+
+    setFormData({
+      companyName: p.name || p.companyName || 'TechCorp Solutions',
+      website: p.website || '',
+      location: p.location || '',
+      foundedYear: String(p.foundedYear || ''),
+      companySize: p.companySize || '',
+      industry: p.industry || '',
+      bio: p.bio || '',
+      logo: p.logo || p.avatar || '',
+      banner: p.banner || '',
+      twitter: p.socialLinks?.twitter || '',
+      linkedin: p.socialLinks?.linkedin || '',
+      instagram: p.socialLinks?.instagram || '',
+    });
+  }, [profile]);
+
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleSave = async () => {
     setIsSaving(true);
-    // Simulate save
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setIsSaving(false);
-    setIsEditing(false);
+    setFeedback(null);
+
+    try {
+      await updateProfile({
+        name: formData.companyName.trim(),
+        website: formData.website.trim(),
+        location: formData.location.trim(),
+        foundedYear: formData.foundedYear.trim(),
+        companySize: formData.companySize.trim(),
+        industry: formData.industry.trim(),
+        bio: formData.bio.trim(),
+        socialLinks: {
+          linkedin: formData.linkedin.trim(),
+          twitter: formData.twitter.trim(),
+          instagram: formData.instagram.trim(),
+        },
+      });
+
+      setFeedback({ type: 'success', message: 'Company profile updated successfully.' });
+      setIsEditing(false);
+    } catch (error) {
+      setFeedback({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Failed to update company profile.',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>, kind: 'logo' | 'banner') => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    setFeedback(null);
+
+    try {
+      const response = await uploadAvatar(file);
+      const uploadedUrl = response?.url || response?.avatar || response?.image || '';
+
+      if (kind === 'logo' && uploadedUrl) {
+        setFormData((prev) => ({ ...prev, logo: uploadedUrl }));
+        await updateProfile({ logo: uploadedUrl });
+      }
+
+      if (kind === 'banner' && uploadedUrl) {
+        setFormData((prev) => ({ ...prev, banner: uploadedUrl }));
+      }
+
+      setFeedback({ type: 'success', message: `${kind === 'logo' ? 'Logo' : 'Banner'} uploaded successfully.` });
+    } catch (error) {
+      setFeedback({
+        type: 'error',
+        message: error instanceof Error ? error.message : `Failed to upload ${kind}.`,
+      });
+    } finally {
+      event.target.value = '';
+    }
   };
 
   return (
     <div className="space-y-6">
+      {feedback && (
+        <div className={`rounded-2xl border p-4 text-sm ${feedback.type === 'success' ? 'border-green-200 bg-green-50 text-green-700' : 'border-red-200 bg-red-50 text-red-700'}`}>
+          {feedback.message}
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
@@ -73,8 +156,8 @@ export default function CompanyProfilePage() {
           ) : (
             <>
               <Button variant="outline" onClick={() => setIsEditing(false)}>Cancel</Button>
-              <Button onClick={handleSave} disabled={isSaving}>
-                {isSaving ? 'Saving...' : 'Save Changes'}
+              <Button onClick={handleSave} disabled={isSaving || isUpdating}>
+                {isSaving || isUpdating ? 'Saving...' : 'Save Changes'}
               </Button>
             </>
           )}
@@ -141,23 +224,6 @@ export default function CompanyProfilePage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-2">Email</label>
-                    <Input 
-                      type="email"
-                      value={formData.email} 
-                      onChange={(e) => handleInputChange('email', e.target.value)}
-                      placeholder="company@example.com"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Phone</label>
-                    <Input 
-                      value={formData.phone} 
-                      onChange={(e) => handleInputChange('phone', e.target.value)}
-                      placeholder="+91 XXXXX XXXXX"
-                    />
-                  </div>
-                  <div>
                     <label className="block text-sm font-medium mb-2">Website</label>
                     <Input 
                       value={formData.website} 
@@ -218,22 +284,24 @@ export default function CompanyProfilePage() {
 
               {/* Branding Tab */}
               <TabsContent value="branding" className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-3">Company Logo</label>
-                  <div className="rounded-lg border-2 border-dashed border-primary-300 p-6 text-center">
+                  <div>
+                    <label className="block text-sm font-medium mb-3">Company Logo</label>
+                  <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={(event) => void handleImageUpload(event, 'logo')} />
+                  <button type="button" className="w-full rounded-lg border-2 border-dashed border-primary-300 p-6 text-center" onClick={() => logoInputRef.current?.click()}>
                     <Upload className="h-8 w-8 mx-auto mb-2 text-charcoal-400" />
                     <p className="text-sm text-charcoal-600 dark:text-charcoal-400">Click to upload or drag and drop</p>
                     <p className="text-xs text-charcoal-500 mt-1">PNG, JPG up to 5MB</p>
-                  </div>
+                  </button>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium mb-3">Banner Image</label>
-                  <div className="rounded-lg border-2 border-dashed border-primary-300 p-6 text-center">
+                  <input ref={bannerInputRef} type="file" accept="image/*" className="hidden" onChange={(event) => void handleImageUpload(event, 'banner')} />
+                  <button type="button" className="w-full rounded-lg border-2 border-dashed border-primary-300 p-6 text-center" onClick={() => bannerInputRef.current?.click()}>
                     <Upload className="h-8 w-8 mx-auto mb-2 text-charcoal-400" />
                     <p className="text-sm text-charcoal-600 dark:text-charcoal-400">Click to upload or drag and drop</p>
                     <p className="text-xs text-charcoal-500 mt-1">PNG, JPG up to 10MB</p>
-                  </div>
+                  </button>
                 </div>
 
                 <div className="rounded-lg border border-primary-200 bg-primary-50/50 p-4 dark:border-primary-800/30 dark:bg-primary-950/20">
@@ -287,7 +355,7 @@ export default function CompanyProfilePage() {
                     <Check className="h-5 w-5 text-info-600 mt-0.5 flex-shrink-0" />
                     <div>
                       <p className="font-medium text-charcoal-900 dark:text-white">Email Verified</p>
-                      <p className="text-xs text-charcoal-600 dark:text-charcoal-400 mt-1">hello@techcorp.com</p>
+                      <p className="text-xs text-charcoal-600 dark:text-charcoal-400 mt-1">{profile?.email || 'Email verified'}</p>
                     </div>
                   </div>
 
@@ -321,8 +389,6 @@ export default function CompanyProfilePage() {
               <CardContent className="grid gap-4 md:grid-cols-2">
                 <Info label="Company Name" value={formData.companyName} icon={<Building2 className="h-4 w-4 text-primary-700" />} />
                 <Info label="Website" value={formData.website} value_isLink icon={<Globe className="h-4 w-4 text-info-700" />} />
-                <Info label="Email" value={formData.email} icon={<Mail className="h-4 w-4 text-primary-700" />} />
-                <Info label="Phone" value={formData.phone} icon={<ShieldCheck className="h-4 w-4 text-charcoal-700" />} />
                 <Info label="Location" value={formData.location} icon={<MapPin className="h-4 w-4 text-secondary-700" />} />
                 <Info label="Founded" value={formData.foundedYear} icon={<Calendar className="h-4 w-4 text-charcoal-700" />} />
               </CardContent>

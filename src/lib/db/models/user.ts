@@ -34,6 +34,7 @@ export interface IUser extends Document {
     github?: string;
     portfolio?: string;
     twitter?: string;
+    instagram?: string;
   };
   preferences: {
     emailNotifications: boolean;
@@ -73,6 +74,12 @@ export interface IUser extends Document {
   deletedBy?: mongoose.Types.ObjectId | string | null;
 
   isVerified?: boolean;
+  logo?: string;
+  website?: string;
+  industry?: string;
+  companySize?: string;
+  foundedYear?: string | number;
+  companyType?: string;
   verifiedAt?: Date | null;
   verifiedBy?: mongoose.Types.ObjectId | string | null;
 
@@ -134,12 +141,18 @@ const userSchema = new Schema<IUser>(
       type: String,
       default: '/images/default-avatar.png',
     },
+    logo: String,
     bio: {
       type: String,
       maxlength: [500, 'Bio cannot be more than 500 characters'],
     },
     location: String,
     phone: String,
+    website: String,
+    industry: String,
+    companySize: String,
+    foundedYear: Schema.Types.Mixed,
+    companyType: String,
     emailVerified: {
       type: Boolean,
       default: false,
@@ -179,6 +192,7 @@ const userSchema = new Schema<IUser>(
       github: String,
       portfolio: String,
       twitter: String,
+      instagram: String,
     },
     preferences: {
       emailNotifications: { type: Boolean, default: true },
@@ -206,6 +220,10 @@ const userSchema = new Schema<IUser>(
       default: Date.now,
     },
     isBanned: {
+      type: Boolean,
+      default: false,
+    },
+    isVerified: {
       type: Boolean,
       default: false,
     },

@@ -16,15 +16,9 @@ type JobItem = {
   status?: string;
   applicationsCount?: number;
   postedAt?: string | Date;
+  deadline?: string | Date;
   salary?: { min?: number; max?: number; period?: string };
 };
-
-const fallbackJobs: JobItem[] = [
-  { _id: 'j1', title: 'Senior Frontend Developer', location: 'Bangalore (Remote)', type: 'full-time', status: 'published', applicationsCount: 24, postedAt: new Date().toISOString(), salary: { min: 1200000, max: 1800000, period: 'year' } },
-  { _id: 'j2', title: 'Backend Developer - Node.js', location: 'Remote', type: 'full-time', status: 'published', applicationsCount: 35, postedAt: new Date().toISOString(), salary: { min: 1000000, max: 1500000, period: 'year' } },
-  { _id: 'j3', title: 'UI/UX Designer', location: 'Hybrid - Bangalore', type: 'contract', status: 'published', applicationsCount: 12, postedAt: new Date().toISOString(), salary: { min: 700000, max: 1100000, period: 'year' } },
-  { _id: 'j4', title: 'Platform Engineer', location: 'Remote', type: 'full-time', status: 'draft', applicationsCount: 0, postedAt: new Date().toISOString(), salary: { min: 1400000, max: 1900000, period: 'year' } },
-];
 
 function formatSalary(job: JobItem) {
   if (!job.salary?.min || !job.salary?.max) return 'Salary not specified';
@@ -45,7 +39,7 @@ export default function CompanyJobsPage() {
   const [query, setQuery] = useState('');
   const [tab, setTab] = useState<'published' | 'draft' | 'filled' | 'closed'>('published');
 
-  const sourceJobs = ((jobs as JobItem[]).length ? (jobs as JobItem[]) : fallbackJobs);
+  const sourceJobs = jobs as JobItem[];
 
   const filteredJobs = useMemo(() => {
     return sourceJobs.filter((job) => {
@@ -63,6 +57,12 @@ export default function CompanyJobsPage() {
   };
 
   const totalApplications = sourceJobs.reduce((sum, job) => sum + (job.applicationsCount || 0), 0);
+  const expiringSoon = sourceJobs.filter((job) => {
+    if (!job.deadline) return false;
+    const diff = new Date(job.deadline).getTime() - Date.now();
+    const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+    return days >= 0 && days <= 3;
+  });
 
   return (
     <div className="space-y-6">
@@ -101,7 +101,7 @@ export default function CompanyJobsPage() {
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-charcoal-400" />
             <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search jobs by title..." className="pl-9" />
           </div>
-          <Button variant="outline">
+          <Button variant="outline" disabled>
             <Filter className="mr-2 h-4 w-4" />
             Filter
           </Button>
@@ -151,7 +151,7 @@ export default function CompanyJobsPage() {
                     <div>Salary: {formatSalary(job)}</div>
                     <div>Applications: {job.applicationsCount || 0}</div>
                     <div>Status: {job.status || 'published'}</div>
-                    <div>Views: {(job.applicationsCount || 0) * 18 + 120}</div>
+                    <div>{job.deadline ? `Deadline: ${new Date(job.deadline).toLocaleDateString()}` : 'Deadline not set'}</div>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2 lg:w-[240px] lg:flex-col">
@@ -182,14 +182,23 @@ export default function CompanyJobsPage() {
             <AlertTriangle className="h-5 w-5 text-secondary-700" />
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="rounded-[22px] border border-secondary-200 bg-secondary-50/80 p-4">
-              <div className="font-semibold text-charcoal-950">UI/UX Designer</div>
-              <div className="mt-2 text-sm text-charcoal-500">Applications: 12 • Expires in 2 days</div>
-              <div className="mt-3 flex gap-2">
-                <Button size="sm">Extend</Button>
-                <Button size="sm" variant="outline">Close</Button>
+            {expiringSoon.length === 0 && (
+              <div className="rounded-[22px] border border-dashed border-primary-200 bg-silver-50/70 p-4 text-sm text-charcoal-500">
+                No jobs are expiring in the next 3 days.
               </div>
-            </div>
+            )}
+            {expiringSoon.map((job) => {
+              const daysLeft = Math.max(0, Math.ceil((new Date(job.deadline as string | Date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+              return (
+                <div key={job._id || job.title} className="rounded-[22px] border border-secondary-200 bg-secondary-50/80 p-4">
+                  <div className="font-semibold text-charcoal-950">{job.title || 'Untitled role'}</div>
+                  <div className="mt-2 text-sm text-charcoal-500">Applications: {job.applicationsCount || 0} • Expires in {daysLeft} day{daysLeft === 1 ? '' : 's'}</div>
+                  <div className="mt-3 flex gap-2">
+                    <Button size="sm" variant="outline">Review</Button>
+                  </div>
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
 
@@ -200,10 +209,10 @@ export default function CompanyJobsPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="rounded-[22px] border border-primary-100/70 bg-silver-50/70 p-4 text-sm text-charcoal-700">
-              <div className="flex items-center gap-2"><Calendar className="h-4 w-4 text-info-700" />Best day to post roles: Tuesday</div>
+              <div className="flex items-center gap-2"><Calendar className="h-4 w-4 text-info-700" />Active roles currently live: {counts.published}</div>
             </div>
             <div className="rounded-[22px] border border-primary-100/70 bg-silver-50/70 p-4 text-sm text-charcoal-700">
-              <div className="flex items-center gap-2"><Users className="h-4 w-4 text-primary-700" />Top funnel role: Frontend & Product Design</div>
+              <div className="flex items-center gap-2"><Users className="h-4 w-4 text-primary-700" />Candidate demand is being measured from real job application counts.</div>
             </div>
           </CardContent>
         </Card>

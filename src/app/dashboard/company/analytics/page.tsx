@@ -283,9 +283,9 @@ export default function CompanyAnalyticsPage() {
                   variant="outline" 
                   size="sm" 
                   className="rounded-xl border-primary-200 text-primary-600 hover:bg-primary-50 dark:border-primary-800"
-                  onClick={() => router.push('/dashboard/company/insights')}
+                  onClick={() => router.push('/dashboard/company/applications')}
                 >
-                  View Detailed Insights
+                  Review Applications
                   <ArrowUpRight className="h-4 w-4 ml-1" />
                 </Button>
               </div>

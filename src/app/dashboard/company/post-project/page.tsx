@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, CheckCircle2, Eye, Paperclip, Plus, Sparkles, Trash2 } from 'lucide-react';
@@ -95,6 +95,25 @@ export default function PostProjectPage() {
   const [attachmentInput, setAttachmentInput] = useState('');
   const [form, setForm] = useState<FormState>(initialState);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const savedDraft = window.localStorage.getItem('company-project-draft');
+    if (!savedDraft) {
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(savedDraft) as FormState;
+      setForm((prev) => ({ ...prev, ...parsed }));
+      setSubmitSuccess('Saved draft restored.');
+    } catch {
+      window.localStorage.removeItem('company-project-draft');
+    }
+  }, []);
+
   const milestoneTotal = useMemo(() => form.milestones.reduce((sum, item) => sum + item.amount, 0), [form.milestones]);
   const canPublish = useMemo(() => {
     return Boolean(
@@ -142,7 +161,8 @@ export default function PostProjectPage() {
   function saveDraft() {
     if (typeof window !== 'undefined') {
       localStorage.setItem('company-project-draft', JSON.stringify(form));
-      window.alert('Draft saved locally.');
+      setSubmitError(null);
+      setSubmitSuccess('Draft saved locally.');
     }
   }
 
@@ -183,6 +203,9 @@ export default function PostProjectPage() {
     });
 
     if (result.success) {
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem('company-project-draft');
+      }
       setSubmitSuccess('Project published successfully.');
       router.push('/dashboard/company/my-projects');
     } else {

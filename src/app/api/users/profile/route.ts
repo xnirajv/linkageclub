@@ -7,11 +7,18 @@ import connectDB from '@/lib/db/connect';
 import { z } from 'zod';
 
 const profileSchema = z.object({
+  email: z.string().email().optional(),
   name: z.string().min(2).optional(),
   headline: z.string().max(100).optional(),
   bio: z.string().max(500).optional(),
   location: z.string().optional(),
   phone: z.string().optional(),
+  website: z.string().url().optional().or(z.literal('')),
+  industry: z.string().max(120).optional(),
+  companySize: z.string().max(60).optional(),
+  foundedYear: z.union([z.string(), z.number()]).optional(),
+  companyType: z.string().max(120).optional(),
+  logo: z.string().url().optional().or(z.literal('')),
 
   skills: z.array(
     z.object({
@@ -49,6 +56,7 @@ const profileSchema = z.object({
     github: z.string().url().optional().or(z.literal('')),
     portfolio: z.string().url().optional().or(z.literal('')),
     twitter: z.string().url().optional().or(z.literal('')),
+    instagram: z.string().url().optional().or(z.literal('')),
   }).optional(),
 
   preferences: z.object({
@@ -123,6 +131,20 @@ export async function PATCH(req: NextRequest) {
     }
 
     await connectDB();
+
+    if (validation.data.email) {
+      const existing = await User.findOne({
+        email: validation.data.email.toLowerCase(),
+        _id: { $ne: session.user.id },
+      }).select('_id');
+
+      if (existing) {
+        return NextResponse.json(
+          { error: 'Email is already in use' },
+          { status: 409 }
+        );
+      }
+    }
 
     const user = await User.findByIdAndUpdate(
       session.user.id,

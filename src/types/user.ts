@@ -41,6 +41,7 @@ export interface SocialLinks {
   github?: string;
   portfolio?: string;
   twitter?: string;
+  instagram?: string;
 }
 
 export interface UserPreferences {

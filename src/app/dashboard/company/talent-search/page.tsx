@@ -1,149 +1,210 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Bookmark, Briefcase, GraduationCap, MapPin, Search, Sparkles, Star, Clock, DollarSign, Trophy, MessageCircle, ArrowRight } from 'lucide-react';
+import { Bookmark, Briefcase, Clock, DollarSign, MapPin, MessageCircle, Search, Sparkles, Star, Trophy } from 'lucide-react';
+import apiClient from '@/lib/api/client';
+import { useApplications } from '@/hooks/useApplications';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 
-interface TalentCard {
+type SearchUser = {
+  _id: string;
+  name?: string;
+  role?: string;
+  location?: string;
+  trustScore?: number;
+  skills?: Array<{ name?: string }>;
+  experience?: Array<{ title?: string }>;
+};
+
+type CompanyApplication = {
+  _id?: string;
+  proposedAmount?: number;
+  proposedDuration?: number;
+  applicantId?: {
+    _id?: string;
+    name?: string;
+    trustScore?: number;
+    location?: string;
+    skills?: Array<{ name?: string }>;
+    experience?: Array<{ title?: string }>;
+  };
+  projectId?: { title?: string };
+  jobId?: { title?: string };
+};
+
+type TalentCard = {
   id: string;
   name: string;
   role: string;
   location: string;
   trustScore: number;
   experience: number;
-  rate: number;
+  rateLabel: string;
+  rateValue: number | null;
   availability: string;
   skills: string[];
   completedProjects?: number;
   avgRating?: number;
-  recentProjects?: Array<{ title: string; rating: number }>;
-}
-
-const talentPool: TalentCard[] = [
-  { 
-    id: '1', 
-    name: 'Riya Sharma', 
-    role: 'Full Stack Developer', 
-    location: 'Mumbai, India', 
-    trustScore: 95, 
-    experience: 3, 
-    rate: 1500, 
-    availability: 'Immediate', 
-    skills: ['React', 'Node.js', 'MongoDB', 'TypeScript'],
-    completedProjects: 12,
-    avgRating: 4.9,
-    recentProjects: [{ title: 'E-commerce Platform', rating: 5 }, { title: 'Admin Dashboard', rating: 4.8 }]
-  },
-  { 
-    id: '2', 
-    name: 'Raj Patel', 
-    role: 'Frontend Engineer', 
-    location: 'Bangalore, India', 
-    trustScore: 92, 
-    experience: 4, 
-    rate: 1200, 
-    availability: 'Immediate', 
-    skills: ['React', 'TypeScript', 'Next.js', 'Tailwind'],
-    completedProjects: 18,
-    avgRating: 4.7,
-    recentProjects: [{ title: 'SaaS Dashboard', rating: 4.7 }, { title: 'Mobile App', rating: 4.6 }]
-  },
-  { 
-    id: '3', 
-    name: 'Priya Mehta', 
-    role: 'Full Stack Engineer', 
-    location: 'Remote', 
-    trustScore: 90, 
-    experience: 5, 
-    rate: 1800, 
-    availability: 'Immediate', 
-    skills: ['React', 'Node.js', 'PostgreSQL', 'Docker'],
-    completedProjects: 24,
-    avgRating: 4.8,
-    recentProjects: [{ title: 'Fintech Platform', rating: 5 }, { title: 'SaaS Product', rating: 4.8 }]
-  },
-  { 
-    id: '4', 
-    name: 'Vikram Singh', 
-    role: 'Backend Developer', 
-    location: 'Delhi, India', 
-    trustScore: 88, 
-    experience: 4, 
-    rate: 1400, 
-    availability: '2 weeks', 
-    skills: ['Node.js', 'Express', 'MongoDB', 'AWS'],
-    completedProjects: 16,
-    avgRating: 4.6,
-    recentProjects: [{ title: 'REST API Development', rating: 4.9 }, { title: 'Microservices', rating: 4.7 }]
-  },
-  { 
-    id: '5', 
-    name: 'Neha Gupta', 
-    role: 'React Specialist', 
-    location: 'Pune, India', 
-    trustScore: 91, 
-    experience: 3, 
-    rate: 1300, 
-    availability: 'Immediate', 
-    skills: ['React', 'TypeScript', 'GraphQL', 'Next.js'],
-    completedProjects: 14,
-    avgRating: 4.8,
-    recentProjects: [{ title: 'Content Management', rating: 4.9 }, { title: 'Real-time Chat', rating: 4.7 }]
-  },
-  { 
-    id: '6', 
-    name: 'Arjun Kumar', 
-    role: 'Full Stack Developer', 
-    location: 'Hyderabad, India', 
-    trustScore: 87, 
-    experience: 2, 
-    rate: 1000, 
-    availability: 'Immediate', 
-    skills: ['React', 'Node.js', 'MongoDB', 'AWS'],
-    completedProjects: 9,
-    avgRating: 4.5,
-    recentProjects: [{ title: 'Web App Development', rating: 4.5 }]
-  },
-];
+  recentProjects?: Array<{ title: string; rating?: number }>;
+};
 
 const filterSkills = ['React', 'Node.js', 'Python', 'MongoDB', 'AWS', 'TypeScript', 'Next.js', 'Express'];
 
+function dedupeById(items: TalentCard[]) {
+  const seen = new Map<string, TalentCard>();
+  items.forEach((item) => {
+    if (!seen.has(item.id)) {
+      seen.set(item.id, item);
+    }
+  });
+  return Array.from(seen.values());
+}
+
+function toCandidateFromApplication(application: CompanyApplication): TalentCard | null {
+  const applicant = application.applicantId;
+  if (!applicant?._id || !applicant.name) {
+    return null;
+  }
+
+  const rateValue =
+    application.proposedAmount && application.proposedDuration
+      ? Math.round(application.proposedAmount / Math.max(application.proposedDuration, 1))
+      : null;
+
+  const title = application.projectId?.title || application.jobId?.title;
+
+  return {
+    id: applicant._id,
+    name: applicant.name,
+    role: application.jobId ? 'Job Applicant' : 'Project Applicant',
+    location: applicant.location || 'Remote',
+    trustScore: applicant.trustScore || 0,
+    experience: applicant.experience?.length || 0,
+    rateLabel: rateValue ? `₹${rateValue}/day` : 'Rate not listed',
+    rateValue,
+    availability: 'Available based on application activity',
+    skills: (applicant.skills || []).map((skill) => skill.name || '').filter(Boolean),
+    completedProjects: applicant.experience?.length || 0,
+    recentProjects: title ? [{ title }] : [],
+  };
+}
+
+function toCandidateFromSearchUser(user: SearchUser): TalentCard {
+  return {
+    id: user._id,
+    name: user.name || 'Candidate',
+    role: user.role === 'student' ? 'Student Candidate' : 'Candidate',
+    location: user.location || 'Remote',
+    trustScore: user.trustScore || 0,
+    experience: user.experience?.length || 0,
+    rateLabel: 'Rate not listed',
+    rateValue: null,
+    availability: 'Availability not listed',
+    skills: (user.skills || []).map((skill) => skill.name || '').filter(Boolean),
+    completedProjects: user.experience?.length || 0,
+  };
+}
+
 export default function TalentSearchPage() {
+  const { applications = [] } = useApplications({ role: 'company', limit: 100 });
+  const typedApplications = applications as CompanyApplication[];
   const [query, setQuery] = useState('');
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [minTrustScore, setMinTrustScore] = useState(80);
   const [maxRate, setMaxRate] = useState(2000);
   const [sortBy, setSortBy] = useState('match');
   const [savedCandidates, setSavedCandidates] = useState<string[]>([]);
+  const [searchedUsers, setSearchedUsers] = useState<SearchUser[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    const runSearch = async () => {
+      if (query.trim().length < 2) {
+        setSearchedUsers([]);
+        setSearchError(null);
+        return;
+      }
+
+      setSearchLoading(true);
+      setSearchError(null);
+
+      try {
+        const params = new URLSearchParams({
+          q: query.trim(),
+          role: 'student',
+          minTrustScore: String(minTrustScore),
+        });
+        const response = await apiClient.get<{ users?: SearchUser[] }>(`/api/search/users?${params.toString()}`);
+        if (active) {
+          setSearchedUsers(response.users || []);
+        }
+      } catch (error) {
+        if (active) {
+          setSearchError(error instanceof Error ? error.message : 'Failed to search candidates.');
+          setSearchedUsers([]);
+        }
+      } finally {
+        if (active) {
+          setSearchLoading(false);
+        }
+      }
+    };
+
+    void runSearch();
+
+    return () => {
+      active = false;
+    };
+  }, [query, minTrustScore]);
+
+  const applicantsPool = useMemo(() => {
+    return dedupeById(
+      typedApplications
+        .map((application) => toCandidateFromApplication(application))
+        .filter(Boolean) as TalentCard[]
+    );
+  }, [typedApplications]);
+
+  const searchPool = useMemo(() => dedupeById(searchedUsers.map(toCandidateFromSearchUser)), [searchedUsers]);
+
+  const basePool = query.trim().length >= 2 ? searchPool : applicantsPool;
 
   const candidates = useMemo(() => {
-    let result = talentPool.filter((talent) => {
+    let result = basePool.filter((talent) => {
       const searchMatch =
+        !query.trim() ||
+        query.trim().length < 2 ||
         talent.name.toLowerCase().includes(query.toLowerCase()) ||
         talent.role.toLowerCase().includes(query.toLowerCase()) ||
+        talent.location.toLowerCase().includes(query.toLowerCase()) ||
         talent.skills.some((skill) => skill.toLowerCase().includes(query.toLowerCase()));
+
       const trustMatch = talent.trustScore >= minTrustScore;
-      const rateMatch = talent.rate <= maxRate;
+      const rateMatch = talent.rateValue === null || talent.rateValue <= maxRate;
       const skillsMatch = selectedSkills.length === 0 || selectedSkills.some((skill) => talent.skills.includes(skill));
       return searchMatch && trustMatch && rateMatch && skillsMatch;
     });
 
-    // Sort results
     if (sortBy === 'trust') {
-      result.sort((a, b) => b.trustScore - a.trustScore);
+      result = [...result].sort((a, b) => b.trustScore - a.trustScore);
     } else if (sortBy === 'rate') {
-      result.sort((a, b) => a.rate - b.rate);
+      result = [...result].sort((a, b) => (a.rateValue ?? Number.MAX_SAFE_INTEGER) - (b.rateValue ?? Number.MAX_SAFE_INTEGER));
     } else if (sortBy === 'experience') {
-      result.sort((a, b) => b.experience - a.experience);
+      result = [...result].sort((a, b) => b.experience - a.experience);
     } else if (sortBy === 'rating') {
-      result.sort((a, b) => (b.avgRating || 0) - (a.avgRating || 0));
+      result = [...result].sort((a, b) => (b.avgRating || 0) - (a.avgRating || 0));
+    } else {
+      result = [...result].sort((a, b) => b.trustScore - a.trustScore);
     }
 
     return result;
-  }, [minTrustScore, query, selectedSkills, maxRate, sortBy]);
+  }, [basePool, maxRate, minTrustScore, query, selectedSkills, sortBy]);
 
   return (
     <div className="space-y-6">
@@ -153,10 +214,9 @@ export default function TalentSearchPage() {
           Talent Search
         </div>
         <h1 className="mt-4 text-3xl font-semibold text-charcoal-950 dark:text-white">Find pre-verified candidates</h1>
-        <p className="mt-2 text-sm leading-7 text-charcoal-500 dark:text-charcoal-400">Use premium search and trust-driven filtering to surface the strongest people for your company opportunities.</p>
+        <p className="mt-2 text-sm leading-7 text-charcoal-500 dark:text-charcoal-400">Browse real applicants from your company funnel, or search the wider platform once you start typing.</p>
       </div>
 
-      {/* Search & Filters Card */}
       <Card className="border-none bg-card/80 shadow-[0_18px_45px_rgba(52,74,134,0.10)] dark:bg-charcoal-900/72">
         <CardContent className="space-y-5 p-5">
           <div className="relative">
@@ -165,7 +225,6 @@ export default function TalentSearchPage() {
           </div>
 
           <div className="grid gap-5 lg:grid-cols-5">
-            {/* Skills */}
             <div className="lg:col-span-2">
               <div className="mb-2 text-sm font-medium text-charcoal-800 dark:text-charcoal-200">Skills</div>
               <div className="flex flex-wrap gap-2">
@@ -185,25 +244,22 @@ export default function TalentSearchPage() {
               </div>
             </div>
 
-            {/* Trust Score */}
             <div>
               <div className="mb-2 text-sm font-medium text-charcoal-800 dark:text-charcoal-200">Trust Score</div>
               <input type="range" min="70" max="100" step="5" value={minTrustScore} onChange={(e) => setMinTrustScore(parseInt(e.target.value, 10))} className="w-full" />
               <div className="mt-2 text-xs text-charcoal-500 dark:text-charcoal-400">{minTrustScore}%+</div>
             </div>
 
-            {/* Max Rate */}
             <div>
               <div className="mb-2 text-sm font-medium text-charcoal-800 dark:text-charcoal-200">Max Rate</div>
-              <input type="range" min="500" max="3000" step="100" value={maxRate} onChange={(e) => setMaxRate(parseInt(e.target.value, 10))} className="w-full" />
-              <div className="mt-2 text-xs text-charcoal-500 dark:text-charcoal-400">₹{maxRate}/hr</div>
+              <input type="range" min="500" max="5000" step="100" value={maxRate} onChange={(e) => setMaxRate(parseInt(e.target.value, 10))} className="w-full" />
+              <div className="mt-2 text-xs text-charcoal-500 dark:text-charcoal-400">₹{maxRate}/day</div>
             </div>
 
-            {/* Sort */}
             <div>
               <div className="mb-2 text-sm font-medium text-charcoal-800 dark:text-charcoal-200">Sort</div>
-              <select 
-                value={sortBy} 
+              <select
+                value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
                 className="w-full rounded-lg border border-primary-200 bg-white px-3 py-1.5 text-xs dark:border-white/10 dark:bg-charcoal-950"
               >
@@ -218,10 +274,10 @@ export default function TalentSearchPage() {
 
           <div className="flex items-center justify-between pt-2">
             <div className="text-sm font-medium text-charcoal-700 dark:text-charcoal-300">
-              {candidates.length} candidates match your filters
+              {query.trim().length >= 2 ? `${candidates.length} platform matches` : `${candidates.length} real candidates from your company pipeline`}
             </div>
-            <Button 
-              size="sm" 
+            <Button
+              size="sm"
               variant="ghost"
               onClick={() => {
                 setQuery('');
@@ -229,6 +285,7 @@ export default function TalentSearchPage() {
                 setMinTrustScore(80);
                 setMaxRate(2000);
                 setSortBy('match');
+                setSearchError(null);
               }}
             >
               Clear All
@@ -237,24 +294,26 @@ export default function TalentSearchPage() {
         </CardContent>
       </Card>
 
-      {/* Results */}
       <Card className="border-none bg-card/80 shadow-[0_18px_45px_rgba(52,74,134,0.10)] dark:bg-charcoal-900/72">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-xl text-charcoal-950 dark:text-white">Candidates</CardTitle>
-          <div className="text-sm text-charcoal-500 dark:text-charcoal-400">
-            {candidates.length} of {talentPool.length}
-          </div>
+          <div className="text-sm text-charcoal-500 dark:text-charcoal-400">{candidates.length}</div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {candidates.length === 0 ? (
+          {searchLoading && (
+            <div className="rounded-[24px] bg-silver-50/70 p-4 text-sm text-charcoal-500">Searching candidates...</div>
+          )}
+          {searchError && (
+            <div className="rounded-[24px] border border-red-200 bg-red-50 p-4 text-sm text-red-700">{searchError}</div>
+          )}
+          {!searchLoading && candidates.length === 0 ? (
             <div className="rounded-[24px] border border-dashed border-primary-200 bg-silver-50/70 p-8 text-center text-sm text-charcoal-500 dark:border-white/10 dark:bg-charcoal-950/35 dark:text-charcoal-400">
-              No candidates match your criteria. Try adjusting filters.
+              {query.trim().length >= 2 ? 'No candidates match your current platform search.' : 'No company applicants available yet. Once candidates apply, they will appear here automatically.'}
             </div>
           ) : (
             candidates.map((talent) => (
               <div key={talent.id} className="rounded-[20px] border border-primary-100/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(225,221,214,0.55))] p-5 dark:border-white/10 dark:bg-charcoal-950/40 transition hover:shadow-lg">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                  {/* Candidate Info */}
                   <div className="flex-1 space-y-3">
                     <div className="flex items-center gap-3">
                       <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-500 to-info-500 text-lg font-semibold text-white">
@@ -266,18 +325,17 @@ export default function TalentSearchPage() {
                       </div>
                     </div>
 
-                    {/* Stats Grid */}
                     <div className="grid gap-2 text-sm text-charcoal-600 dark:text-charcoal-300">
                       <div className="flex items-center gap-3">
                         <Trophy className="h-4 w-4 text-primary-700" />
                         <span>Trust Score: <span className="font-semibold">{talent.trustScore}%</span></span>
-                        {talent.avgRating && (
+                        {talent.avgRating ? (
                           <>
                             <span className="text-charcoal-400">•</span>
-                            <Star className="h-4 w-4 text-yellow-400 fill-yellow-400" />
+                            <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
                             <span>{talent.avgRating}/5</span>
                           </>
-                        )}
+                        ) : null}
                       </div>
                       <div className="flex flex-wrap gap-4">
                         <div className="flex items-center gap-1">
@@ -294,71 +352,53 @@ export default function TalentSearchPage() {
                         </div>
                         <div className="flex items-center gap-1">
                           <DollarSign className="h-4 w-4 text-secondary-700" />
-                          ₹{talent.rate}/hr
+                          {talent.rateLabel}
                         </div>
                       </div>
-                      {talent.completedProjects !== undefined && (
-                        <div className="text-xs">
-                          <span className="text-charcoal-500 dark:text-charcoal-400">{talent.completedProjects} projects completed</span>
-                        </div>
+                      {typeof talent.completedProjects === 'number' && (
+                        <div className="text-xs text-charcoal-500 dark:text-charcoal-400">{talent.completedProjects} tracked experience entries</div>
                       )}
                     </div>
 
-                    {/* Skills */}
                     <div>
                       <div className="mb-2 text-xs font-medium text-charcoal-500 dark:text-charcoal-400">Skills</div>
                       <div className="flex flex-wrap gap-2">
                         {talent.skills.map((skill) => (
-                          <span key={skill} className="rounded-full bg-primary-100 px-3 py-1 text-xs font-medium text-primary-800 dark:bg-primary-950/40 dark:text-primary-400">{skill}</span>
+                          <span key={`${talent.id}-${skill}`} className="rounded-full bg-primary-100 px-3 py-1 text-xs font-medium text-primary-800 dark:bg-primary-950/40 dark:text-primary-400">{skill}</span>
                         ))}
                       </div>
                     </div>
 
-                    {/* Recent Projects */}
                     {talent.recentProjects && talent.recentProjects.length > 0 && (
-                      <div className="pt-2 border-t border-charcoal-200 dark:border-charcoal-800">
+                      <div className="border-t border-charcoal-200 pt-2 dark:border-charcoal-800">
                         <div className="mb-2 text-xs font-medium text-charcoal-500 dark:text-charcoal-400">Recent Work</div>
                         <div className="space-y-1">
                           {talent.recentProjects.map((project, idx) => (
-                            <div key={idx} className="flex items-center justify-between text-sm text-charcoal-600 dark:text-charcoal-300">
-                              <span>{project.title}</span>
-                              <div className="flex items-center gap-1">
-                                {[...Array(5)].map((_, i) => (
-                                  <Star
-                                    key={i}
-                                    className={`h-3 w-3 ${
-                                      i < Math.floor(project.rating)
-                                        ? 'fill-yellow-400 text-yellow-400'
-                                        : 'text-charcoal-300 dark:text-charcoal-700'
-                                    }`}
-                                  />
-                                ))}
-                                <span className="ml-1 text-xs">({project.rating})</span>
-                              </div>
-                            </div>
+                            <div key={`${talent.id}-${idx}`} className="text-sm text-charcoal-600 dark:text-charcoal-300">{project.title}</div>
                           ))}
                         </div>
                       </div>
                     )}
                   </div>
 
-                  {/* Actions */}
                   <div className="flex flex-wrap gap-2 lg:w-[200px] lg:flex-col">
                     <Button asChild size="sm">
-                      <Link href={`/dashboard/company/post-project`}>Hire Now</Link>
+                      <Link href="/dashboard/company/post-project">Hire Now</Link>
                     </Button>
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => toggleSaved(talent.id)}
+                      onClick={() => setSavedCandidates((prev) => prev.includes(talent.id) ? prev.filter((id) => id !== talent.id) : [...prev, talent.id])}
                       className={savedCandidates.includes(talent.id) ? 'bg-primary-50 text-primary-700 dark:bg-primary-950/30 dark:text-primary-400' : ''}
                     >
                       <Bookmark className="mr-2 h-4 w-4" />
                       {savedCandidates.includes(talent.id) ? 'Saved' : 'Save'}
                     </Button>
-                    <Button size="sm" variant="outline">
-                      <MessageCircle className="mr-2 h-4 w-4" />
-                      Message
+                    <Button asChild size="sm" variant="outline">
+                      <Link href="/dashboard/messages">
+                        <MessageCircle className="mr-2 h-4 w-4" />
+                        Message
+                      </Link>
                     </Button>
                   </div>
                 </div>
@@ -368,7 +408,6 @@ export default function TalentSearchPage() {
         </CardContent>
       </Card>
 
-      {/* Saved Searches & Tips */}
       <div className="grid gap-6 lg:grid-cols-2">
         <Card className="border-none bg-card/80 dark:bg-charcoal-900/72">
           <CardHeader>
@@ -376,12 +415,12 @@ export default function TalentSearchPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="rounded-[20px] border border-primary-100/70 bg-primary-50/70 p-4 text-sm dark:border-primary-800/30 dark:bg-primary-950/20">
-              <p className="font-medium text-primary-900 dark:text-primary-300">React Developers (80+ Trust)</p>
-              <p className="mt-1 text-xs text-primary-700 dark:text-primary-400">12 new matches this week</p>
+              <p className="font-medium text-primary-900 dark:text-primary-300">High Trust Applicants</p>
+              <p className="mt-1 text-xs text-primary-700 dark:text-primary-400">Based on live company application data</p>
             </div>
             <div className="rounded-[20px] border border-primary-100/70 bg-primary-50/70 p-4 text-sm dark:border-primary-800/30 dark:bg-primary-950/20">
-              <p className="font-medium text-primary-900 dark:text-primary-300">Full Stack (Bangalore)</p>
-              <p className="mt-1 text-xs text-primary-700 dark:text-primary-400">8 new matches this week</p>
+              <p className="font-medium text-primary-900 dark:text-primary-300">Platform Search</p>
+              <p className="mt-1 text-xs text-primary-700 dark:text-primary-400">Start typing at least 2 characters to search the wider user base</p>
             </div>
             <Button size="sm" variant="outline">Create Saved Search</Button>
           </CardContent>
@@ -390,11 +429,11 @@ export default function TalentSearchPage() {
         <Card className="border-none bg-gradient-to-br from-primary-700 via-info-600 to-info-500 text-white shadow-lg">
           <CardContent className="p-6">
             <div className="flex items-start gap-3">
-              <Trophy className="h-5 w-5 mt-1 flex-shrink-0" />
+              <Trophy className="mt-1 h-5 w-5 flex-shrink-0" />
               <div>
-                <div className="text-lg font-semibold">Smart Matching</div>
-                <div className="mt-2 text-sm leading-6 text-white/90">Use trust score combined with skill fit to identify the best candidates quickly. Save searches to track new matches automatically.</div>
-                <Button size="sm" variant="secondary" className="mt-3">Learn More</Button>
+                <div className="text-lg font-semibold">Live Talent Funnel</div>
+                <div className="mt-2 text-sm leading-6 text-white/90">The default list now comes from real candidates who have already entered your hiring funnel, while typed search expands to platform users.</div>
+                <Button size="sm" variant="secondary" className="mt-3">Use Filters</Button>
               </div>
             </div>
           </CardContent>
@@ -402,12 +441,4 @@ export default function TalentSearchPage() {
       </div>
     </div>
   );
-
-  function toggleSaved(candidateId: string) {
-    setSavedCandidates(prev =>
-      prev.includes(candidateId)
-        ? prev.filter(id => id !== candidateId)
-        : [...prev, candidateId]
-    );
-  }
 }
