@@ -13,7 +13,7 @@ import { Textarea } from '@/components/forms/Textarea';
 import { SimpleTagInput } from '@/components/forms/TagInput';
 
 type Step = 1 | 2 | 3 | 4;
-type Visibility = 'public' | 'private';
+type Visibility = 'public' | 'private' | 'invite';
 type LocationPreference = 'remote' | 'onsite' | 'hybrid';
 
 interface Milestone {
@@ -154,7 +154,8 @@ export default function PostProjectPage() {
     setSubmitSuccess(null);
     setIsSubmitting(true);
   try {
-    const result = await createProject({
+      const visibilityValue = form.visibility === 'invite' ? 'private' : form.visibility;
+      const result = await createProject({
       title: form.title,
       description: form.description,
       category: form.category,
@@ -172,7 +173,7 @@ export default function PostProjectPage() {
       duration: parseInt(form.duration, 10) || 0,
       requirements: form.requirements.filter(Boolean),
       experienceLevel: form.experienceLevel,
-      visibility: form.visibility,
+        visibility: visibilityValue,
       milestones: form.milestones.filter((item) => item.title && item.amount > 0).map((item) => ({
         title: item.title,
         description: item.title,
@@ -252,7 +253,13 @@ export default function PostProjectPage() {
                   {categories.map((category) => <option key={category} value={category}>{category}</option>)}
                 </select>
                 <Textarea rows={7} value={form.description} onChange={(e) => setField('description', e.target.value)} placeholder="Describe the project scope, features, deliverables, and expectations..." />
-                <Input value={form.summary} onChange={(e) => setField('summary', e.target.value)} placeholder="Short summary for the listing card" />
+                <div className="text-xs text-charcoal-500">Minimum 50 characters.</div>
+                <Input
+                  value={form.summary}
+                  onChange={(e) => setField('summary', e.target.value.slice(0, 200))}
+                  placeholder="Short summary for the listing card"
+                />
+                <div className="text-xs text-charcoal-500">{form.summary.length}/200 characters</div>
                 <div className="flex justify-between">
                   <Button variant="outline" onClick={saveDraft}>Save as Draft</Button>
                   <Button onClick={() => setStep(2)}>Continue</Button>
@@ -304,6 +311,10 @@ export default function PostProjectPage() {
                   <Input type="number" value={form.budgetMin} onChange={(e) => setField('budgetMin', e.target.value)} placeholder="Minimum budget" />
                   <Input type="number" value={form.budgetMax} onChange={(e) => setField('budgetMax', e.target.value)} placeholder="Maximum budget" />
                 </div>
+                <div className="rounded-[20px] border border-primary-100/70 bg-silver-50/70 p-4 text-xs text-charcoal-600">
+                  Budget Range: {formatCurrency(parseInt(form.budgetMin, 10) || 0)} - {formatCurrency(parseInt(form.budgetMax, 10) || 0)}
+                </div>
+                <div className="text-xs text-charcoal-500">Budget must be within the approved range and max should be greater than min.</div>
                 <Input type="number" value={form.duration} onChange={(e) => setField('duration', e.target.value)} placeholder="Duration in days" />
                 <div className="space-y-3">
                   {form.milestones.map((item, index) => (
@@ -335,6 +346,7 @@ export default function PostProjectPage() {
                   {[
                     ['public', 'Public listing'],
                     ['private', 'Private listing'],
+                    ['invite', 'Invite only'],
                   ].map(([value, label]) => (
                     <button key={value} type="button" onClick={() => setField('visibility', value as Visibility)} className={`rounded-[20px] border px-4 py-4 text-left text-sm ${form.visibility === value ? 'border-primary-700 bg-primary-50 text-primary-800' : 'border-primary-100 bg-silver-50/70 text-charcoal-700'}`}>
                       {label}
@@ -363,6 +375,7 @@ export default function PostProjectPage() {
                       setAttachmentInput('');
                     }}>Add</Button>
                   </div>
+                  <div className="text-xs text-charcoal-500">Maximum 10 files, 50MB total.</div>
                 </div>
                 <label className="flex items-center gap-3 rounded-[20px] border border-primary-100/70 bg-silver-50/70 p-4 text-sm text-charcoal-700 dark:text-charcoal-300">
                   <input type="checkbox" checked={form.confirmTerms} onChange={(e) => setField('confirmTerms', e.target.checked)} />

@@ -14,11 +14,12 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserProjects } from '@/hooks/useProjects';
+import { useApplications } from '@/hooks/useApplications';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 
-type ProjectStatus = 'active' | 'open' | 'completed' | 'draft';
+type ProjectStatus = 'active' | 'in_progress' | 'completed' | 'draft';
 
 type ProjectItem = {
   _id: string;
@@ -29,18 +30,23 @@ type ProjectItem = {
   applicationsCount?: number;
   createdAt?: string;
   selectedApplicant?: string;
+  milestones?: Array<{ status?: string }>;
 };
 
 function statusLabel(status: ProjectStatus) {
-  if (status === 'open') return 'Open';
   if (status === 'active') return 'Active';
+  if (status === 'in_progress') return 'In Progress';
   if (status === 'completed') return 'Completed';
   return 'Draft';
 }
 
 function normalizeStatus(status?: string): ProjectStatus {
-  if (status === 'in_progress' || status === 'active') {
+  if (status === 'open' || status === 'active') {
     return 'active';
+  }
+
+  if (status === 'in_progress') {
+    return 'in_progress';
   }
 
   if (status === 'completed') {
@@ -51,7 +57,7 @@ function normalizeStatus(status?: string): ProjectStatus {
     return 'draft';
   }
 
-  return 'open';
+  return 'draft';
 }
 
 function formatCurrency(value?: number) {
@@ -82,6 +88,7 @@ function formatRelativeDate(value?: string) {
 export default function MyProjectsPage() {
   const { user } = useAuth();
   const { projects = [], isLoading, errorMessage } = useUserProjects(user?.id, { role: 'company' });
+  const { applications = [] } = useApplications({ role: 'company', type: 'project', limit: 200 });
   const [tab, setTab] = useState<ProjectStatus>('active');
   const [query, setQuery] = useState('');
 
@@ -95,8 +102,24 @@ export default function MyProjectsPage() {
       applicationsCount: project.applicationsCount,
       createdAt: project.createdAt ? new Date(project.createdAt).toISOString() : undefined,
       selectedApplicant: project.selectedApplicant,
+      milestones: project.milestones,
     }));
   }, [projects]);
+
+  const applicationByProject = useMemo(() => {
+    const map = new Map<string, typeof applications>();
+    applications.forEach((application) => {
+      const projectId = application.projectId?._id || application.projectId;
+      if (!projectId) {
+        return;
+      }
+      if (!map.has(projectId)) {
+        map.set(projectId, []);
+      }
+      map.get(projectId)?.push(application);
+    });
+    return map;
+  }, [applications]);
   const filteredProjects = useMemo(() => {
     return typedProjects.filter((project) => {
       const projectStatus = normalizeStatus(project.status);
@@ -110,7 +133,7 @@ export default function MyProjectsPage() {
 
   const counts = {
     active: typedProjects.filter((project) => normalizeStatus(project.status) === 'active').length,
-    open: typedProjects.filter((project) => normalizeStatus(project.status) === 'open').length,
+    in_progress: typedProjects.filter((project) => normalizeStatus(project.status) === 'in_progress').length,
     completed: typedProjects.filter((project) => normalizeStatus(project.status) === 'completed').length,
     draft: typedProjects.filter((project) => normalizeStatus(project.status) === 'draft').length,
   };
@@ -154,7 +177,7 @@ export default function MyProjectsPage() {
       <div className="grid gap-3 md:grid-cols-4">
         {[
           ['active', `Active (${counts.active})`],
-          ['open', `Open (${counts.open})`],
+          ['in_progress', `In Progress (${counts.in_progress})`],
           ['completed', `Completed (${counts.completed})`],
           ['draft', `Drafts (${counts.draft})`],
         ].map(([value, label]) => (
@@ -182,6 +205,15 @@ export default function MyProjectsPage() {
           {!isLoading && filteredProjects.map((project) => {
             const projectStatus = normalizeStatus(project.status);
             const budgetValue = project.budget?.max || project.budget?.min;
+            const applicationsForProject = applicationByProject.get(project._id) || [];
+            const acceptedApplication = applicationsForProject.find((application) => application.status === 'accepted');
+            const bestMatch = [...applicationsForProject].sort((a, b) => (b.applicantId?.trustScore || 0) - (a.applicantId?.trustScore || 0))[0];
+            const candidateName = acceptedApplication?.applicantId?.name || bestMatch?.applicantId?.name || 'Not assigned yet';
+            const trustScore = acceptedApplication?.applicantId?.trustScore || bestMatch?.applicantId?.trustScore || 0;
+            const hired = Boolean(acceptedApplication || project.selectedApplicant);
+            const totalMilestones = project.milestones?.length || 0;
+            const completedMilestones = project.milestones?.filter((milestone) => milestone.status === 'completed' || milestone.status === 'approved').length || 0;
+            const progress = totalMilestones > 0 ? Math.round((completedMilestones / totalMilestones) * 100) : 0;
             return (
               <div key={project._id} className="rounded-[28px] border border-primary-100/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(225,221,214,0.55))] p-5 dark:border-white/10 dark:bg-charcoal-950/40">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -189,26 +221,43 @@ export default function MyProjectsPage() {
                     <div>
                       <h3 className="text-lg font-semibold text-charcoal-950 dark:text-white">{project.title}</h3>
                       <p className="mt-1 text-sm text-charcoal-500 dark:text-charcoal-400">
-                        Status: {statusLabel(projectStatus)} - Applications: {project.applicationsCount || 0} - Posted: {formatRelativeDate(project.createdAt)}
+                        Status: {statusLabel(projectStatus)} - Applications: {project.applicationsCount || 0} - Hired: {hired ? 'Yes' : 'No'}
                       </p>
                     </div>
                     <div className="grid gap-2 text-sm text-charcoal-600 dark:text-charcoal-300 md:grid-cols-2">
+                      <div>
+                        {candidateName === 'Not assigned yet'
+                          ? `Best Match: ${candidateName}`
+                          : `Candidate: ${candidateName} (${trustScore}%)`}
+                      </div>
                       <div>Budget: {formatCurrency(budgetValue)}</div>
                       <div>Duration: {project.duration || 0} days</div>
+                      <div>Posted: {formatRelativeDate(project.createdAt)}</div>
                     </div>
+                    {projectStatus !== 'draft' && (
+                      <div>
+                        <div className="mb-2 flex items-center justify-between text-sm text-charcoal-500 dark:text-charcoal-400">
+                          <span>Progress</span>
+                          <span>{progress}%</span>
+                        </div>
+                        <div className="h-2 rounded-full bg-primary-100 dark:bg-charcoal-800">
+                          <div className="h-2 rounded-full bg-gradient-to-r from-secondary-500 via-info-500 to-primary-700" style={{ width: `${progress}%` }} />
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div className="flex flex-wrap gap-2 lg:w-[220px] lg:flex-col">
                     <Button asChild size="sm">
                       <Link href={`/dashboard/company/my-projects/${project._id}`}>View Details</Link>
                     </Button>
                     <Button asChild size="sm" variant="outline">
-                      <Link href={projectStatus === 'open' ? `/dashboard/company/my-projects/${project._id}/applications` : '/dashboard/messages'}>
-                        {projectStatus === 'open' ? 'Review Applications' : 'Message Candidate'}
+                      <Link href={projectStatus === 'active' ? `/dashboard/company/my-projects/${project._id}/applications` : '/dashboard/messages'}>
+                        {projectStatus === 'active' ? 'Review Applications' : 'Message Candidate'}
                       </Link>
                     </Button>
                     <Button asChild size="sm" variant="outline">
                       <Link href={`/dashboard/company/my-projects/${project._id}/manage`}>
-                        {projectStatus === 'draft' ? 'Continue Editing' : 'Manage Project'}
+                        {projectStatus === 'draft' ? 'Continue Editing' : 'Manage Milestones'}
                       </Link>
                     </Button>
                   </div>

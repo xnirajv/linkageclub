@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
 
     const [applications, total] = await Promise.all([
       Application.find(query)
-        .populate('applicantId', 'name avatar trustScore location')
+        .populate('applicantId', 'name avatar trustScore location skills experience')
         .populate('companyId', 'name avatar companyName')
         .populate('projectId', 'title budget category')
         .populate('jobId', 'title salary')
