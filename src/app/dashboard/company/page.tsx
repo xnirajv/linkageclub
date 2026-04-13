@@ -31,7 +31,7 @@ type CompanyProject = {
   createdAt?: string | Date;
   applicationsCount?: number;
   budget?: { min?: number; max?: number };
-  milestones?: Array<{ title?: string }>;
+  milestones?: Array<{ title?: string; status?: string; deadline?: number | string }>;
   selectedApplicant?: string | { _id?: string; name?: string; trustScore?: number };
 };
 
