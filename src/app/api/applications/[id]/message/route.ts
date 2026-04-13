@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/options';
 import Application from '@/lib/db/models/application';
@@ -8,6 +8,7 @@ import connectDB from '@/lib/db/connect';
 import { z } from 'zod';
 import { uploadFile } from '@/lib/utils/upload';
 import mongoose from 'mongoose';
+import { errors, handleAPIError, successResponse } from '@/lib/api/errors';
 
 const replySchema = z.object({
   messageId: z.string(),
@@ -44,22 +45,34 @@ export async function POST(
     const session = await getServerSession(authOptions);
 
     if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      throw errors.unauthorized();
     }
 
-    const formData = await req.formData();
-    const content = formData.get('content') as string;
-    const attachments = formData.getAll('attachments') as File[];
+    const contentType = req.headers.get('content-type') || '';
+    let content = '';
+    let attachments: File[] = [];
+    let attachmentUrls: Array<{ url: string; type: string; name: string; size: number }> = [];
+
+    if (contentType.includes('application/json')) {
+      const body = await req.json();
+      content = String(body.content || '');
+      attachmentUrls = Array.isArray(body.attachments)
+        ? body.attachments.map((url: string) => ({
+            url,
+            type: 'file',
+            name: url.split('/').pop() || 'file',
+            size: 0,
+          }))
+        : [];
+    } else {
+      const formData = await req.formData();
+      content = String(formData.get('content') || '');
+      attachments = formData.getAll('attachments') as File[];
+    }
 
     // Validate content
     if (!content || content.trim().length === 0) {
-      return NextResponse.json(
-        { error: 'Message content is required' },
-        { status: 400 }
-      );
+      throw errors.badRequest('Message content is required');
     }
 
     await connectDB();
@@ -69,10 +82,7 @@ export async function POST(
       .populate('companyId', 'name email');
 
     if (!application) {
-      return NextResponse.json(
-        { error: 'Application not found' },
-        { status: 404 }
-      );
+      throw errors.notFound('Application');
     }
 
     // Check if user is part of the application
@@ -81,17 +91,13 @@ export async function POST(
     const isAdmin = session.user.role === 'admin';
 
     if (!isApplicant && !isCompany && !isAdmin) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      throw errors.unauthorized();
     }
 
     // Determine receiver
     const receiverId = isApplicant ? application.companyId._id : application.applicantId._id;
 
     // Upload attachments if any
-    const attachmentUrls: Array<{ url: string; type: string; name: string; size: number }> = [];
     if (attachments && attachments.length > 0) {
       for (const file of attachments) {
         const url = await uploadFile(file, `applications/${application._id}/messages`);
@@ -157,23 +163,19 @@ export async function POST(
       priority: 'high',
     });
 
-    return NextResponse.json({
+    return successResponse({
       message: 'Message sent successfully',
       data: {
-        id: message._id,
+        id: message._id.toString(),
         content: message.content,
         attachments: message.attachments,
         type: message.type,
         createdAt: message.createdAt,
-        conversationId: conversation._id,
+        conversationId: conversation._id.toString(),
       },
     });
   } catch (error) {
-    console.error('Error sending message:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return handleAPIError(error);
   }
 }
 
@@ -186,10 +188,7 @@ export async function GET(
     const session = await getServerSession(authOptions);
 
     if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      throw errors.unauthorized();
     }
 
     const searchParams = req.nextUrl.searchParams;
@@ -203,10 +202,7 @@ export async function GET(
       .select('applicantId companyId');
 
     if (!application) {
-      return NextResponse.json(
-        { error: 'Application not found' },
-        { status: 404 }
-      );
+      throw errors.notFound('Application');
     }
 
     // Check if user is part of the application
@@ -215,10 +211,7 @@ export async function GET(
     const isAdmin = session.user.role === 'admin';
 
     if (!isApplicant && !isCompany && !isAdmin) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      throw errors.unauthorized();
     }
 
     // Find conversation
@@ -227,7 +220,7 @@ export async function GET(
     });
 
     if (!conversation) {
-      return NextResponse.json({
+      return successResponse({
         messages: [],
         pagination: {
           page,
@@ -323,7 +316,7 @@ export async function GET(
       createdAt: message.createdAt,
     }));
 
-    return NextResponse.json({
+    return successResponse({
       messages: transformedMessages,
       pagination: {
         page,
@@ -333,16 +326,12 @@ export async function GET(
         hasMore: skip + limit < total,
       },
       conversation: {
-        id: conversation._id,
+        id: conversation._id.toString(),
         unreadCount: conversation.unreadCount.get(session.user.id) || 0,
       },
     });
   } catch (error) {
-    console.error('Error fetching messages:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return handleAPIError(error);
   }
 }
 
@@ -355,20 +344,14 @@ export async function PUT(
     const session = await getServerSession(authOptions);
 
     if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      throw errors.unauthorized();
     }
 
     const body = await req.json();
     const validation = replySchema.safeParse(body);
 
     if (!validation.success) {
-      return NextResponse.json(
-        { error: 'Validation failed', details: validation.error.errors },
-        { status: 400 }
-      );
+      throw errors.badRequest(validation.error.errors[0]?.message || 'Validation failed');
     }
 
     await connectDB();
@@ -378,10 +361,7 @@ export async function PUT(
       .populate('companyId', 'name email');
 
     if (!application) {
-      return NextResponse.json(
-        { error: 'Application not found' },
-        { status: 404 }
-      );
+      throw errors.notFound('Application');
     }
 
     // Check if user is part of the application
@@ -390,20 +370,14 @@ export async function PUT(
     const isAdmin = session.user.role === 'admin';
 
     if (!isApplicant && !isCompany && !isAdmin) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      throw errors.unauthorized();
     }
 
     // Find original message
     const originalMessage = await Message.findById(validation.data.messageId);
 
     if (!originalMessage) {
-      return NextResponse.json(
-        { error: 'Original message not found' },
-        { status: 404 }
-      );
+      throw errors.notFound('Message');
     }
 
     // Determine receiver
@@ -464,10 +438,10 @@ export async function PUT(
       category: 'message',
     });
 
-    return NextResponse.json({
+    return successResponse({
       message: 'Reply sent successfully',
       data: {
-        id: reply._id,
+        id: reply._id.toString(),
         content: reply.content,
         type: reply.type,
         replyTo: {
@@ -478,11 +452,7 @@ export async function PUT(
       },
     });
   } catch (error) {
-    console.error('Error sending reply:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return handleAPIError(error);
   }
 }
 
@@ -495,20 +465,14 @@ export async function PATCH(
     const session = await getServerSession(authOptions);
 
     if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      throw errors.unauthorized();
     }
 
     const body = await req.json();
     const { messageIds } = body;
 
     if (!messageIds || !Array.isArray(messageIds) || messageIds.length === 0) {
-      return NextResponse.json(
-        { error: 'Message IDs are required' },
-        { status: 400 }
-      );
+      throw errors.badRequest('Message IDs are required');
     }
 
     await connectDB();
@@ -544,16 +508,12 @@ export async function PATCH(
       }
     }
 
-    return NextResponse.json({
+    return successResponse({
       message: 'Messages marked as read',
       modifiedCount: result.modifiedCount,
     });
   } catch (error) {
-    console.error('Error marking messages as read:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return handleAPIError(error);
   }
 }
 
@@ -566,10 +526,7 @@ export async function DELETE(
     const session = await getServerSession(authOptions);
 
     if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      throw errors.unauthorized();
     }
 
     const { searchParams } = new URL(req.url);
@@ -577,10 +534,7 @@ export async function DELETE(
     const deleteForEveryone = searchParams.get('deleteForEveryone') === 'true';
 
     if (!messageId) {
-      return NextResponse.json(
-        { error: 'Message ID is required' },
-        { status: 400 }
-      );
+      throw errors.badRequest('Message ID is required');
     }
 
     await connectDB();
@@ -588,18 +542,12 @@ export async function DELETE(
     const message = await Message.findById(messageId);
 
     if (!message) {
-      return NextResponse.json(
-        { error: 'Message not found' },
-        { status: 404 }
-      );
+      throw errors.notFound('Message');
     }
 
     // Check if user is the sender
     if (message.senderId.toString() !== session.user.id && session.user.role !== 'admin') {
-      return NextResponse.json(
-        { error: 'You can only delete your own messages' },
-        { status: 401 }
-      );
+      throw errors.forbidden();
     }
 
     if (deleteForEveryone && message.senderId.toString() === session.user.id) {
@@ -614,14 +562,10 @@ export async function DELETE(
       );
     }
 
-    return NextResponse.json({
+    return successResponse({
       message: 'Message deleted successfully',
     });
   } catch (error) {
-    console.error('Error deleting message:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return handleAPIError(error);
   }
 }

@@ -1,21 +1,22 @@
-import { NextRequest, NextResponse } from 'next/server';
+import mongoose from 'mongoose';
+import { NextRequest } from 'next/server';
 import { getServerSession } from 'next-auth';
+import { z } from 'zod';
 import { authOptions } from '@/lib/auth/options';
 import Project from '@/lib/db/models/project';
 import Application from '@/lib/db/models/application';
 import connectDB from '@/lib/db/connect';
-import mongoose from 'mongoose';
+import { errors, handleAPIError, successResponse } from '@/lib/api/errors';
 
-// Define extended type for project with application status
-interface ProjectWithApplicationStatus {
-  _id: mongoose.Types.ObjectId;
-  title: string;
-  description: string;
-  companyId: any;
-  status: string;
+const querySchema = z.object({
+  type: z.enum(['all', 'active', 'completed']).default('all'),
+  role: z.enum(['student', 'company']).default('student'),
+});
+
+type ProjectWithApplicationStatus = Record<string, unknown> & {
+  _id: mongoose.Types.ObjectId | string;
   applicationStatus?: string;
-  [key: string]: any;
-}
+};
 
 export async function GET(
   req: NextRequest,
@@ -23,77 +24,87 @@ export async function GET(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session || (session.user.id !== params.userId && session.user.role !== 'admin')) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      throw errors.unauthorized();
     }
+
+    if (!mongoose.Types.ObjectId.isValid(params.userId)) {
+      throw errors.invalidInput('user id');
+    }
+
+    const queryParams = querySchema.parse({
+      type: req.nextUrl.searchParams.get('type') ?? undefined,
+      role: req.nextUrl.searchParams.get('role') ?? undefined,
+    });
 
     await connectDB();
 
-    const searchParams = req.nextUrl.searchParams;
-    const type = searchParams.get('type') || 'all';
-    const role = searchParams.get('role');
-
     let projects: ProjectWithApplicationStatus[] = [];
 
-    if (role === 'company') {
-      const query: any = { companyId: params.userId };
-      
-      if (type === 'active') {
-        query.status = { $in: ['open', 'in_progress'] };
-      } else if (type === 'completed') {
-        query.status = 'completed';
+    if (queryParams.role === 'company') {
+      const companyQuery: Record<string, unknown> = { companyId: params.userId };
+
+      if (queryParams.type === 'active') {
+        companyQuery.status = { $in: ['open', 'in_progress'] };
+      } else if (queryParams.type === 'completed') {
+        companyQuery.status = 'completed';
       }
 
-      const foundProjects = await Project.find(query)
-        .sort({ createdAt: -1 });
-      
-      projects = foundProjects.map(project => project.toObject() as ProjectWithApplicationStatus);
+      const foundProjects = await Project.find(companyQuery)
+        .populate('companyId', 'name avatar companyName')
+        .sort({ createdAt: -1 })
+        .lean();
+
+      projects = foundProjects as ProjectWithApplicationStatus[];
     } else {
       const applications = await Application.find({
         applicantId: params.userId,
         type: 'project',
       }).select('projectId status');
 
-      const validApplications = applications.filter(app => app.projectId);
-      const projectIds = validApplications.map(app => app.projectId);
+      const validApplications = applications.filter((application) => application.projectId);
+      const projectIds = validApplications.map((application) => application.projectId);
 
       if (projectIds.length === 0) {
-        return NextResponse.json({ projects: [] });
+        return successResponse({ projects: [] });
       }
 
-      const query: any = { _id: { $in: projectIds } };
-      
-      if (type === 'active') {
-        query.status = { $in: ['open', 'in_progress'] };
-      } else if (type === 'completed') {
-        query.status = 'completed';
+      const studentQuery: Record<string, unknown> = { _id: { $in: projectIds } };
+
+      if (queryParams.type === 'active') {
+        studentQuery.status = { $in: ['open', 'in_progress'] };
+      } else if (queryParams.type === 'completed') {
+        studentQuery.status = 'completed';
       }
 
-      const foundProjects = await Project.find(query)
-        .populate('companyId', 'name avatar companyName');
+      const foundProjects = await Project.find(studentQuery)
+        .populate('companyId', 'name avatar companyName')
+        .sort({ createdAt: -1 })
+        .lean();
 
-      projects = foundProjects.map(project => {
-        const projectObj = project.toObject() as ProjectWithApplicationStatus;
+      projects = foundProjects.map((project) => {
         const application = validApplications.find(
-          app => app.projectId?.toString() === project._id.toString()
+          (item) => item.projectId?.toString() === project._id.toString()
         );
-        if (application) {
-          projectObj.applicationStatus = application.status;
-        }
-        return projectObj;
+
+        return {
+          ...(project as ProjectWithApplicationStatus),
+          applicationStatus: application?.status,
+        };
       });
     }
 
-    return NextResponse.json({ projects });
+    return successResponse({
+      projects: projects.map((project) => ({
+        ...project,
+        _id:
+          typeof project._id === 'string'
+            ? project._id
+            : project._id.toString(),
+      })),
+    });
   } catch (error) {
-    console.error('Error fetching user projects:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return handleAPIError(error);
   }
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -8,12 +8,24 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/forms/Textarea';
 import { X, Plus, Briefcase, DollarSign, Clock, Tag, Sparkles, ChevronDown, ChevronUp, Rocket, Send } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useProjectActions } from '@/hooks/useProjects';
 
-const CATEGORIES = ['Web Development', 'Mobile', 'Data Science', 'AI/ML', 'DevOps', 'Design', 'Other'];
+const CATEGORIES = [
+  'Web Development',
+  'Mobile Development',
+  'AI / ML',
+  'Data Science',
+  'DevOps',
+  'Design',
+  'Content Writing',
+  'Marketing',
+  'Other',
+];
 const EXPERIENCE_LEVELS = ['beginner', 'intermediate', 'advanced'];
 
 export function ProjectPostForm() {
   const router = useRouter();
+  const { createProject } = useProjectActions();
   const [form, setForm] = useState({
     title: '',
     description: '',
@@ -31,6 +43,8 @@ export function ProjectPostForm() {
   const [reqInput, setReqInput] = useState('');
   const [tagInput, setTagInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
   const [expandedSections, setExpandedSections] = useState({
     details: true,
     budget: true,
@@ -63,32 +77,51 @@ export function ProjectPostForm() {
   };
 
   const handleSubmit = async () => {
+    if (isSubmitting) return;
     setIsSubmitting(true);
+    setSubmitError(null);
+    setSubmitSuccess(null);
+
     try {
-      const response = await fetch('/api/projects', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...form,
-          budget: {
-            min: Number(form.budgetMin),
-            max: Number(form.budgetMax),
-            type: form.budgetType,
-            currency: 'INR',
-          },
-          duration: Number(form.duration),
-          skills: form.skills.map((s) => ({ name: s, level: 'intermediate', mandatory: false })),
-        }),
+      const result = await createProject({
+        title: form.title.trim(),
+        description: form.description.trim(),
+        category: form.category,
+        skills: form.skills.map((name) => ({ name, level: form.experienceLevel, mandatory: false })),
+        budget: {
+          min: Number(form.budgetMin),
+          max: Number(form.budgetMax),
+          type: form.budgetType,
+          currency: 'INR',
+        },
+        duration: Number(form.duration),
+        requirements: form.requirements,
+        experienceLevel: form.experienceLevel,
+        visibility: 'public',
       });
-      if (response.ok) {
-        router.push('/dashboard/company/my-projects');
+
+      if (!result.success) {
+        setSubmitError(result.error || 'Failed to post project.');
+        return;
       }
+
+      setSubmitSuccess('Project posted successfully.');
+      router.push('/dashboard/company/my-projects');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const isValid = form.title && form.description && form.category;
+  const isValid = useMemo(() => {
+    return Boolean(
+      form.title.trim() &&
+      form.description.trim().length >= 50 &&
+      form.category &&
+      form.budgetMin &&
+      form.budgetMax &&
+      form.duration
+    );
+  }, [form]);
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
@@ -102,6 +135,12 @@ export function ProjectPostForm() {
           Create a project and find the right talent
         </p>
       </div>
+
+      {(submitError || submitSuccess) && (
+        <div className={`rounded-2xl border p-4 text-sm ${submitError ? 'border-red-200 bg-red-50 text-red-700' : 'border-green-200 bg-green-50 text-green-700'}`}>
+          {submitError || submitSuccess}
+        </div>
+      )}
 
       {/* Project Details Section */}
       <Card className="border-0 shadow-lg overflow-hidden">
@@ -218,7 +257,7 @@ export function ProjectPostForm() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1.5">Min Budget (₹)</label>
+                <label className="block text-sm font-medium mb-1.5">Min Budget (INR)</label>
                 <Input
                   type="number"
                   value={form.budgetMin}
@@ -228,7 +267,7 @@ export function ProjectPostForm() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1.5">Max Budget (₹)</label>
+                <label className="block text-sm font-medium mb-1.5">Max Budget (INR)</label>
                 <Input
                   type="number"
                   value={form.budgetMax}

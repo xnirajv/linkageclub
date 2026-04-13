@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/options';
 import Application from '@/lib/db/models/application';
@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { sendInterviewInvitationEmail } from '@/lib/email/application';
 import { IUser } from '@/lib/db/models/user';
 import { Document } from 'mongoose'; // Add this import
+import { errors, handleAPIError, successResponse } from '@/lib/api/errors';
 
 // Define the Interview interface
 interface IInterview {
@@ -103,20 +104,14 @@ export async function POST(
     const session = await getServerSession(authOptions);
 
     if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      throw errors.unauthorized();
     }
 
     const body = await req.json();
     const validation = interviewSchema.safeParse(body);
 
     if (!validation.success) {
-      return NextResponse.json(
-        { error: 'Validation failed', details: validation.error.errors },
-        { status: 400 }
-      );
+      throw errors.badRequest(validation.error.errors[0]?.message || 'Validation failed');
     }
 
     await connectDB();
@@ -128,10 +123,7 @@ export async function POST(
       .populate('jobId', 'title') as unknown as PopulatedApplication;
 
     if (!application) {
-      return NextResponse.json(
-        { error: 'Application not found' },
-        { status: 404 }
-      );
+      throw errors.notFound('Application');
     }
 
     // Check if user is authorized (company or admin)
@@ -139,10 +131,7 @@ export async function POST(
     const isAdmin = session.user.role === 'admin';
 
     if (!isCompany && !isAdmin) {
-      return NextResponse.json(
-        { error: 'Only companies can schedule interviews' },
-        { status: 401 }
-      );
+      throw errors.forbidden();
     }
 
     // Create interview object
@@ -209,7 +198,7 @@ export async function POST(
       console.error('Failed to send interview invitation email:', emailError);
     }
 
-    return NextResponse.json({
+    return successResponse({
       message: 'Interview scheduled successfully',
       interview: {
         date: interviewDateTime,
@@ -219,11 +208,7 @@ export async function POST(
       },
     });
   } catch (error) {
-    console.error('Error scheduling interview:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return handleAPIError(error);
   }
 }
 
@@ -236,10 +221,7 @@ export async function GET(
     const session = await getServerSession(authOptions);
 
     if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      throw errors.unauthorized();
     }
 
     await connectDB();
@@ -250,10 +232,7 @@ export async function GET(
       .populate('companyId', 'name email') as unknown as PopulatedApplication;
 
     if (!application) {
-      return NextResponse.json(
-        { error: 'Application not found' },
-        { status: 404 }
-      );
+      throw errors.notFound('Application');
     }
 
     // Check authorization
@@ -262,29 +241,19 @@ export async function GET(
     const isAdmin = session.user.role === 'admin';
 
     if (!isApplicant && !isCompany && !isAdmin) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      throw errors.unauthorized();
     }
 
     if (!application.interview) {
-      return NextResponse.json(
-        { error: 'No interview scheduled' },
-        { status: 404 }
-      );
+      throw errors.notFound('Interview');
     }
 
-    return NextResponse.json({
+    return successResponse({
       interview: application.interview,
       status: application.status,
     });
   } catch (error) {
-    console.error('Error fetching interview:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return handleAPIError(error);
   }
 }
 
@@ -297,20 +266,14 @@ export async function PATCH(
     const session = await getServerSession(authOptions);
 
     if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      throw errors.unauthorized();
     }
 
     const body = await req.json();
     const validation = interviewSchema.partial().safeParse(body);
 
     if (!validation.success) {
-      return NextResponse.json(
-        { error: 'Validation failed', details: validation.error.errors },
-        { status: 400 }
-      );
+      throw errors.badRequest(validation.error.errors[0]?.message || 'Validation failed');
     }
 
     await connectDB();
@@ -320,10 +283,7 @@ export async function PATCH(
       .populate('companyId', 'name email') as unknown as PopulatedApplication;
 
     if (!application) {
-      return NextResponse.json(
-        { error: 'Application not found' },
-        { status: 404 }
-      );
+      throw errors.notFound('Application');
     }
 
     // Check if user is authorized (company or applicant)
@@ -332,17 +292,11 @@ export async function PATCH(
     const isAdmin = session.user.role === 'admin';
 
     if (!isApplicant && !isCompany && !isAdmin) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      throw errors.unauthorized();
     }
 
     if (!application.interview) {
-      return NextResponse.json(
-        { error: 'No interview scheduled' },
-        { status: 404 }
-      );
+      throw errors.notFound('Interview');
     }
 
     // Store old interview for notification
@@ -384,16 +338,12 @@ export async function PATCH(
       });
     }
 
-    return NextResponse.json({
+    return successResponse({
       message: 'Interview updated successfully',
       interview: application.interview,
     });
   } catch (error) {
-    console.error('Error updating interview:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return handleAPIError(error);
   }
 }
 
@@ -406,10 +356,7 @@ export async function DELETE(
     const session = await getServerSession(authOptions);
 
     if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      throw errors.unauthorized();
     }
 
     await connectDB();
@@ -419,10 +366,7 @@ export async function DELETE(
       .populate('companyId', 'name email') as unknown as PopulatedApplication;
 
     if (!application) {
-      return NextResponse.json(
-        { error: 'Application not found' },
-        { status: 404 }
-      );
+      throw errors.notFound('Application');
     }
 
     // Check if user is authorized (company or applicant)
@@ -431,17 +375,11 @@ export async function DELETE(
     const isAdmin = session.user.role === 'admin';
 
     if (!isApplicant && !isCompany && !isAdmin) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      throw errors.unauthorized();
     }
 
     if (!application.interview) {
-      return NextResponse.json(
-        { error: 'No interview scheduled' },
-        { status: 404 }
-      );
+      throw errors.notFound('Interview');
     }
 
     // Store interview for notification
@@ -472,15 +410,11 @@ export async function DELETE(
       });
     }
 
-    return NextResponse.json({
+    return successResponse({
       message: 'Interview cancelled successfully',
     });
   } catch (error) {
-    console.error('Error cancelling interview:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return handleAPIError(error);
   }
 }
 
@@ -493,20 +427,14 @@ export async function PUT(
     const session = await getServerSession(authOptions);
 
     if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      throw errors.unauthorized();
     }
 
     const body = await req.json();
     const validation = interviewFeedbackSchema.safeParse(body);
 
     if (!validation.success) {
-      return NextResponse.json(
-        { error: 'Validation failed', details: validation.error.errors },
-        { status: 400 }
-      );
+      throw errors.badRequest(validation.error.errors[0]?.message || 'Validation failed');
     }
 
     await connectDB();
@@ -516,10 +444,7 @@ export async function PUT(
       .populate('companyId', 'name email') as unknown as PopulatedApplication;
 
     if (!application) {
-      return NextResponse.json(
-        { error: 'Application not found' },
-        { status: 404 }
-      );
+      throw errors.notFound('Application');
     }
 
     // Check if user is authorized (company)
@@ -527,17 +452,11 @@ export async function PUT(
     const isAdmin = session.user.role === 'admin';
 
     if (!isCompany && !isAdmin) {
-      return NextResponse.json(
-        { error: 'Only companies can submit interview feedback' },
-        { status: 401 }
-      );
+      throw errors.forbidden();
     }
 
     if (!application.interview) {
-      return NextResponse.json(
-        { error: 'No interview scheduled' },
-        { status: 404 }
-      );
+      throw errors.notFound('Interview');
     }
 
     // Update interview with feedback
@@ -567,7 +486,7 @@ export async function PUT(
       });
     }
 
-    return NextResponse.json({
+    return successResponse({
       message: 'Interview feedback submitted successfully',
       feedback: {
         rating: validation.data.rating,
@@ -575,10 +494,6 @@ export async function PUT(
       },
     });
   } catch (error) {
-    console.error('Error submitting feedback:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return handleAPIError(error);
   }
 }

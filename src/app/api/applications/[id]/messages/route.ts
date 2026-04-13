@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/options';
 import Application from '@/lib/db/models/application';
 import connectDB from '@/lib/db/connect';
+import { errors, handleAPIError, successResponse } from '@/lib/api/errors';
 
 export async function GET(
   _req: NextRequest,
@@ -12,23 +13,17 @@ export async function GET(
     const session = await getServerSession(authOptions);
     
     if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      throw errors.unauthorized();
     }
 
     await connectDB();
 
     const application = await Application.findById(params.id)
-      .select('messages')
+      .select('messages applicantId companyId')
       .populate('messages.senderId', 'name avatar');
 
     if (!application) {
-      return NextResponse.json(
-        { error: 'Application not found' },
-        { status: 404 }
-      );
+      throw errors.notFound('Application');
     }
 
     // Check if user is part of the application
@@ -36,10 +31,7 @@ export async function GET(
     const isCompany = application.companyId?.toString() === session.user.id;
 
     if (!isApplicant && !isCompany) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      throw errors.unauthorized();
     }
 
     // Mark messages as read
@@ -54,14 +46,10 @@ export async function GET(
 
     await application.save();
 
-    return NextResponse.json({
+    return successResponse({
       messages: application.messages,
     });
   } catch (error) {
-    console.error('Error fetching messages:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return handleAPIError(error);
   }
 }

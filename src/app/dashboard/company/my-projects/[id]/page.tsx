@@ -1,40 +1,80 @@
 'use client';
 
 import Link from 'next/link';
+import { useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Calendar, CreditCard, MessageSquare, ShieldCheck, Target } from 'lucide-react';
+import { useApplications } from '@/hooks/useApplications';
 import { useProject } from '@/hooks/useProjects';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
+type ProjectApplication = {
+  _id: string;
+  status?: string;
+  proposedAmount?: number;
+  applicantId?: { _id?: string; name?: string; trustScore?: number; location?: string };
+};
+
 function formatCurrency(value: number) {
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(value);
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0,
+  }).format(value);
 }
 
 export default function CompanyProjectDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { project, isLoading } = useProject(params.id as string);
+  const projectId = params.id as string;
+  const { project, isLoading, errorMessage } = useProject(projectId);
+  const { applications = [], isLoading: applicationsLoading } = useApplications({
+    role: 'company',
+    projectId,
+    limit: 50,
+  });
 
-  const fallback = {
-    title: 'MERN E-commerce Platform',
-    category: 'Web Development',
-    description: 'A premium commerce platform with authentication, catalog, checkout, payment integration, and admin reporting.',
-    budget: { min: 50000, max: 70000 },
-    duration: 30,
-    status: 'active',
-    milestones: [
-      { title: 'UI Development', amount: 15000, status: 'completed' },
-      { title: 'Backend API', amount: 20000, status: 'in_progress' },
-      { title: 'Integration & Testing', amount: 15000, status: 'pending' },
-    ],
-  };
+  const typedApplications = applications as ProjectApplication[];
+  const selectedApplication = useMemo(() => {
+    if (!project?.selectedApplicant) {
+      return typedApplications.find((application) => application.status === 'accepted') || null;
+    }
 
-  const current = project || fallback;
-  const progress = Math.round(((current.milestones?.filter((item: any) => item.status === 'completed').length || 0) / Math.max(current.milestones?.length || 1, 1)) * 100);
+    return (
+      typedApplications.find(
+        (application) =>
+          application.applicantId?._id ===
+          (typeof project.selectedApplicant === 'string'
+            ? project.selectedApplicant
+            : project.selectedApplicant?._id)
+      ) || null
+    );
+  }, [project?.selectedApplicant, typedApplications]);
 
-  if (isLoading) {
+  const completedMilestones = project?.milestones?.filter((item) => item.status === 'completed' || item.status === 'approved').length || 0;
+  const progress = Math.round((completedMilestones / Math.max(project?.milestones?.length || 1, 1)) * 100);
+  const releasedAmount =
+    project?.milestones
+      ?.filter((item) => item.status === 'approved' || item.status === 'completed')
+      .reduce((sum, item) => sum + (item.amount || 0), 0) || 0;
+  const pendingAmount = Math.max((project?.budget?.max || project?.budget?.min || 0) - releasedAmount, 0);
+
+  if (isLoading || applicationsLoading) {
     return <div className="rounded-[28px] bg-card/80 p-8 text-sm text-charcoal-500 dark:bg-charcoal-900/72 dark:text-charcoal-400">Loading project details...</div>;
+  }
+
+  if (!project) {
+    return (
+      <div className="space-y-4">
+        <div className="rounded-[28px] border border-red-200 bg-red-50 p-6 text-sm text-red-700">
+          {errorMessage || 'Project not found.'}
+        </div>
+        <Button asChild variant="outline">
+          <Link href="/dashboard/company/my-projects">Back to My Projects</Link>
+        </Button>
+      </div>
+    );
   }
 
   return (
@@ -45,13 +85,13 @@ export default function CompanyProjectDetailPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-3xl font-semibold text-charcoal-950 dark:text-white">{current.title}</h1>
+            <h1 className="text-3xl font-semibold text-charcoal-950 dark:text-white">{project.title}</h1>
             <p className="mt-2 text-sm leading-7 text-charcoal-500 dark:text-charcoal-400">Project detail, candidate management, milestones, and payment tracking in one company workspace.</p>
           </div>
         </div>
         <div className="flex flex-wrap gap-3">
           <Button asChild variant="outline">
-            <Link href={`/dashboard/company/my-projects/${params.id}/manage`}>Manage Project</Link>
+            <Link href={`/dashboard/company/my-projects/${projectId}/manage`}>Manage Project</Link>
           </Button>
           <Button asChild variant="outline">
             <Link href="/dashboard/messages">
@@ -63,9 +103,9 @@ export default function CompanyProjectDetailPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">
-        <Metric title="Status" value={String(current.status || 'active')} />
-        <Metric title="Budget" value={`${formatCurrency(current.budget?.min || 0)} - ${formatCurrency(current.budget?.max || 0)}`} />
-        <Metric title="Duration" value={`${current.duration || 0} days`} />
+        <Metric title="Status" value={String(project.status || 'open')} />
+        <Metric title="Budget" value={`${formatCurrency(project.budget?.min || 0)} - ${formatCurrency(project.budget?.max || 0)}`} />
+        <Metric title="Duration" value={`${project.duration || 0} days`} />
         <Metric title="Progress" value={`${progress}%`} />
       </div>
 
@@ -75,12 +115,12 @@ export default function CompanyProjectDetailPage() {
             <CardHeader><CardTitle className="text-xl text-charcoal-950 dark:text-white">Overview</CardTitle></CardHeader>
             <CardContent className="space-y-4 text-sm text-charcoal-700 dark:text-charcoal-300">
               <div className="rounded-[24px] border border-primary-100/70 bg-silver-50/70 p-4 dark:border-white/10 dark:bg-charcoal-950/35">
-                <div className="font-semibold text-charcoal-950 dark:text-white">{current.category || 'Web Development'}</div>
-                <div className="mt-3 leading-7">{current.description}</div>
+                <div className="font-semibold text-charcoal-950 dark:text-white">{project.category || 'General'}</div>
+                <div className="mt-3 leading-7">{project.description}</div>
               </div>
               <div className="grid gap-3 md:grid-cols-2">
-                <ActionCard icon={<Target className="h-4 w-4 text-primary-700" />} title="Review Milestone" text="Approve work, request changes, or release payment." />
-                <ActionCard icon={<Calendar className="h-4 w-4 text-info-700" />} title="Timeline" text="Monitor milestone deadlines and delivery health." />
+                <ActionCard icon={<Target className="h-4 w-4 text-primary-700" />} title="Review Milestone" text={`${project.milestones?.length || 0} milestones in this project.`} />
+                <ActionCard icon={<Calendar className="h-4 w-4 text-info-700" />} title="Timeline" text={`${typedApplications.length} applications attached to this project.`} />
               </div>
             </CardContent>
           </Card>
@@ -88,7 +128,7 @@ export default function CompanyProjectDetailPage() {
           <Card className="border-none bg-card/80 dark:bg-charcoal-900/72">
             <CardHeader><CardTitle className="text-xl text-charcoal-950 dark:text-white">Milestones</CardTitle></CardHeader>
             <CardContent className="space-y-3">
-              {(current.milestones || []).map((milestone: any, index: number) => (
+              {(project.milestones || []).map((milestone, index) => (
                 <div key={`${milestone.title}-${index}`} className="rounded-[24px] border border-primary-100/70 bg-silver-50/70 p-4 dark:border-white/10 dark:bg-charcoal-950/35">
                   <div className="flex items-center justify-between gap-3">
                     <div>
@@ -99,6 +139,11 @@ export default function CompanyProjectDetailPage() {
                   </div>
                 </div>
               ))}
+              {(project.milestones || []).length === 0 && (
+                <div className="rounded-[24px] border border-dashed border-primary-200 bg-silver-50/70 p-6 text-sm text-charcoal-500">
+                  No milestones added yet.
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -108,12 +153,18 @@ export default function CompanyProjectDetailPage() {
             <CardHeader><CardTitle className="text-xl text-charcoal-950 dark:text-white">Candidate</CardTitle></CardHeader>
             <CardContent className="space-y-3 text-sm text-charcoal-700 dark:text-charcoal-300">
               <div className="rounded-[24px] border border-primary-100/70 bg-silver-50/70 p-4 dark:border-white/10 dark:bg-charcoal-950/35">
-                <div className="font-semibold text-charcoal-950 dark:text-white">Riya Sharma</div>
-                <div className="mt-2">Trust Score: 92%</div>
-                <div className="mt-1">Location: Mumbai, India</div>
+                <div className="font-semibold text-charcoal-950 dark:text-white">{selectedApplication?.applicantId?.name || 'No candidate selected yet'}</div>
+                <div className="mt-2">Trust Score: {selectedApplication?.applicantId?.trustScore || 0}%</div>
+                <div className="mt-1">Location: {selectedApplication?.applicantId?.location || 'Not provided'}</div>
+                <div className="mt-1">Status: {selectedApplication?.status || 'Awaiting company decision'}</div>
+                <div className="mt-1">Proposed amount: {formatCurrency(selectedApplication?.proposedAmount || 0)}</div>
                 <div className="mt-4 flex gap-2">
-                  <Button size="sm">View Profile</Button>
-                  <Button size="sm" variant="outline">Rate Candidate</Button>
+                  <Button asChild size="sm">
+                    <Link href={`/dashboard/company/my-projects/${projectId}/applications`}>Review Applicants</Link>
+                  </Button>
+                  <Button asChild size="sm" variant="outline">
+                    <Link href="/dashboard/messages">Message</Link>
+                  </Button>
                 </div>
               </div>
             </CardContent>
@@ -123,8 +174,8 @@ export default function CompanyProjectDetailPage() {
             <CardHeader><CardTitle className="text-xl text-charcoal-950 dark:text-white">Payments</CardTitle></CardHeader>
             <CardContent className="space-y-3 text-sm text-charcoal-700 dark:text-charcoal-300">
               <div className="rounded-[24px] border border-primary-100/70 bg-silver-50/70 p-4 dark:border-white/10 dark:bg-charcoal-950/35">
-                <div className="flex items-center gap-2"><CreditCard className="h-4 w-4 text-secondary-700" />Released: {formatCurrency(15000)}</div>
-                <div className="mt-2">Pending: {formatCurrency((current.budget?.max || 0) - 15000)}</div>
+                <div className="flex items-center gap-2"><CreditCard className="h-4 w-4 text-secondary-700" />Released: {formatCurrency(releasedAmount)}</div>
+                <div className="mt-2">Pending: {formatCurrency(pendingAmount)}</div>
               </div>
             </CardContent>
           </Card>
@@ -132,7 +183,7 @@ export default function CompanyProjectDetailPage() {
           <Card className="border-none bg-gradient-to-br from-primary-700 via-info-600 to-info-500 text-white">
             <CardContent className="p-6">
               <div className="flex items-center gap-2 text-sm uppercase tracking-[0.16em] text-white/70"><ShieldCheck className="h-4 w-4" />Company Control</div>
-              <div className="mt-4 text-xl font-semibold">This detail page now sits on the same premium project management language as the rest of the company dashboard.</div>
+              <div className="mt-4 text-xl font-semibold">This project now reflects the real database state instead of placeholder candidate and milestone data.</div>
             </CardContent>
           </Card>
         </div>

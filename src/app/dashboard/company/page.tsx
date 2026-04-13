@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { useApplications } from '@/hooks/useApplications';
 import { useAuth } from '@/hooks/useAuth';
-import { useProjects } from '@/hooks/useProjects';
+import { useUserProjects } from '@/hooks/useProjects';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -32,7 +32,7 @@ type CompanyProject = {
   applicationsCount?: number;
   budget?: { min?: number; max?: number };
   milestones?: Array<{ title?: string }>;
-  assignedCandidate?: { name?: string; trustScore?: number };
+  selectedApplicant?: string | { _id?: string; name?: string; trustScore?: number };
 };
 
 type CompanyApplication = {
@@ -40,13 +40,10 @@ type CompanyApplication = {
   status?: string;
   createdAt?: string;
   submittedAt?: string;
-  expectedBudget?: number;
-  estimatedDuration?: number;
-  applicant?: { name?: string; trustScore?: number; experience?: number };
-  applicantId?: { name?: string };
-  user?: { name?: string };
-  project?: { title?: string };
-  projectId?: { title?: string };
+  proposedAmount?: number;
+  proposedDuration?: number;
+  projectId?: { _id?: string; title?: string };
+  applicantId?: { _id?: string; name?: string; trustScore?: number; experience?: number };
 };
 
 const recommendationCards = [
@@ -86,7 +83,7 @@ function formatRelative(dateValue?: string | Date) {
 
 export default function CompanyDashboardPage() {
   const { user } = useAuth();
-  const { projects = [], isLoading: projectsLoading } = useProjects({ limit: 12 });
+  const { projects = [], isLoading: projectsLoading } = useUserProjects(user?.id, { role: 'company' });
   const { applications = [], isLoading: applicationsLoading } = useApplications({ role: 'company', limit: 100 });
 
   const typedProjects = projects as unknown as CompanyProject[];
@@ -100,10 +97,10 @@ export default function CompanyDashboardPage() {
     const totalApplicants = typedApplications.length;
     const totalSpent = typedProjects.reduce((sum, project) => sum + (project.budget?.max || project.budget?.min || 0), 0);
     const pendingCount = typedApplications.filter((application) => application.status === 'pending').length;
-    const reviewedCount = typedApplications.filter((application) => ['reviewed', 'reviewing'].includes(application.status || '')).length;
-    const interviewCount = typedApplications.filter((application) => application.status === 'interview').length;
-    const offerCount = typedApplications.filter((application) => application.status === 'offered').length;
-    const hiredCount = typedApplications.filter((application) => ['accepted', 'hired'].includes(application.status || '')).length;
+    const reviewedCount = typedApplications.filter((application) => application.status === 'reviewed').length;
+    const interviewCount = typedApplications.filter((application) => ['interview_scheduled', 'interview_completed'].includes(application.status || '')).length;
+    const offerCount = typedApplications.filter((application) => application.status === 'accepted').length;
+    const hiredCount = typedApplications.filter((application) => application.status === 'accepted').length;
     const conversionRate = totalApplicants ? Math.round((hiredCount / totalApplicants) * 1000) / 10 : 0;
 
     return {
@@ -123,58 +120,44 @@ export default function CompanyDashboardPage() {
   const quickStats = [
     {
       label: 'Active Projects',
-      value: `${stats.activeProjects || typedProjects.length || 3}`,
-      trend: `+${Math.max(1, Math.ceil((stats.activeProjects || 3) / 2))} from last month`,
+      value: `${stats.activeProjects}`,
+      trend: `${stats.openProjects} open right now`,
       icon: Briefcase,
       accent: 'from-primary-700 to-info-600',
     },
     {
       label: 'Open Positions',
-      value: `${stats.openProjects || Math.max(2, typedProjects.length)}`,
-      trend: `+${Math.max(1, Math.ceil((stats.openProjects || 2) / 2))} from last month`,
+      value: `${stats.openProjects}`,
+      trend: `${stats.pendingCount} applications pending review`,
       icon: PenSquare,
       accent: 'from-secondary-500 to-secondary-300',
     },
     {
       label: 'Total Applicants',
-      value: `${stats.totalApplicants || 24}`,
-      trend: `+${Math.max(3, Math.ceil((stats.totalApplicants || 24) / 4))} from last month`,
+      value: `${stats.totalApplicants}`,
+      trend: `${stats.reviewedCount + stats.interviewCount} already moved forward`,
       icon: Users,
       accent: 'from-info-600 to-primary-600',
     },
     {
       label: 'Total Spent',
-      value: formatCurrency(stats.totalSpent || 120000),
-      trend: '+45% from last month',
+      value: formatCurrency(stats.totalSpent),
+      trend: `${stats.hiredCount} hires in progress`,
       icon: CreditCard,
       accent: 'from-charcoal-700 to-charcoal-500',
     },
   ];
 
-  const activeProjects = typedProjects.slice(0, 3);
+  const activeProjects = typedProjects
+    .filter((project) => ['open', 'in_progress', 'active'].includes(project.status || ''))
+    .slice(0, 3);
   const recentApplications = typedApplications.slice(0, 3);
-  const activeProjectDisplay: CompanyProject[] =
-    activeProjects.length > 0
-      ? activeProjects
-      : [
-          { title: 'E-commerce Platform', createdAt: new Date().toISOString(), duration: 30, applicationsCount: 12, budget: { max: 15000 }, milestones: [{ title: 'UI Development' }], assignedCandidate: { name: 'Riya Sharma', trustScore: 92 } },
-          { title: 'Admin Dashboard', createdAt: new Date().toISOString(), duration: 20, applicationsCount: 8, budget: { max: 40000 }, milestones: [{ title: 'Applications review' }] },
-          { title: 'Mobile App UI Design', createdAt: new Date().toISOString(), duration: 25, applicationsCount: 15, budget: { max: 22000 }, milestones: [{ title: 'Wireframes' }], assignedCandidate: { name: 'Priya Singh', trustScore: 85 } },
-        ];
-  const recentApplicationDisplay: CompanyApplication[] =
-    recentApplications.length > 0
-      ? recentApplications
-      : [
-          { applicant: { name: 'Riya Sharma', trustScore: 92, experience: 2 }, project: { title: 'E-commerce Platform' }, expectedBudget: 55000, estimatedDuration: 28, submittedAt: new Date().toISOString() },
-          { applicant: { name: 'Raj Patel', trustScore: 88, experience: 3 }, project: { title: 'Admin Dashboard' }, expectedBudget: 60000, estimatedDuration: 25, submittedAt: new Date().toISOString() },
-          { applicant: { name: 'Ankit Sharma', trustScore: 85, experience: 2 }, project: { title: 'Mobile App UI Design' }, expectedBudget: 45000, estimatedDuration: 20, submittedAt: new Date().toISOString() },
-        ];
   const pipelineStages = [
-    { label: 'New', count: stats.pendingCount || 8 },
-    { label: 'Reviewing', count: stats.reviewedCount || 4 },
-    { label: 'Interview', count: stats.interviewCount || 2 },
-    { label: 'Offer', count: stats.offerCount || 1 },
-    { label: 'Hired', count: stats.hiredCount || 1 },
+    { label: 'New', count: stats.pendingCount },
+    { label: 'Reviewing', count: stats.reviewedCount },
+    { label: 'Interview', count: stats.interviewCount },
+    { label: 'Offer', count: stats.offerCount },
+    { label: 'Hired', count: stats.hiredCount },
   ];
 
   if (projectsLoading || applicationsLoading) {
@@ -232,10 +215,10 @@ export default function CompanyDashboardPage() {
             </div>
 
             <div className="grid grid-cols-3 gap-3 rounded-[28px] border border-white/14 bg-card/10 p-4 backdrop-blur">
-              {[
-                { label: 'Projects', value: stats.activeProjects || 3 },
-                { label: 'Applicants', value: stats.totalApplicants || 24 },
-                { label: 'Conversion', value: `${stats.conversionRate || 12.5}%` },
+                {[
+                { label: 'Projects', value: stats.activeProjects },
+                { label: 'Applicants', value: stats.totalApplicants },
+                { label: 'Conversion', value: `${stats.conversionRate}%` },
               ].map((item) => (
                 <div key={item.label} className="rounded-[22px] bg-black/10 px-4 py-3 text-center">
                   <div className="text-lg font-semibold">{item.value}</div>
@@ -280,17 +263,31 @@ export default function CompanyDashboardPage() {
               </Button>
             </CardHeader>
             <CardContent className="space-y-4">
-              {activeProjectDisplay.map((project, index) => {
-                const title = project._id ? project.title || 'Untitled project' : ['E-commerce Platform', 'Admin Dashboard', 'Mobile App UI Design'][index];
-                const candidateName = project.assignedCandidate?.name || ['Riya Sharma', 'Not assigned yet', 'Priya Singh'][index];
-                const trust = project.assignedCandidate?.trustScore || [92, 88, 85][index];
-                const progress = [40, 0, 60][index];
-                const budget = formatCurrency(project.budget?.max || project.budget?.min || [15000, 40000, 22000][index]);
-                const milestone = project.milestones?.[0]?.title || ['UI Development', 'Applications review', 'Wireframes'][index];
+              {activeProjects.length === 0 && (
+                <div className="rounded-[24px] border border-dashed border-primary-200 bg-silver-50/70 p-8 text-center text-sm text-charcoal-500 dark:border-white/10 dark:bg-charcoal-950/35 dark:text-charcoal-400">
+                  No company projects yet. Post your first project to start receiving applications.
+                </div>
+              )}
+              {activeProjects.map((project) => {
+                const title = project.title || 'Untitled project';
+                const assignedCandidateId =
+                  typeof project.selectedApplicant === 'string'
+                    ? project.selectedApplicant
+                    : project.selectedApplicant?._id;
+                const candidateApplication = typedApplications.find(
+                  (application) =>
+                    application.projectId?._id === project._id &&
+                    application.applicantId?._id === assignedCandidateId
+                );
+                const candidateName = candidateApplication?.applicantId?.name || 'Not assigned yet';
+                const trust = candidateApplication?.applicantId?.trustScore || 0;
+                const progress = project.status === 'completed' ? 100 : project.status === 'in_progress' ? 50 : 0;
+                const budget = formatCurrency(project.budget?.max || project.budget?.min || 0);
+                const milestone = project.milestones?.[0]?.title || 'No milestones yet';
 
                 return (
                   <div
-                    key={project._id || `${title}-${index}`}
+                    key={project._id || title}
                     className="rounded-[28px] border border-primary-100/70 bg-[linear-gradient(180deg,rgba(225,221,214,0.35),rgba(255,255,255,0.88))] p-5 dark:border-white/10 dark:bg-charcoal-950/40"
                   >
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -299,7 +296,7 @@ export default function CompanyDashboardPage() {
                           <h3 className="text-lg font-semibold text-charcoal-950 dark:text-white">{title}</h3>
                           <p className="mt-1 text-sm text-charcoal-500 dark:text-charcoal-400">
                             {candidateName === 'Not assigned yet'
-                              ? `Status: Open | Applications: ${project.applicationsCount || 8} candidates waiting`
+                              ? `Status: ${project.status || 'open'} | Applications: ${project.applicationsCount || 0} candidates waiting`
                               : `Candidate: ${candidateName} | Trust Score: ${trust}% | Started ${formatRelative(project.createdAt)}`}
                           </p>
                         </div>
@@ -315,8 +312,8 @@ export default function CompanyDashboardPage() {
                         <div className="grid gap-2 text-sm text-charcoal-600 dark:text-charcoal-300 md:grid-cols-2">
                           <div>Next milestone: {milestone}</div>
                           <div>Amount: {budget}</div>
-                          <div>{['Due in 3 days', 'Best match available', 'Due tomorrow'][index]}</div>
-                          <div>Duration: {project.duration || [30, 20, 25][index]} days</div>
+                          <div>{project.applicationsCount || 0} total applications</div>
+                          <div>Duration: {project.duration || 0} days</div>
                         </div>
                       </div>
                       <div className="flex flex-wrap gap-2 lg:w-[220px] lg:flex-col">
@@ -330,7 +327,7 @@ export default function CompanyDashboardPage() {
                           </Link>
                         </Button>
                         <Button asChild size="sm" variant="outline">
-                          <Link href="/dashboard/company/applications">Review Work</Link>
+                          <Link href={`/dashboard/company/my-projects/${project._id}/applications`}>Review Applications</Link>
                         </Button>
                       </div>
                     </div>
@@ -356,24 +353,22 @@ export default function CompanyDashboardPage() {
               </Button>
             </CardHeader>
             <CardContent className="space-y-4">
-              {recentApplicationDisplay.map((application, index) => {
-                const applicantName =
-                  application.applicant?.name ||
-                  application.applicantId?.name ||
-                  application.user?.name ||
-                  ['Riya Sharma', 'Raj Patel', 'Ankit Sharma'][index];
-                const projectTitle =
-                  application.project?.title ||
-                  application.projectId?.title ||
-                  ['E-commerce Platform', 'Admin Dashboard', 'Mobile App UI Design'][index];
-                const trust = application.applicant?.trustScore || [92, 88, 85][index];
-                const experience = application.applicant?.experience || [2, 3, 2][index];
-                const proposed = application.expectedBudget || [55000, 60000, 45000][index];
-                const days = application.estimatedDuration || [28, 25, 20][index];
+              {recentApplications.length === 0 && (
+                <div className="rounded-[24px] border border-dashed border-primary-200 bg-silver-50/70 p-8 text-center text-sm text-charcoal-500 dark:border-white/10 dark:bg-charcoal-950/35 dark:text-charcoal-400">
+                  No recent applications yet.
+                </div>
+              )}
+              {recentApplications.map((application) => {
+                const applicantName = application.applicantId?.name || 'Candidate';
+                const projectTitle = application.projectId?.title || 'Project';
+                const trust = application.applicantId?.trustScore || 0;
+                const experience = application.applicantId?.experience || 0;
+                const proposed = application.proposedAmount || 0;
+                const days = application.proposedDuration || 0;
 
                 return (
                   <div
-                    key={application._id || `${applicantName}-${index}`}
+                    key={application._id || `${applicantName}-${projectTitle}`}
                     className="rounded-[28px] border border-secondary-200/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(225,221,214,0.55))] p-5 dark:border-white/10 dark:bg-charcoal-950/40"
                   >
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -396,10 +391,10 @@ export default function CompanyDashboardPage() {
                       </div>
                       <div className="flex flex-wrap gap-2 lg:w-[240px] lg:flex-col">
                         <Button asChild size="sm">
-                          <Link href="/dashboard/company/applications">View Application</Link>
+                          <Link href={`/dashboard/company/applications/${application._id}`}>View Application</Link>
                         </Button>
                         <Button asChild size="sm" variant="outline">
-                          <Link href="/dashboard/company/applications">Shortlist</Link>
+                          <Link href={`/dashboard/company/applications/${application._id}`}>Shortlist</Link>
                         </Button>
                         <Button asChild size="sm" variant="outline">
                           <Link href="/dashboard/messages">Message</Link>
@@ -452,7 +447,7 @@ export default function CompanyDashboardPage() {
               </div>
               <div className="rounded-[24px] border border-secondary-200 bg-secondary-50/80 p-4 dark:border-secondary-800/40 dark:bg-secondary-950/10">
                 <div className="text-sm font-semibold text-charcoal-950 dark:text-white">
-                  Conversion Rate: {stats.conversionRate || 12.5}% <span className="text-charcoal-500 dark:text-charcoal-400">(Target: 20%)</span>
+                  Conversion Rate: {stats.conversionRate}% <span className="text-charcoal-500 dark:text-charcoal-400">(Target: 20%)</span>
                 </div>
                 <Button asChild variant="ghost" className="mt-2 h-auto px-0 text-primary-700 hover:text-primary-800">
                   <Link href="/dashboard/company/analytics">
@@ -529,7 +524,7 @@ export default function CompanyDashboardPage() {
               })}
             </div>
             <div className="mt-4 flex flex-wrap gap-4 text-sm text-charcoal-600 dark:text-charcoal-300">
-              <span>Total Spent: {formatCurrency(stats.totalSpent || 120000)}</span>
+              <span>Total Spent: {formatCurrency(stats.totalSpent)}</span>
               <span>Average per hire: {formatCurrency(40000)}</span>
               <span>ROI: 4.2x</span>
             </div>

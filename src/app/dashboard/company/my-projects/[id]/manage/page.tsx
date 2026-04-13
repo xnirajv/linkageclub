@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Plus, Save, Sparkles, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/forms/Textarea';
+import { useProject } from '@/hooks/useProjects';
 
 interface Milestone {
   title: string;
@@ -17,18 +18,81 @@ interface Milestone {
 export default function ManageProjectPage() {
   const params = useParams();
   const router = useRouter();
-  const [title, setTitle] = useState('MERN E-commerce Platform');
-  const [summary, setSummary] = useState('Build a premium commerce platform with authentication, admin tools, payment integration, and clean responsive UX.');
-  const [description, setDescription] = useState('Build a full-stack e-commerce platform with premium UX, modern architecture, and milestone-based delivery.');
-  const [skills, setSkills] = useState(['React', 'Node.js', 'MongoDB']);
+  const projectId = params.id as string;
+  const { project, isLoading, errorMessage, updateProject } = useProject(projectId);
+  const [title, setTitle] = useState('');
+  const [summary, setSummary] = useState('');
+  const [description, setDescription] = useState('');
+  const [skills, setSkills] = useState<string[]>([]);
   const [skillInput, setSkillInput] = useState('');
-  const [budgetMin, setBudgetMin] = useState('50000');
-  const [budgetMax, setBudgetMax] = useState('70000');
-  const [duration, setDuration] = useState('30');
-  const [milestones, setMilestones] = useState<Milestone[]>([
-    { title: 'UI Development', amount: '15000', deadline: '5' },
-    { title: 'Backend API', amount: '20000', deadline: '15' },
-  ]);
+  const [budgetMin, setBudgetMin] = useState('');
+  const [budgetMax, setBudgetMax] = useState('');
+  const [duration, setDuration] = useState('');
+  const [milestones, setMilestones] = useState<Milestone[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!project) return;
+    setTitle(project.title || '');
+    setSummary(project.requirements?.[0] || '');
+    setDescription(project.description || '');
+    setSkills((project.skills || []).map((skill) => skill.name));
+    setBudgetMin(String(project.budget?.min ?? ''));
+    setBudgetMax(String(project.budget?.max ?? ''));
+    setDuration(String(project.duration ?? ''));
+    setMilestones(
+      (project.milestones || []).map((milestone) => ({
+        title: milestone.title || '',
+        amount: String(milestone.amount ?? ''),
+        deadline: String(milestone.deadline ?? ''),
+      }))
+    );
+  }, [project]);
+
+  const canSave = useMemo(() => {
+    return Boolean(title.trim() && description.trim() && budgetMin && budgetMax && duration);
+  }, [title, description, budgetMin, budgetMax, duration]);
+
+  const handleSave = async () => {
+    if (isSaving) return;
+    setIsSaving(true);
+    setSaveError(null);
+    setSaveSuccess(null);
+
+    const result = await updateProject({
+      title: title.trim(),
+      description: description.trim(),
+      requirements: summary ? [summary] : [],
+      skills: skills
+        .filter(Boolean)
+        .map((name) => ({ name, level: 'intermediate', mandatory: true })),
+      budget: {
+        type: project?.budget?.type || 'fixed',
+        min: Number(budgetMin),
+        max: Number(budgetMax),
+        currency: project?.budget?.currency || 'INR',
+      },
+      duration: Number(duration),
+      milestones: milestones
+        .filter((milestone) => milestone.title && milestone.amount && milestone.deadline)
+        .map((milestone) => ({
+          title: milestone.title,
+          description: milestone.title,
+          amount: Number(milestone.amount),
+          deadline: Number(milestone.deadline),
+        })),
+    });
+
+    if (!result.success) {
+      setSaveError(result.error || 'Failed to save changes.');
+    } else {
+      setSaveSuccess('Project updated successfully.');
+    }
+
+    setIsSaving(false);
+  };
 
   return (
     <div className="space-y-6">
@@ -46,11 +110,27 @@ export default function ManageProjectPage() {
             <p className="mt-2 text-sm leading-7 text-charcoal-500 dark:text-charcoal-400">Update project positioning, budget clarity, required skills, and milestone structure from the premium company workspace.</p>
           </div>
         </div>
-        <Button onClick={() => router.push(`/dashboard/company/my-projects/${params.id}`)}>
+        <Button onClick={handleSave} disabled={!canSave || isSaving || isLoading}>
           <Save className="mr-2 h-4 w-4" />
-          Save Changes
+          {isSaving ? 'Saving...' : 'Save Changes'}
         </Button>
       </div>
+
+      {errorMessage && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          {errorMessage}
+        </div>
+      )}
+      {saveError && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          {saveError}
+        </div>
+      )}
+      {saveSuccess && (
+        <div className="rounded-2xl border border-green-200 bg-green-50 p-4 text-sm text-green-700">
+          {saveSuccess}
+        </div>
+      )}
 
       <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <div className="space-y-6">

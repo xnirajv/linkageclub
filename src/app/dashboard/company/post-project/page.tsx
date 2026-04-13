@@ -43,7 +43,17 @@ interface FormState {
   confirmTerms: boolean;
 }
 
-const categories = ['Web Development', 'Mobile Development', 'AI / ML', 'Blockchain', 'Design', 'Other'];
+const categories = [
+  'Web Development',
+  'Mobile Development',
+  'AI / ML',
+  'Data Science',
+  'DevOps',
+  'Design',
+  'Content Writing',
+  'Marketing',
+  'Other',
+];
 const skillSuggestions = ['React', 'Node.js', 'MongoDB', 'Next.js', 'AWS', 'Figma', 'Python', 'TypeScript'];
 
 const initialState: FormState = {
@@ -80,10 +90,23 @@ export default function PostProjectPage() {
   const [step, setStep] = useState<Step>(1);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
   const [attachmentInput, setAttachmentInput] = useState('');
   const [form, setForm] = useState<FormState>(initialState);
 
   const milestoneTotal = useMemo(() => form.milestones.reduce((sum, item) => sum + item.amount, 0), [form.milestones]);
+  const canPublish = useMemo(() => {
+    return Boolean(
+      form.confirmTerms &&
+      form.title.trim() &&
+      form.description.trim().length >= 50 &&
+      form.category &&
+      form.budgetMin &&
+      form.budgetMax &&
+      form.duration
+    );
+  }, [form]);
 
   function setField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -124,7 +147,12 @@ export default function PostProjectPage() {
   }
 
   async function publishProject() {
-  setIsSubmitting(true);
+    if (isSubmitting) {
+      return;
+    }
+    setSubmitError(null);
+    setSubmitSuccess(null);
+    setIsSubmitting(true);
   try {
     const result = await createProject({
       title: form.title,
@@ -139,7 +167,7 @@ export default function PostProjectPage() {
         type: form.budgetType,
         min: parseInt(form.budgetMin, 10) || 0,
         max: parseInt(form.budgetMax, 10) || 0,
-        currency: 'INR', // ✅ Add this
+        currency: 'INR',
       },
       duration: parseInt(form.duration, 10) || 0,
       requirements: form.requirements.filter(Boolean),
@@ -147,20 +175,21 @@ export default function PostProjectPage() {
       visibility: form.visibility,
       milestones: form.milestones.filter((item) => item.title && item.amount > 0).map((item) => ({
         title: item.title,
-        description: item.title, // ✅ Add description (same as title)
+        description: item.title,
         amount: item.amount,
         deadline: item.deadline,
       })),
     });
 
     if (result.success) {
+      setSubmitSuccess('Project published successfully.');
       router.push('/dashboard/company/my-projects');
     } else {
-      window.alert(result.error || 'Failed to publish project.');
+      setSubmitError(result.error || 'Failed to publish project.');
     }
   } catch (error) {
     console.error(error);
-    window.alert('Failed to publish project.');
+    setSubmitError('Failed to publish project.');
   } finally {
     setIsSubmitting(false);
   }
@@ -184,6 +213,12 @@ export default function PostProjectPage() {
           </Link>
         </Button>
       </div>
+
+      {(submitError || submitSuccess) && (
+        <div className={`rounded-2xl border p-4 text-sm ${submitError ? 'border-red-200 bg-red-50 text-red-700' : 'border-green-200 bg-green-50 text-green-700'}`}>
+          {submitError || submitSuccess}
+        </div>
+      )}
 
       <div className="grid gap-4 md:grid-cols-4">
         {['Basic Information', 'Skills & Requirements', 'Budget & Timeline', 'Visibility & Attachments'].map((label, index) => {
@@ -340,7 +375,7 @@ export default function PostProjectPage() {
                       <Eye className="mr-2 h-4 w-4" />
                       Preview
                     </Button>
-                    <Button onClick={publishProject} disabled={isSubmitting || !form.confirmTerms}>
+                    <Button onClick={publishProject} disabled={isSubmitting || !canPublish}>
                       {isSubmitting ? 'Publishing...' : 'Publish Project'}
                     </Button>
                   </div>
@@ -387,7 +422,7 @@ export default function PostProjectPage() {
             <DialogDescription>This is how candidates will see the project.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 rounded-[24px] border border-primary-100/70 bg-silver-50/70 p-5">
-            <div className="text-sm text-charcoal-500">Budget: {formatCurrency(parseInt(form.budgetMin, 10) || 0)} - {formatCurrency(parseInt(form.budgetMax, 10) || 0)} • Duration: {form.duration || 0} days</div>
+            <div className="text-sm text-charcoal-500">Budget: {formatCurrency(parseInt(form.budgetMin, 10) || 0)} - {formatCurrency(parseInt(form.budgetMax, 10) || 0)} - Duration: {form.duration || 0} days</div>
             <div className="text-sm leading-7 text-charcoal-700">{form.description || 'Project description preview.'}</div>
             <div className="flex flex-wrap gap-2">
               {form.skills.map((skill) => (
@@ -397,7 +432,7 @@ export default function PostProjectPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setPreviewOpen(false)}>Close</Button>
-            <Button onClick={publishProject} disabled={isSubmitting}>{isSubmitting ? 'Publishing...' : 'Publish Project'}</Button>
+            <Button onClick={publishProject} disabled={isSubmitting || !canPublish}>{isSubmitting ? 'Publishing...' : 'Publish Project'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

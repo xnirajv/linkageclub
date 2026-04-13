@@ -29,6 +29,11 @@ interface UseProjectsOptions {
   status?: string;
 }
 
+interface UseUserProjectsOptions {
+  type?: 'all' | 'active' | 'completed';
+  role?: 'student' | 'company';
+}
+
 interface CreateProjectData {
   title: string;
   description: string;
@@ -78,6 +83,10 @@ interface ProjectsPayload {
 
 interface ProjectPayload {
   project: Project;
+}
+
+interface UserProjectsPayload {
+  projects: Project[];
 }
 
 async function revalidateProjectKeys(
@@ -279,6 +288,34 @@ export function useProject(id: string) {
     isError: error,
     errorMessage: error instanceof Error ? error.message : data?.error,
     updateProject,
+    mutate,
+  };
+}
+
+export function useUserProjects(userId?: string, options: UseUserProjectsOptions = {}) {
+  const actions = useProjectActions();
+  const queryParams = new URLSearchParams();
+
+  Object.entries(options).forEach(([key, value]) => {
+    if (value) {
+      queryParams.append(key, value);
+    }
+  });
+
+  const key = userId
+    ? `/api/projects/user/${userId}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
+    : null;
+
+  const { data, error, mutate } = useSWR<ApiEnvelope<UserProjectsPayload>>(key, fetcher);
+
+  return {
+    projects: data?.data?.projects || [],
+    isLoading: !error && !data,
+    isError: error,
+    errorMessage: error instanceof Error ? error.message : data?.error,
+    applyToProject: actions.applyToProject,
+    saveProject: actions.saveProject,
+    createProject: actions.createProject,
     mutate,
   };
 }
