@@ -190,12 +190,24 @@ export function useApplication(id: string) {
     }
   }, [id]);
 
+  const getStatusHistory = useCallback(async () => {
+    try {
+      const response = await apiClient.get<ApiEnvelope<{ currentStatus: string; history: any[]; reviewedAt?: string; reviewNotes?: string }>>(
+        `/api/applications/${id}/status`
+      );
+      return response.data;
+    } catch {
+      return null;
+    }
+  }, [id]);
+
   return {
     application: data?.data?.application,
     isLoading: !error && !data,
     isError: error,
     errorMessage: error instanceof Error ? error.message : data?.error,
     getMessages,
+    getStatusHistory,
     mutate,
   };
 }
