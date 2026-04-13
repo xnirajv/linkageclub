@@ -85,7 +85,18 @@ export default function MyProjectsPage() {
   const [tab, setTab] = useState<ProjectStatus>('active');
   const [query, setQuery] = useState('');
 
-  const typedProjects = projects as ProjectItem[];
+  const typedProjects: ProjectItem[] = useMemo(() => {
+    return projects.map((project) => ({
+      _id: project._id,
+      title: project.title || 'Untitled project',
+      status: project.status || 'open',
+      budget: project.budget,
+      duration: project.duration,
+      applicationsCount: project.applicationsCount,
+      createdAt: project.createdAt ? new Date(project.createdAt).toISOString() : undefined,
+      selectedApplicant: project.selectedApplicant,
+    }));
+  }, [projects]);
   const filteredProjects = useMemo(() => {
     return typedProjects.filter((project) => {
       const projectStatus = normalizeStatus(project.status);

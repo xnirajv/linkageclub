@@ -82,6 +82,7 @@ export default function ManageProjectPage() {
           description: milestone.title,
           amount: Number(milestone.amount),
           deadline: Number(milestone.deadline),
+          status: 'pending',
         })),
     });
 
