@@ -94,7 +94,7 @@ const getSidebarConfig = (role: string): SidebarSection[] => {
           { title: 'Jobs', href: '/dashboard/company/jobs', icon: Briefcase },
           { title: 'Talent Search', href: '/dashboard/company/talent-search', icon: Users },
           { title: 'Company Profile', href: '/dashboard/company/profile', icon: Building },
-          { title: 'Analytics', href: '/dashboard/company/analytics', icon: BarChart3 },
+          { title: 'Analytics & Reports', href: '/dashboard/company/analytics', icon: BarChart3 },
           { title: 'Team Management', href: '/dashboard/company/team', icon: Users },
           { title: 'Billing & Payments', href: '/dashboard/company/billing', icon: DollarSign },
         ],
