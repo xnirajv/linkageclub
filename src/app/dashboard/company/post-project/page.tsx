@@ -174,14 +174,14 @@ export default function PostProjectPage() {
     setSubmitSuccess(null);
     setIsSubmitting(true);
   try {
-      const visibilityValue = form.visibility === 'invite' ? 'private' : form.visibility;
       const result = await createProject({
       title: form.title,
+      summary: form.summary.trim() || undefined,
       description: form.description,
       category: form.category,
       skills: form.skills.filter(Boolean).map((name) => ({ 
         name, 
-        level: form.experienceLevel, 
+        level: form.experienceLevel === 'any' ? 'intermediate' : form.experienceLevel,
         mandatory: true 
       })),
       budget: {
@@ -191,9 +191,15 @@ export default function PostProjectPage() {
         currency: 'INR',
       },
       duration: parseInt(form.duration, 10) || 0,
+      location: {
+        type: form.locationPreference,
+        label: form.locationPreference === 'remote' ? 'Remote' : form.locationText.trim() || undefined,
+      },
       requirements: form.requirements.filter(Boolean),
       experienceLevel: form.experienceLevel,
-        visibility: visibilityValue,
+      visibility: form.visibility,
+      attachments: form.attachments.filter(Boolean),
+      isFeatured: form.featured,
       milestones: form.milestones.filter((item) => item.title && item.amount > 0).map((item) => ({
         title: item.title,
         description: item.title,

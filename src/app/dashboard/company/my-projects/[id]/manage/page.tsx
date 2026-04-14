@@ -28,6 +28,11 @@ export default function ManageProjectPage() {
   const [budgetMin, setBudgetMin] = useState('');
   const [budgetMax, setBudgetMax] = useState('');
   const [duration, setDuration] = useState('');
+  const [locationType, setLocationType] = useState<'remote' | 'onsite' | 'hybrid'>('remote');
+  const [locationLabel, setLocationLabel] = useState('');
+  const [featured, setFeatured] = useState(false);
+  const [attachments, setAttachments] = useState<string[]>([]);
+  const [attachmentInput, setAttachmentInput] = useState('');
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -36,12 +41,16 @@ export default function ManageProjectPage() {
   useEffect(() => {
     if (!project) return;
     setTitle(project.title || '');
-    setSummary(project.requirements?.[0] || '');
+    setSummary(project.summary || '');
     setDescription(project.description || '');
     setSkills((project.skills || []).map((skill) => skill.name));
     setBudgetMin(String(project.budget?.min ?? ''));
     setBudgetMax(String(project.budget?.max ?? ''));
     setDuration(String(project.duration ?? ''));
+    setLocationType(project.location?.type || 'remote');
+    setLocationLabel(project.location?.label || '');
+    setFeatured(Boolean(project.isFeatured));
+    setAttachments(project.attachments || []);
     setMilestones(
       (project.milestones || []).map((milestone) => ({
         title: milestone.title || '',
@@ -63,8 +72,9 @@ export default function ManageProjectPage() {
 
     const result = await updateProject({
       title: title.trim(),
+      summary: summary.trim() || undefined,
       description: description.trim(),
-      requirements: summary ? [summary] : [],
+      requirements: project?.requirements || [],
       skills: skills
         .filter(Boolean)
         .map((name) => ({ name, level: 'intermediate', mandatory: true })),
@@ -75,6 +85,12 @@ export default function ManageProjectPage() {
         currency: project?.budget?.currency || 'INR',
       },
       duration: Number(duration),
+      location: {
+        type: locationType,
+        label: locationType === 'remote' ? 'Remote' : locationLabel.trim() || undefined,
+      },
+      attachments,
+      isFeatured: featured,
       milestones: milestones
         .filter((milestone) => milestone.title && milestone.amount && milestone.deadline)
         .map((milestone) => ({
@@ -141,6 +157,22 @@ export default function ManageProjectPage() {
               <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Project title" />
               <Input value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="Short summary" />
               <Textarea rows={7} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Project description" />
+              <div className="grid gap-4 md:grid-cols-2">
+                <select value={locationType} onChange={(e) => setLocationType(e.target.value as 'remote' | 'onsite' | 'hybrid')} className="rounded-md border border-input bg-background px-3 py-2 text-sm">
+                  <option value="remote">Remote</option>
+                  <option value="onsite">Onsite</option>
+                  <option value="hybrid">Hybrid</option>
+                </select>
+                {locationType === 'remote' ? (
+                  <div className="rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground">Remote project</div>
+                ) : (
+                  <Input value={locationLabel} onChange={(e) => setLocationLabel(e.target.value)} placeholder="Location label" />
+                )}
+              </div>
+              <label className="flex items-center gap-3 rounded-xl border border-primary-100/70 bg-silver-50/70 px-4 py-3 text-sm text-charcoal-700 dark:border-white/10 dark:bg-charcoal-950/35 dark:text-charcoal-300">
+                <input type="checkbox" checked={featured} onChange={(e) => setFeatured(e.target.checked)} />
+                Feature this project in listings
+              </label>
             </CardContent>
           </Card>
 
@@ -176,6 +208,32 @@ export default function ManageProjectPage() {
               <Input value={budgetMin} onChange={(e) => setBudgetMin(e.target.value)} placeholder="Minimum budget" />
               <Input value={budgetMax} onChange={(e) => setBudgetMax(e.target.value)} placeholder="Maximum budget" />
               <Input value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="Duration (days)" />
+            </CardContent>
+          </Card>
+
+          <Card className="border-none bg-card/80 dark:bg-charcoal-900/72">
+            <CardHeader><CardTitle className="text-xl text-charcoal-950 dark:text-white">Attachments</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex gap-3">
+                <Input value={attachmentInput} onChange={(e) => setAttachmentInput(e.target.value)} placeholder="Add attachment name" />
+                <Button onClick={() => {
+                  if (!attachmentInput.trim()) return;
+                  setAttachments((prev) => [...prev, attachmentInput.trim()]);
+                  setAttachmentInput('');
+                }}>Add</Button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {attachments.map((attachment) => (
+                  <button
+                    key={attachment}
+                    type="button"
+                    onClick={() => setAttachments((prev) => prev.filter((item) => item !== attachment))}
+                    className="rounded-full bg-primary-100 px-3 py-1 text-xs font-medium text-primary-800"
+                  >
+                    {attachment} x
+                  </button>
+                ))}
+              </div>
             </CardContent>
           </Card>
         </div>

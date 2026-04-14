@@ -2,6 +2,7 @@ import mongoose, { Schema, Document, Model } from 'mongoose';
 
 export interface IProject extends Document {
   title: string;
+  summary?: string;
   description: string;
   companyId: mongoose.Types.ObjectId;
   category: string;
@@ -17,6 +18,10 @@ export interface IProject extends Document {
     currency: string;
   };
   duration: number;
+  location?: {
+    type: 'remote' | 'onsite' | 'hybrid';
+    label?: string;
+  };
   milestones: Array<{
     title: string;
     description: string;
@@ -25,9 +30,11 @@ export interface IProject extends Document {
     status: 'pending' | 'in_progress' | 'completed' | 'approved';
   }>;
   requirements: string[];
-  experienceLevel: 'beginner' | 'intermediate' | 'advanced';
+  experienceLevel: 'beginner' | 'intermediate' | 'advanced' | 'any';
   status: 'draft' | 'open' | 'in_progress' | 'completed' | 'cancelled';
-  visibility: 'public' | 'private';
+  visibility: 'public' | 'private' | 'invite';
+  attachments: string[];
+  isFeatured: boolean;
   applications: Array<{
     userId: mongoose.Types.ObjectId;
     proposedAmount: number;
@@ -63,6 +70,11 @@ const projectSchema = new Schema<IProject>(
       trim: true,
       minlength: [5, 'Title must be at least 5 characters'],
       maxlength: [100, 'Title cannot exceed 100 characters'],
+    },
+    summary: {
+      type: String,
+      trim: true,
+      maxlength: [200, 'Summary cannot exceed 200 characters'],
     },
     description: {
       type: String,
@@ -117,6 +129,14 @@ const projectSchema = new Schema<IProject>(
       min: 1,
       max: 365,
     },
+    location: {
+      type: {
+        type: String,
+        enum: ['remote', 'onsite', 'hybrid'],
+        default: 'remote',
+      },
+      label: String,
+    },
     milestones: [
       {
         title: { type: String, required: true },
@@ -133,7 +153,7 @@ const projectSchema = new Schema<IProject>(
     requirements: [String],
     experienceLevel: {
       type: String,
-      enum: ['beginner', 'intermediate', 'advanced'],
+      enum: ['beginner', 'intermediate', 'advanced', 'any'],
       required: true,
     },
     status: {
@@ -143,8 +163,13 @@ const projectSchema = new Schema<IProject>(
     },
     visibility: {
       type: String,
-      enum: ['public', 'private'],
+      enum: ['public', 'private', 'invite'],
       default: 'public',
+    },
+    attachments: [String],
+    isFeatured: {
+      type: Boolean,
+      default: false,
     },
     applications: [
       {

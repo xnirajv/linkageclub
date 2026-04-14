@@ -36,6 +36,7 @@ interface UseUserProjectsOptions {
 
 interface CreateProjectData {
   title: string;
+  summary?: string;
   description: string;
   category: string;
   skills: Array<{
@@ -50,9 +51,15 @@ interface CreateProjectData {
     currency: string;
   };
   duration: number;
+  location?: {
+    type: 'remote' | 'onsite' | 'hybrid';
+    label?: string;
+  };
   requirements: string[];
   experienceLevel: string;
-  visibility: 'public' | 'private';
+  visibility: 'public' | 'private' | 'invite';
+  attachments?: string[];
+  isFeatured?: boolean;
   milestones?: Array<{
     title: string;
     description?: string;

@@ -12,6 +12,7 @@ import { errors, handleAPIError, successResponse } from '@/lib/api/errors';
 
 const projectSchema = z.object({
   title: z.string().min(5).max(100),
+  summary: z.string().max(200).optional(),
   description: z.string().min(50).max(5000),
   category: z.string(),
   skills: z.array(
@@ -31,6 +32,10 @@ const projectSchema = z.object({
     path: ['max'],
   }),
   duration: z.number().min(1).max(365),
+  location: z.object({
+    type: z.enum(['remote', 'onsite', 'hybrid']),
+    label: z.string().max(120).optional(),
+  }).optional(),
   milestones: z.array(
     z.object({
       title: z.string(),
@@ -40,8 +45,10 @@ const projectSchema = z.object({
     })
   ).optional(),
   requirements: z.array(z.string()),
-  experienceLevel: z.enum(['beginner', 'intermediate', 'advanced']),
-  visibility: z.enum(['public', 'private']).default('public'),
+  experienceLevel: z.enum(['beginner', 'intermediate', 'advanced', 'any']),
+  visibility: z.enum(['public', 'private', 'invite']).default('public'),
+  attachments: z.array(z.string()).max(10).optional(),
+  isFeatured: z.boolean().default(false),
 });
 
 const listQuerySchema = z.object({
@@ -51,7 +58,7 @@ const listQuerySchema = z.object({
   skills: z.array(z.string()).default([]),
   minBudget: z.coerce.number().min(0).default(0),
   maxBudget: z.coerce.number().min(0).default(1000000),
-  experienceLevel: z.enum(['beginner', 'intermediate', 'advanced']).optional(),
+  experienceLevel: z.enum(['beginner', 'intermediate', 'advanced', 'any']).optional(),
   status: z.enum(['draft', 'open', 'in_progress', 'completed', 'cancelled']).default('open'),
   search: z.string().trim().optional(),
 });
@@ -214,6 +221,7 @@ export async function POST(req: NextRequest) {
       ...validation.data,
       companyId: new mongoose.Types.ObjectId(session.user.id),
       status: 'open',
+      attachments: validation.data.attachments || [],
       applications: [],
       applicationsCount: 0,
       views: 0,

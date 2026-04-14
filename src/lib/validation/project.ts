@@ -4,13 +4,13 @@ import { z } from 'zod';
 export const projectStatusEnum = z.enum(['draft', 'open', 'in_progress', 'completed', 'cancelled']);
 
 // Project visibility enum
-export const projectVisibilityEnum = z.enum(['public', 'private']);
+export const projectVisibilityEnum = z.enum(['public', 'private', 'invite']);
 
 // Budget type enum
 export const budgetTypeEnum = z.enum(['fixed', 'hourly', 'milestone']);
 
 // Experience level enum
-export const projectExperienceEnum = z.enum(['beginner', 'intermediate', 'advanced']);
+export const projectExperienceEnum = z.enum(['beginner', 'intermediate', 'advanced', 'any']);
 
 // Skill level enum
 export const skillLevelEnum = z.enum(['beginner', 'intermediate', 'advanced', 'expert']);

@@ -30,7 +30,7 @@ interface Project {
   requiredSkills: Skill[];
   budget: { min: number; max: number };
   duration: number;
-  experienceLevel: 'beginner' | 'intermediate' | 'advanced';
+  experienceLevel: 'beginner' | 'intermediate' | 'advanced' | 'any';
   location?: string;
   remote: boolean;
   category: string;
@@ -396,6 +396,10 @@ function calculateExperienceMatch(
   userExperience: number,
   requiredLevel: string
 ): number {
+  if (requiredLevel === 'any') {
+    return 100;
+  }
+
   const levelMap: Record<string, number> = {
     beginner: 1,
     intermediate: 3,

@@ -212,6 +212,10 @@ function getUserExperienceLevel(user: IUser): string {
 }
 
 function getExperienceLevelMatch(userLevel: string, requiredLevel: string): number {
+  if (requiredLevel === 'any') {
+    return 100;
+  }
+
   const levels = ['beginner', 'intermediate', 'advanced', 'expert'];
   const userIndex = levels.indexOf(userLevel);
   const requiredIndex = levels.indexOf(requiredLevel);

@@ -1,9 +1,9 @@
 import { User } from './user';
 
 export type ProjectStatus = 'active' | 'draft' | 'open' | 'in_progress' | 'completed' | 'cancelled';
-export type ProjectVisibility = 'public' | 'private';
+export type ProjectVisibility = 'public' | 'private' | 'invite';
 export type BudgetType = 'fixed' | 'hourly' | 'milestone';
-export type ExperienceLevel = 'beginner' | 'intermediate' | 'advanced';
+export type ExperienceLevel = 'beginner' | 'intermediate' | 'advanced' | 'any';
 
 export interface ProjectSkill {
   name: string;
@@ -56,18 +56,25 @@ export interface ProjectReview {
 export interface Project {
   _id: string;
   title: string;
+  summary?: string;
   description: string;
   companyId: string | User;
   category: string;
   skills: ProjectSkill[];
   budget: Budget;
   duration: number;
+  location?: {
+    type: 'remote' | 'onsite' | 'hybrid';
+    label?: string;
+  };
   deadline?: string;
   milestones: Milestone[];
   requirements: string[];
   experienceLevel: ExperienceLevel;
   status: ProjectStatus;
   visibility: ProjectVisibility;
+  attachments: string[];
+  isFeatured: boolean;
   applications: ProjectApplication[];
   selectedApplicant?: string;
   startDate?: Date;

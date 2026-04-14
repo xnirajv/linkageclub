@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/options';
 import Notification from '@/lib/db/models/notification';
 import connectDB from '@/lib/db/connect';
+import User from '@/lib/db/models/user';
 
 export async function GET(req: NextRequest) {
   try {
@@ -77,7 +78,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { title, message, type, category, priority, userIds } = body;
+    const { title, message, type, category, priority, userIds, roles } = body;
 
     await connectDB();
 
@@ -100,13 +101,35 @@ export async function POST(req: NextRequest) {
         count: notifications.length,
       });
     } else {
-      // Send to all users (broadcast)
-      // This should be done in batches for large user bases
-      // For now, we'll create a placeholder or use a different approach
-      return NextResponse.json(
-        { error: 'Broadcast notifications not implemented' },
-        { status: 501 }
+      const userQuery: Record<string, unknown> = {};
+      if (Array.isArray(roles) && roles.length > 0) {
+        userQuery.role = { $in: roles };
+      }
+
+      const recipients = await User.find(userQuery).select('_id').lean();
+      if (recipients.length === 0) {
+        return NextResponse.json(
+          { error: 'No users found for broadcast' },
+          { status: 404 }
+        );
+      }
+
+      const notifications = await Notification.insertMany(
+        recipients.map((user) => ({
+          userId: user._id,
+          title,
+          message,
+          type,
+          category,
+          priority: priority || 'medium',
+          read: false,
+        }))
       );
+
+      return NextResponse.json({
+        message: 'Broadcast notifications sent successfully',
+        count: notifications.length,
+      });
     }
 
   } catch (error) {

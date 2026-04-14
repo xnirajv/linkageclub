@@ -29,6 +29,7 @@ export default function PostJobPage() {
   const router = useRouter();
   const { createJob } = useJobs() as { createJob: (data: any) => Promise<{ success: boolean }> };
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [form, setForm] = useState<JobForm>({
     title: '',
     description: '',
@@ -48,6 +49,7 @@ export default function PostJobPage() {
 
   async function handleSubmit() {
     setIsSubmitting(true);
+    setSubmitError(null);
     try {
       const result = await createJob({
         title: form.title,
@@ -78,11 +80,11 @@ export default function PostJobPage() {
       if (result.success) {
         router.push('/dashboard/company/jobs');
       } else {
-        window.alert('Failed to create job.');
+        setSubmitError('Failed to create job.');
       }
     } catch (error) {
       console.error(error);
-      window.alert('Failed to create job.');
+      setSubmitError('Failed to create job.');
     } finally {
       setIsSubmitting(false);
     }
@@ -106,6 +108,12 @@ export default function PostJobPage() {
           </Link>
         </Button>
       </div>
+
+      {submitError && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          {submitError}
+        </div>
+      )}
 
       <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
         <div className="space-y-6">
