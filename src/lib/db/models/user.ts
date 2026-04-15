@@ -3,9 +3,10 @@ import bcrypt from 'bcryptjs';
 
 export interface IUser extends Document {
   email: string;
+  username?: string;
   password?: string;
   name: string;
-  headline?:string;
+  headline?: string;
   role: 'student' | 'company' | 'mentor' | 'founder' | 'admin';
   avatar?: string;
   bio?: string;
@@ -114,6 +115,15 @@ const userSchema = new Schema<IUser>(
       trim: true,
       match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email'],
     },
+    username: {
+      type: String,
+      unique: true,
+      sparse: true, // Important: Allows null/undefined values for old users
+      lowercase: true,
+      trim: true,
+      match: [/^[a-z0-9-]+$/, 'Username can only contain lowercase letters, numbers, and hyphens'],
+      index: true
+    },
     password: {
       type: String,
       required: [true, 'Password is required'],
@@ -126,10 +136,10 @@ const userSchema = new Schema<IUser>(
       trim: true,
       minlength: [2, 'Name must be at least 2 characters'],
     },
-    headline:{
+    headline: {
       type: String,
-      default:"",
-      maxlength:[100, 'Headline cannot be more than 100 characters'],
+      default: "",
+      maxlength: [100, 'Headline cannot be more than 100 characters'],
     },
     role: {
       type: String,

@@ -5,6 +5,7 @@ import connectDB from '@/lib/db/connect';
 import { sendVerificationEmail } from '@/lib/email/verification';
 import { generateToken } from '@/lib/utils/generateToken';
 import { z } from 'zod';
+import { getUniqueUsername } from '@/lib/utils/username';
 
 const signupSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -44,6 +45,8 @@ export async function POST(req: NextRequest) {
 
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
+    const username = await getUniqueUsername(name, User);
+
 
     // Generate verification token
     const verificationToken = generateToken();
@@ -54,6 +57,7 @@ export async function POST(req: NextRequest) {
     const user = await User.create({
       name,
       email,
+      username: username,
       password: hashedPassword,
       role,
       emailVerificationToken: verificationToken,

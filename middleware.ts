@@ -153,5 +153,6 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/api/:path*', '/((?!_next/static|_next/image|favicon.ico|public).*)'],
+  matcher: ['/dashboard/:path*', '/api/:path*', '/((?!_next/static|_next/image|favicon.ico|public|profile).*)'],
+  // 👆 Yahan 'profile' add kiya
 };

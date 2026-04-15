@@ -22,14 +22,15 @@ interface ProfilePageProps {
 
 async function getUser(username: string): Promise<UserType | null> {
   await connectDB();
-  
-  const isEmail = username.includes('@');
-  const query = isEmail ? { email: username } : { _id: username };
-  
+
+  const query = username.includes('@')
+    ? { email: username }  // Backward compatibility
+    : { username: username }; // New username-based lookupe };
+
   const user = await User.findOne(query).lean();
-  
+
   if (!user) return null;
-  
+
   return {
     _id: user._id.toString(),
     name: user.name,
@@ -72,7 +73,7 @@ async function getUser(username: string): Promise<UserType | null> {
 
 export async function generateMetadata({ params }: ProfilePageProps): Promise<Metadata> {
   const user = await getUser(params.username);
-  
+
   if (!user) {
     return {
       title: 'User Not Found',
@@ -113,11 +114,11 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
   return (
     <Container size="lg" className="py-8">
       {/* Profile Header */}
-      <ProfileHeader 
-        user={user} 
-        isOwnProfile={false} 
-        onEdit={() => {}} 
-        onShare={() => {}} 
+      <ProfileHeader
+        user={user}
+        isOwnProfile={false}
+        onEdit={() => { }}
+        onShare={() => { }}
       />
 
       {/* Profile Stats */}

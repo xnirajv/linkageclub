@@ -116,10 +116,13 @@ export async function PATCH(
       );
 
       if (validation.data.status === 'accepted') {
+        // Project ko update karo: Status change karo aur Candidate assign karo
         await Project.findByIdAndUpdate(application.projectId._id, {
-          status: 'in_progress',
-          selectedApplicant: application.applicantId._id,
-          startDate: new Date(),
+          $set: {
+            status: 'in_progress',
+            assignedCandidateId: application.applicantId._id, // Correct ID reference
+            startDate: new Date()
+          }
         });
       }
     }
