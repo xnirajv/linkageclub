@@ -115,6 +115,7 @@ export const founderRegistrationSchema = z.object({
   fullName: nameSchema,
   email: emailSchema,
   password: passwordSchema,
+  
   confirmPassword: z.string(),
   startupName: z.string().min(2, 'Startup name is required'),
   startupStage: z.string(),
