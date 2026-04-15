@@ -10,11 +10,11 @@ const studentSchema = z.object({
   fullName: z.string().min(2),
   email: z.string().email(),
   password: z.string().min(8),
-  college: z.string().min(2),
+  college: z.string().optional(),
   graduationYear: z.string(),
   degree: z.string(),
-  yearOfStudy: z.enum(['1st', '2nd', '3rd', '4th', 'graduate']),
-  skills: z.array(z.string()).min(3),
+  yearOfStudy: z.enum(['1st', '2nd', '3rd', '4th', 'graduate']).optional(),
+  skills: z.array(z.string()).optional(),
   linkedin: z.string().url().optional().or(z.literal('')),
   github: z.string().url().optional().or(z.literal('')),
   portfolio: z.string().url().optional().or(z.literal('')),
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
       role: 'student',
       emailVerificationToken: verificationToken,
       emailVerificationExpires: verificationExpires,
-      skills: skills.map(skill => ({
+      skills: (skills || []).map(skill => ({
         name: skill,
         level: 'beginner',
         verified: false,
