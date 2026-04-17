@@ -63,12 +63,12 @@ export async function POST(req: NextRequest) {
       emailVerificationToken: verificationToken,
       emailVerificationExpires: verificationExpires,
       skills: Array.isArray(skills)
-        ? skills.map(skill => ({
-          name: skill,
-          level: 'beginner',
-          verified: false,
-        }))
-        : [],
+  ? skills.map(skill => ({
+      name: skill,
+      level: 'beginner',
+      verified: false,
+    }))
+  : [],
       socialLinks: {
         linkedin,
         github,
@@ -88,22 +88,14 @@ export async function POST(req: NextRequest) {
     });
 
     // Send verification email
-    let emailSent = true;
-
-    try {
-      await sendVerificationEmail(email, verificationToken, fullName);
-    } catch (err) {
-      emailSent = false;
-      console.error("EMAIL ERROR:", err);
-    }
+    await sendVerificationEmail(email, verificationToken, fullName);
 
     // Create student profile (you might want a separate Student model)
     // For now, we'll store additional info in a metadata field or separate collection
 
     return NextResponse.json(
       {
-        message: 'Account created successfully',
-        emailSent,
+        message: 'Account created successfully. Please verify your email.',
         userId: user._id,
       },
       { status: 201 }
