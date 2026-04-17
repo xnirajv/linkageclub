@@ -94,7 +94,7 @@ export function StudentSignupForm({ onBack }: StudentSignupFormProps) {
 
       if (!response.ok) {
         const errorResponse = await response.json();
-        throw new Error(errorResponse.message || 'Failed to create account');
+        throw new Error(errorResponse.error || 'Failed to create account');
       }
 
       router.push('/verify-email?email=' + encodeURIComponent(data.email));
