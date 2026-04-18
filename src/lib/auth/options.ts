@@ -79,6 +79,8 @@ export const authOptions: NextAuthOptions = {
 
       if (trigger === "update" && session) {
         token.name = session.user?.name || token.name;
+        token.role = session.user?.role || token.role;
+        token.trustScore = session.user?.trustScore || token.trustScore;
       }
 
       return token;
