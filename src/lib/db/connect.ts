@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import dns from 'dns';
 
-dns.setServers(["1.1.1.1" , "8.8.8.8"])
+dns.setServers(["1.1.1.1", "8.8.8.8"]);
 
 const MONGODB_URI = process.env.MONGODB_URI;
 
@@ -46,7 +46,6 @@ async function connectDB() {
     cached.conn = await cached.promise;
   } catch (e) {
     cached.promise = null;
-    console.error('❌ MongoDB connection error:', e);
     throw e;
   }
 
