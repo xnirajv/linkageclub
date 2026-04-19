@@ -14,70 +14,55 @@ const companySchema = z.object({
   industry: z.string(),
   size: z.enum(['1-10', '11-50', '51-200', '201-500', '500+']),
   location: z.string().min(2),
-  description: z.string().min(100),
+  description: z.string().min(100).max(500),  
   foundedYear: z.string(),
   linkedin: z.string().url().optional().or(z.literal('')),
   twitter: z.string().url().optional().or(z.literal('')),
 });
 
 export async function POST(req: NextRequest) {
-  console.log('1. Company signup API called');
-  
   try {
-    console.log('2. Connecting to DB...');
     await connectDB();
-    console.log('3. DB connected');
 
-    console.log('4. Getting formData...');
     const formData = await req.formData();
-    console.log('5. FormData received');
-
     const data: any = {};
+
     for (const [key, value] of formData.entries()) {
       data[key] = value;
-      console.log(`6. Field: ${key} = ${value}`);
     }
 
-    console.log('7. Validating data...');
     const validation = companySchema.safeParse(data);
 
     if (!validation.success) {
-      console.log('8. Validation failed:', JSON.stringify(validation.error.errors, null, 2));
       return NextResponse.json(
         { error: 'Validation failed', details: validation.error.errors },
         { status: 400 }
       );
     }
-    console.log('9. Validation passed');
 
     const { 
       companyName, email, password, website, 
       location, description, linkedin, twitter 
     } = validation.data;
-    console.log(`10. Extracted: companyName=${companyName}, email=${email}`);
 
-    console.log('11. Checking existing user...');
+    // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      console.log('12. User already exists');
       return NextResponse.json(
         { error: 'User with this email already exists' },
         { status: 400 }
       );
     }
-    console.log('13. User does not exist');
 
-    console.log('14. Hashing password...');
+    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
-    console.log('15. Password hashed');
 
-    console.log('16. Generating token...');
+    // Generate verification token
     const verificationToken = generateToken();
     const verificationExpires = new Date();
     verificationExpires.setHours(verificationExpires.getHours() + 24);
-    console.log('17. Token generated');
 
-    console.log('18. Creating user...');
+    // Create user
     const user = await User.create({
       name: companyName,
       email,
@@ -85,7 +70,7 @@ export async function POST(req: NextRequest) {
       role: 'company',
       emailVerificationToken: verificationToken,
       emailVerificationExpires: verificationExpires,
-      bio: description,
+      bio: description.slice(0, 500), 
       location,
       socialLinks: {
         linkedin,
@@ -104,17 +89,22 @@ export async function POST(req: NextRequest) {
         daysActive: 1,
       },
     });
-    console.log(`19. User created with id: ${user._id}`);
 
-    console.log('20. Sending verification email...');
-    try {
-      await sendVerificationEmail(email, verificationToken, companyName);
-      console.log('21. Email sent successfully');
-    } catch (emailError) {
-      console.error('21. Email failed:', emailError);
+    // Handle logo upload
+    const logoFile = formData.get('logo') as File;
+    if (logoFile) {
+      // Upload logo to cloud storage
+      // const logoUrl = await uploadFile(logoFile, 'company-logos');
+      // await User.updateOne({ _id: user._id }, { avatar: logoUrl });
     }
 
-    console.log('22. Sending success response');
+    // Send verification email
+    try {
+      await sendVerificationEmail(email, verificationToken, companyName);
+    } catch (error) {
+      console.error('Company email send failed:', error);
+    }
+
     return NextResponse.json(
       {
         message: 'Company account created successfully. Please verify your email.',
@@ -123,9 +113,9 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    console.error('ERROR at step:', error);
+    console.error('Company signup error:', error);
     return NextResponse.json(
-      { error: 'Internal server error', details: String(error) },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

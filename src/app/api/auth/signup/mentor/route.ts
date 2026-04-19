@@ -16,7 +16,7 @@ const mentorSchema = z.object({
   expertise: z.array(z.string()).min(3),
   yearsOfExperience: z.string(),
   hourlyRate: z.string(),
-  bio: z.string().min(200),
+  bio: z.string().min(200).max(500),  // ✅ FIX: max 500 chars (user model limit)
   linkedin: z.string().url(),
   github: z.string().url().optional().or(z.literal('')),
   portfolio: z.string().url().optional().or(z.literal('')),
@@ -37,7 +37,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { fullName, email, password, currentRole, currentCompany, expertise, yearsOfExperience, hourlyRate, bio, linkedin, github, portfolio, availability } = validation.data;
+    const { 
+      fullName, email, password, currentRole, currentCompany, 
+      expertise, yearsOfExperience, hourlyRate, bio, 
+      linkedin, github, portfolio, availability 
+    } = validation.data;
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
@@ -64,7 +68,7 @@ export async function POST(req: NextRequest) {
       role: 'mentor',
       emailVerificationToken: verificationToken,
       emailVerificationExpires: verificationExpires,
-      bio,
+      bio: bio.slice(0, 500),  // ✅ FIX: Ensure max 500 chars
       socialLinks: {
         linkedin,
         github,

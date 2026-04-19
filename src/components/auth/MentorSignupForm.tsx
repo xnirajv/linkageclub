@@ -16,6 +16,7 @@ import { TagInput } from '../forms/TagInput';
 import { Textarea } from '../forms/Textarea';
 import { cn } from '@/lib/utils/cn';
 
+// ✅ UPDATED SCHEMA - matches backend requirements
 const mentorSchema = z
   .object({
     fullName: z.string().min(2, 'Full name must be at least 2 characters'),
@@ -26,20 +27,16 @@ const mentorSchema = z
       .regex(/[A-Z]/, 'Must contain at least one uppercase letter')
       .regex(/[0-9]/, 'Must contain at least one number'),
     confirmPassword: z.string(),
-    currentRole: z.string().optional().or(z.literal('')),
-    currentCompany: z.string().optional().or(z.literal('')),
-    expertise: z.array(z.string()).optional(),
-    yearsOfExperience: z.string().optional().or(z.literal('')),
-    hourlyRate: z
-      .string()
-      .optional()
-      .or(z.literal(''))
-      .refine((val) => !val || (!Number.isNaN(Number(val)) && Number(val) >= 500), 'Minimum rate is Rs 500/hour'),
-    bio: z.string().optional().or(z.literal('')),
-    linkedin: z.string().url('Invalid LinkedIn URL').optional().or(z.literal('')),
+    currentRole: z.string().min(2, 'Current role is required'),  // ✅ REQUIRED
+    currentCompany: z.string().min(2, 'Current company is required'),  // ✅ REQUIRED
+    expertise: z.array(z.string()).min(3, 'At least 3 expertise areas required'),  // ✅ REQUIRED
+    yearsOfExperience: z.string().min(1, 'Years of experience required'),  // ✅ REQUIRED
+    hourlyRate: z.string().min(1, 'Hourly rate required'),  // ✅ REQUIRED
+    bio: z.string().min(200, 'Bio must be at least 200 characters').max(500, 'Bio cannot exceed 500 characters'),  // ✅ REQUIRED with max
+    linkedin: z.string().url('Invalid LinkedIn URL'),  // ✅ REQUIRED
     github: z.string().url('Invalid GitHub URL').optional().or(z.literal('')),
     portfolio: z.string().url('Invalid portfolio URL').optional().or(z.literal('')),
-    availability: z.string(),
+    availability: z.string().min(1, 'Availability selection required'),  // ✅ REQUIRED
     termsAccepted: z.boolean().refine((val) => val === true, 'You must accept the terms'),
   })
   .refine((data) => data.password === data.confirmPassword, {
@@ -54,32 +51,13 @@ interface MentorSignupFormProps {
 }
 
 const expertiseSuggestions = [
-  'React.js',
-  'Node.js',
-  'Python',
-  'JavaScript',
-  'TypeScript',
-  'Java',
-  'System Design',
-  'Data Structures',
-  'Algorithms',
-  'Machine Learning',
-  'DevOps',
-  'AWS',
-  'Docker',
-  'Kubernetes',
-  'Microservices',
-  'Frontend Development',
-  'Backend Development',
-  'Full Stack',
-  'Mobile Development',
-  'UI/UX Design',
-  'Product Management',
-  'Agile Methodologies',
-  'Career Coaching',
-  'Interview Preparation',
-  'Leadership',
-  'Soft Skills',
+  'React.js', 'Node.js', 'Python', 'JavaScript', 'TypeScript', 'Java',
+  'System Design', 'Data Structures', 'Algorithms', 'Machine Learning',
+  'DevOps', 'AWS', 'Docker', 'Kubernetes', 'Microservices',
+  'Frontend Development', 'Backend Development', 'Full Stack',
+  'Mobile Development', 'UI/UX Design', 'Product Management',
+  'Agile Methodologies', 'Career Coaching', 'Interview Preparation',
+  'Leadership', 'Soft Skills',
 ];
 
 const experienceYears = [
@@ -159,6 +137,7 @@ export function MentorSignupForm({ onBack }: MentorSignupFormProps) {
     <Form form={form} onSubmit={onSubmit} className="space-y-8">
       {error ? <FormMessage type="error">{error}</FormMessage> : null}
 
+      {/* Section 1: Account Information */}
       <div className={sectionClassName}>
         <div className="mb-5 flex items-start gap-3">
           <div className={cn(iconShellClassName, 'bg-gradient-to-br from-primary-600 to-info-600')}>
@@ -223,6 +202,7 @@ export function MentorSignupForm({ onBack }: MentorSignupFormProps) {
         </FormFieldGroup>
       </div>
 
+      {/* Section 2: Professional Information (All Required Now) */}
       <div className={sectionClassName}>
         <div className="mb-5 flex items-start gap-3">
           <div className={cn(iconShellClassName, 'bg-gradient-to-br from-secondary-500 to-secondary-700')}>
@@ -237,11 +217,11 @@ export function MentorSignupForm({ onBack }: MentorSignupFormProps) {
         </div>
 
         <FormFieldGroup>
-          <FormField name="currentRole" label="Current Role">
+          <FormField name="currentRole" label="Current Role" required>
             <Input placeholder="Senior Engineer" {...form.register('currentRole')} />
           </FormField>
 
-          <FormField name="currentCompany" label="Current Company">
+          <FormField name="currentCompany" label="Current Company" required>
             <Input placeholder="Google" {...form.register('currentCompany')} />
           </FormField>
         </FormFieldGroup>
@@ -252,9 +232,10 @@ export function MentorSignupForm({ onBack }: MentorSignupFormProps) {
             label="Years of Experience"
             options={experienceYears}
             placeholder="Select experience"
+            required
           />
 
-          <FormField name="hourlyRate" label="Hourly Rate (Rs)">
+          <FormField name="hourlyRate" label="Hourly Rate (Rs)" required>
             <Input type="number" placeholder="1500" {...form.register('hourlyRate')} />
           </FormField>
         </FormFieldGroup>
@@ -262,27 +243,24 @@ export function MentorSignupForm({ onBack }: MentorSignupFormProps) {
         <TagInput
           name="expertise"
           label="Areas of Expertise"
-          description="Optional for now. You can expand your expertise later from your dashboard."
+          description="Add at least 3 areas of expertise"
           placeholder="Type an area..."
           suggestions={expertiseSuggestions}
           maxTags={10}
           className="mt-4"
         />
 
-        <FormField
-          name="bio"
-          label="Professional Bio"
-          description="Optional for now. You can polish your mentor bio later from your dashboard."
-          className="mt-4"
-        >
+        <FormField name="bio" label="Professional Bio" required className="mt-4">
           <Textarea
             placeholder="I'm a senior engineer with 8+ years of experience..."
             rows={6}
             {...form.register('bio')}
           />
+          <p className="text-xs text-gray-500 mt-1">Minimum 200 characters, maximum 500 characters</p>
         </FormField>
       </div>
 
+      {/* Section 3: Links & Availability */}
       <div className={sectionClassName}>
         <div className="mb-5 flex items-start gap-3">
           <div className={cn(iconShellClassName, 'bg-gradient-to-br from-info-500 to-primary-600')}>
@@ -297,7 +275,7 @@ export function MentorSignupForm({ onBack }: MentorSignupFormProps) {
         </div>
 
         <FormFieldGroup>
-          <FormField name="linkedin" label="LinkedIn Profile">
+          <FormField name="linkedin" label="LinkedIn Profile" required>
             <Input placeholder="https://linkedin.com/in/vikram" {...form.register('linkedin')} />
           </FormField>
 
@@ -316,9 +294,11 @@ export function MentorSignupForm({ onBack }: MentorSignupFormProps) {
           options={availabilityOptions}
           placeholder="When can you mentor?"
           className="mt-4"
+          required
         />
       </div>
 
+      {/* Section 4: Consent */}
       <div className={sectionClassName}>
         <div className="mb-5 flex items-start gap-3">
           <div className={cn(iconShellClassName, 'bg-gradient-to-br from-charcoal-700 to-charcoal-900')}>
