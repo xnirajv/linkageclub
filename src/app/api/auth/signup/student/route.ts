@@ -55,7 +55,11 @@ export async function POST(req: NextRequest) {
     });
 
     // Non-blocking email - fire and forget
-    sendVerificationEmail(email, verificationToken, fullName).catch(() => {});
+    try {
+      await sendVerificationEmail(email, verificationToken, fullName);
+    } catch (error) {
+      console.error('Email send error:', error);
+    }
 
     return NextResponse.json(
       {

@@ -15,7 +15,8 @@ export async function sendVerificationEmail(
   token: string,
   name: string
 ): Promise<void> {
-  const verificationUrl = `${process.env.NEXTAUTH_URL}/verify-email?token=${token}`;
+  try{
+    const verificationUrl = `${process.env.NEXTAUTH_URL}/verify-email?token=${token}`;
 
   const mailOptions = {
     from: `"InternHub" <${process.env.SMTP_FROM}>`,
@@ -76,4 +77,8 @@ export async function sendVerificationEmail(
   };
 
   await transporter.sendMail(mailOptions);
+  }catch (error) {
+    console.error("SMTP send error:", error);
+    throw error;
+  }
 }
