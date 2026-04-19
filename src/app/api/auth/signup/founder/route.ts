@@ -15,7 +15,7 @@ const founderSchema = z.object({
   industry: z.string(),
   lookingFor: z.array(z.string()),
   cofounderRole: z.string().optional(),
-  startupDescription: z.string().min(100),
+  startupDescription: z.string().min(100).max(500),  // ✅ FIX: max 500 chars (user model limit)
   website: z.string().url().optional().or(z.literal('')),
   linkedin: z.string().url().optional().or(z.literal('')),
 });
@@ -34,7 +34,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { fullName, email, password, startupDescription, website, linkedin } = validation.data;
+    const { 
+      fullName, email, password, startupDescription, website, linkedin 
+    } = validation.data;
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
@@ -61,7 +63,7 @@ export async function POST(req: NextRequest) {
       role: 'founder',
       emailVerificationToken: verificationToken,
       emailVerificationExpires: verificationExpires,
-      bio: startupDescription,
+      bio: startupDescription.slice(0, 500),  // ✅ FIX: Ensure max 500 chars
       socialLinks: {
         linkedin,
         portfolio: website,
@@ -79,10 +81,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Create founder profile (you might want a separate Founder model)
-    // Store startup info in metadata or separate collection
-
-    // You can create a separate Founder model here if needed
+    // TODO: Store startupName, startupStage, industry, lookingFor, cofounderRole in a separate FounderProfile collection
 
     // Send verification email
     try {

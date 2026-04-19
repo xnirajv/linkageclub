@@ -32,7 +32,7 @@ const mentorSchema = z
     expertise: z.array(z.string()).min(3, 'At least 3 expertise areas required'),  // ✅ REQUIRED
     yearsOfExperience: z.string().min(1, 'Years of experience required'),  // ✅ REQUIRED
     hourlyRate: z.string().min(1, 'Hourly rate required'),  // ✅ REQUIRED
-    bio: z.string().min(200, 'Bio must be at least 200 characters').max(500, 'Bio cannot exceed 500 characters'),  // ✅ REQUIRED with max
+    bio: z.string().min(200, 'Bio must be at least 200 characters').max(500, 'Bio cannot exceed 500 characters'),
     linkedin: z.string().url('Invalid LinkedIn URL'),  // ✅ REQUIRED
     github: z.string().url('Invalid GitHub URL').optional().or(z.literal('')),
     portfolio: z.string().url('Invalid portfolio URL').optional().or(z.literal('')),
@@ -87,6 +87,7 @@ export function MentorSignupForm({ onBack }: MentorSignupFormProps) {
   const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [bioLength, setBioLength] = React.useState(0);
 
   const form = useForm<MentorFormData>({
     resolver: zodResolver(mentorSchema),
@@ -251,12 +252,25 @@ export function MentorSignupForm({ onBack }: MentorSignupFormProps) {
         />
 
         <FormField name="bio" label="Professional Bio" required className="mt-4">
-          <Textarea
-            placeholder="I'm a senior engineer with 8+ years of experience..."
-            rows={6}
-            {...form.register('bio')}
-          />
-          <p className="text-xs text-gray-500 mt-1">Minimum 200 characters, maximum 500 characters</p>
+          <div>
+            <Textarea
+              placeholder="I'm a senior engineer with 8+ years of experience..."
+              rows={6}
+              {...form.register('bio')}
+              onChange={(e) => setBioLength(e.target.value.length)}
+              className={bioLength > 500 ? 'border-red-500 focus:ring-red-500' : ''}
+            />
+            <div className={`text-xs mt-1 flex justify-between ${bioLength > 500 ? 'text-red-500' : bioLength > 450 ? 'text-yellow-500' : 'text-gray-500'
+              }`}>
+              <span>{bioLength} / 500 characters</span>
+              {bioLength > 500 && (
+                <span>⚠️ {bioLength - 500} characters over limit</span>
+              )}
+              {bioLength <= 500 && bioLength > 450 && (
+                <span>⚠️ Approaching limit</span>
+              )}
+            </div>
+          </div>
         </FormField>
       </div>
 

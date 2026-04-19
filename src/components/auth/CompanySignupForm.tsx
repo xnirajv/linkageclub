@@ -31,7 +31,7 @@ const companySchema = z
       required_error: 'Company size is required',
     }),
     location: z.string().min(2, 'Location is required'),
-    description: z.string().min(100, 'Description must be at least 100 characters'),
+    description: z.string().min(100, 'Description must be at least 100 characters').max(500, 'Description cannot exceed 500 characters'),
     foundedYear: z.string().min(4, 'Founded year is required'),
     linkedin: z.string().url('Invalid LinkedIn URL').optional().or(z.literal('')),
     twitter: z.string().url('Invalid Twitter URL').optional().or(z.literal('')),
@@ -83,6 +83,7 @@ export function CompanySignupForm({ onBack }: CompanySignupFormProps) {
   const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [descLength, setDescLength] = React.useState(0);
 
   const form = useForm<CompanyFormData>({
     resolver: zodResolver(companySchema),
@@ -252,11 +253,20 @@ export function CompanySignupForm({ onBack }: CompanySignupFormProps) {
         </FormFieldGroup>
 
         <FormField name="description" label="Company Description" required className="mt-4">
-          <Textarea
-            placeholder="Tell us about your company mission, products, and culture..."
-            rows={5}
-            {...form.register('description')}
-          />
+          <div>
+            <Textarea
+              placeholder="Tell us about your company mission, products, and culture..."
+              rows={5}
+              {...form.register('description')}
+              onChange={(e) => setDescLength(e.target.value.length)}
+              className={descLength > 500 ? 'border-red-500' : ''}
+            />
+            <div className={`text-xs mt-1 flex justify-between ${descLength > 500 ? 'text-red-500' : descLength > 450 ? 'text-yellow-500' : 'text-gray-500'
+              }`}>
+              <span>{descLength} / 500 characters</span>
+              {descLength > 500 && <span>⚠️ {descLength - 500} characters over limit</span>}
+            </div>
+          </div>
         </FormField>
       </div>
 

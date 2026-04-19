@@ -15,6 +15,7 @@ import { FormFieldGroup, FormField } from '../forms/FormField';
 import { Textarea } from '../forms/Textarea';
 import { cn } from '@/lib/utils/cn';
 
+// ✅ UPDATED SCHEMA - matches backend requirements
 const founderSchema = z
   .object({
     fullName: z.string().min(2, 'Full name must be at least 2 characters'),
@@ -26,11 +27,11 @@ const founderSchema = z
       .regex(/[0-9]/, 'Must contain at least one number'),
     confirmPassword: z.string(),
     startupName: z.string().min(2, 'Startup name is required'),
-    startupStage: z.string().optional().or(z.literal('')),
-    industry: z.string().optional().or(z.literal('')),
-    lookingFor: z.array(z.string()).optional(),
+    startupStage: z.string().min(1, 'Startup stage is required'),  // ✅ REQUIRED
+    industry: z.string().min(1, 'Industry is required'),  // ✅ REQUIRED
+    lookingFor: z.array(z.string()).min(1, 'Select at least one option'),  // ✅ REQUIRED
     cofounderRole: z.string().optional(),
-    startupDescription: z.string().optional().or(z.literal('')),
+    startupDescription: z.string().min(100, 'Description must be at least 100 characters').max(500, 'Description cannot exceed 500 characters'),  // ✅ REQUIRED with max
     website: z.string().url('Invalid website URL').optional().or(z.literal('')),
     linkedin: z.string().url('Invalid LinkedIn URL').optional().or(z.literal('')),
     termsAccepted: z.boolean().refine((val) => val === true, 'You must accept the terms'),
@@ -96,6 +97,7 @@ export function FounderSignupForm({ onBack }: FounderSignupFormProps) {
   const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [descLength, setDescLength] = React.useState(0);
 
   const form = useForm<FounderFormData>({
     resolver: zodResolver(founderSchema),
@@ -146,6 +148,7 @@ export function FounderSignupForm({ onBack }: FounderSignupFormProps) {
     <Form form={form} onSubmit={onSubmit} className="space-y-8">
       {error ? <FormMessage type="error">{error}</FormMessage> : null}
 
+      {/* Section 1: Account Information */}
       <div className={sectionClassName}>
         <div className="mb-5 flex items-start gap-3">
           <div className={cn(iconShellClassName, 'bg-gradient-to-br from-primary-600 to-info-600')}>
@@ -210,6 +213,7 @@ export function FounderSignupForm({ onBack }: FounderSignupFormProps) {
         </FormFieldGroup>
       </div>
 
+      {/* Section 2: Startup Information (All Required Now) */}
       <div className={sectionClassName}>
         <div className="mb-5 flex items-start gap-3">
           <div className={cn(iconShellClassName, 'bg-gradient-to-br from-secondary-500 to-secondary-700')}>
@@ -228,7 +232,7 @@ export function FounderSignupForm({ onBack }: FounderSignupFormProps) {
             <Input placeholder="TechStart" {...form.register('startupName')} />
           </FormField>
 
-          <SelectField name="industry" label="Industry" options={industries} placeholder="Select industry" />
+          <SelectField name="industry" label="Industry" options={industries} placeholder="Select industry" required />
         </FormFieldGroup>
 
         <FormFieldGroup className="mt-4">
@@ -237,6 +241,7 @@ export function FounderSignupForm({ onBack }: FounderSignupFormProps) {
             label="Startup Stage"
             options={startupStages}
             placeholder="Select stage"
+            required
           />
 
           <FormField name="website" label="Website">
@@ -244,16 +249,26 @@ export function FounderSignupForm({ onBack }: FounderSignupFormProps) {
           </FormField>
         </FormFieldGroup>
 
-        <FormField
-          name="startupDescription"
-          label="Startup Description"
-          description="Optional for now. You can expand your startup story later from the dashboard."
-          className="mt-4"
-        >
-          <Textarea placeholder="We're building a platform that..." rows={5} {...form.register('startupDescription')} />
+        <FormField name="startupDescription" label="Startup Description" required className="mt-4">
+          <div>
+            <Textarea
+              placeholder="We're building a platform that..."
+              rows={5}
+              {...form.register('startupDescription')}
+              onChange={(e) => setDescLength(e.target.value.length)}
+              className={descLength > 500 ? 'border-red-500' : ''}
+            />
+            <div className={`text-xs mt-1 flex justify-between ${
+              descLength > 500 ? 'text-red-500' : descLength > 450 ? 'text-yellow-500' : 'text-gray-500'
+            }`}>
+              <span>{descLength} / 500 characters</span>
+              {descLength > 500 && <span>⚠️ {descLength - 500} characters over limit</span>}
+            </div>
+          </div>
         </FormField>
       </div>
 
+      {/* Section 3: Team Needs */}
       <div className={sectionClassName}>
         <div className="mb-5 flex items-start gap-3">
           <div className={cn(iconShellClassName, 'bg-gradient-to-br from-info-500 to-primary-600')}>
@@ -270,26 +285,29 @@ export function FounderSignupForm({ onBack }: FounderSignupFormProps) {
         <CheckboxGroup
           name="lookingFor"
           label="What are you looking for?"
-          description="Optional for now. You can update team needs later from the dashboard."
+          description="Select at least one option"
           options={lookingForOptions}
           className="rounded-[24px] border border-white/60 bg-white/78 p-4"
+          required
         />
 
-        {lookingFor.includes('cofounder') ? (
+        {lookingFor.includes('cofounder') && (
           <SelectField
             name="cofounderRole"
             label="Co-founder Role Needed"
             options={cofounderRoles}
             placeholder="Select role"
             className="mt-4"
+            required={lookingFor.includes('cofounder')}
           />
-        ) : null}
+        )}
 
         <FormField name="linkedin" label="LinkedIn Profile" className="mt-4">
           <Input placeholder="https://linkedin.com/in/rahul" {...form.register('linkedin')} />
         </FormField>
       </div>
 
+      {/* Section 4: Consent */}
       <div className={sectionClassName}>
         <div className="mb-5 flex items-start gap-3">
           <div className={cn(iconShellClassName, 'bg-gradient-to-br from-charcoal-700 to-charcoal-900')}>
