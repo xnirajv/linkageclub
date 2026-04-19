@@ -85,7 +85,11 @@ export async function POST(req: NextRequest) {
     // You can create a separate Founder model here if needed
 
     // Send verification email
-    await sendVerificationEmail(email, verificationToken, fullName);
+    try {
+      await sendVerificationEmail(email, verificationToken, fullName);
+    } catch (error) {
+      console.error('Founder email send failed:', error);
+    }
 
     return NextResponse.json(
       {

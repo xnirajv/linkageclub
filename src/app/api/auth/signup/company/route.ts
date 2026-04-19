@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
 
     const formData = await req.formData();
     const data: any = {};
-    
+
     for (const [key, value] of formData.entries()) {
       data[key] = value;
     }
@@ -96,7 +96,11 @@ export async function POST(req: NextRequest) {
     }
 
     // Send verification email
-    await sendVerificationEmail(email, verificationToken, companyName);
+    try {
+      await sendVerificationEmail(email, verificationToken, companyName);
+    } catch (error) {
+      console.error('Company email send failed:', error);
+    }
 
     // Create company profile (you might want a separate Company model)
     // Store additional company info in a separate collection

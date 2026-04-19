@@ -121,7 +121,11 @@ export async function POST(req: NextRequest) {
     });
 
     // Send verification email
-    await sendVerificationEmail(email, verificationToken, fullName);
+    try {
+      await sendVerificationEmail(email, verificationToken, fullName);
+    } catch (error) {
+      console.error('Mentor email send failed:', error);
+    }
 
     return NextResponse.json(
       {
