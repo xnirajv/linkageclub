@@ -5,10 +5,12 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Building2, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Building2, Eye, EyeOff, ShieldCheck, MapPin, Calendar, Users, Globe, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { CheckboxField } from '@/components/forms/Checkbox';
+import { SelectField } from '@/components/forms/Select';
+import { Textarea } from '@/components/forms/Textarea';
 import { Form, FormActions, FormMessage } from '../forms/Form';
 import { FormFieldGroup, FormField } from '../forms/FormField';
 import { cn } from '@/lib/utils/cn';
@@ -23,12 +25,14 @@ const companySchema = z
       .regex(/[A-Z]/, 'Must contain at least one uppercase letter')
       .regex(/[0-9]/, 'Must contain at least one number'),
     confirmPassword: z.string(),
-    website: z.string().url('Invalid website URL').optional().or(z.literal('')),
-    industry: z.string().optional().or(z.literal('')),
-    size: z.enum(['1-10', '11-50', '51-200', '201-500', '500+']).optional(),
-    location: z.string().optional().or(z.literal('')),
-    description: z.string().optional().or(z.literal('')),
-    foundedYear: z.string().optional().or(z.literal('')),
+    website: z.string().url('Invalid website URL'),
+    industry: z.string().min(1, 'Industry is required'),
+    size: z.enum(['1-10', '11-50', '51-200', '201-500', '500+'], {
+      required_error: 'Company size is required',
+    }),
+    location: z.string().min(2, 'Location is required'),
+    description: z.string().min(100, 'Description must be at least 100 characters'),
+    foundedYear: z.string().min(4, 'Founded year is required'),
     linkedin: z.string().url('Invalid LinkedIn URL').optional().or(z.literal('')),
     twitter: z.string().url('Invalid Twitter URL').optional().or(z.literal('')),
     logo: z.any().optional(),
@@ -44,6 +48,28 @@ type CompanyFormData = z.infer<typeof companySchema>;
 interface CompanySignupFormProps {
   onBack: () => void;
 }
+
+// Options for selects
+const industryOptions = [
+  { value: 'technology', label: 'Technology / Software' },
+  { value: 'fintech', label: 'FinTech' },
+  { value: 'healthcare', label: 'Healthcare' },
+  { value: 'edtech', label: 'EdTech' },
+  { value: 'ecommerce', label: 'E-commerce / Retail' },
+  { value: 'manufacturing', label: 'Manufacturing' },
+  { value: 'consulting', label: 'Consulting' },
+  { value: 'marketing', label: 'Marketing / Advertising' },
+  { value: 'realestate', label: 'Real Estate' },
+  { value: 'other', label: 'Other' },
+];
+
+const sizeOptions = [
+  { value: '1-10', label: '1-10 employees' },
+  { value: '11-50', label: '11-50 employees' },
+  { value: '51-200', label: '51-200 employees' },
+  { value: '201-500', label: '201-500 employees' },
+  { value: '500+', label: '500+ employees' },
+];
 
 const sectionClassName =
   'rounded-[28px] border border-white/55 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(241,236,228,0.62))] p-6 shadow-[0_28px_70px_-50px_rgba(15,23,42,0.35)]';
@@ -87,14 +113,12 @@ export function CompanySignupForm({ onBack }: CompanySignupFormProps) {
         if (value === undefined || value === null || value === '') {
           return;
         }
-
         if (key === 'logo') {
           if (value instanceof File) {
             formData.append(key, value);
           }
           return;
         }
-
         formData.append(key, String(value));
       });
 
@@ -120,6 +144,7 @@ export function CompanySignupForm({ onBack }: CompanySignupFormProps) {
     <Form form={form} onSubmit={onSubmit} className="space-y-8">
       {error ? <FormMessage type="error">{error}</FormMessage> : null}
 
+      {/* Section 1: Account Information */}
       <div className={sectionClassName}>
         <div className="mb-5 flex items-start gap-3">
           <div className={cn(iconShellClassName, 'bg-gradient-to-br from-primary-700 to-info-600')}>
@@ -184,12 +209,64 @@ export function CompanySignupForm({ onBack }: CompanySignupFormProps) {
         </FormFieldGroup>
       </div>
 
+      {/* Section 2: Company Details (NEW - All Required Fields) */}
+      <div className={sectionClassName}>
+        <div className="mb-5 flex items-start gap-3">
+          <div className={cn(iconShellClassName, 'bg-gradient-to-br from-secondary-500 to-secondary-700')}>
+            <Globe className="h-5 w-5" />
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-charcoal-950">Company Details</h3>
+            <p className="mt-1 text-sm leading-6 text-charcoal-600">
+              Tell us about your company to help candidates find you.
+            </p>
+          </div>
+        </div>
+
+        <FormFieldGroup>
+          <FormField name="website" label="Website" required>
+            <Input placeholder="https://www.techcorp.com" {...form.register('website')} />
+          </FormField>
+
+          <SelectField name="industry" label="Industry" options={industryOptions} placeholder="Select industry" required />
+        </FormFieldGroup>
+
+        <FormFieldGroup className="mt-4">
+          <SelectField name="size" label="Company Size" options={sizeOptions} placeholder="Select size" required />
+
+          <FormField name="location" label="Location" required>
+            <div className="relative">
+              <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input className="pl-10" placeholder="Bengaluru, India" {...form.register('location')} />
+            </div>
+          </FormField>
+        </FormFieldGroup>
+
+        <FormFieldGroup className="mt-4">
+          <FormField name="foundedYear" label="Founded Year" required>
+            <div className="relative">
+              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input className="pl-10" placeholder="2020" {...form.register('foundedYear')} />
+            </div>
+          </FormField>
+        </FormFieldGroup>
+
+        <FormField name="description" label="Company Description" required className="mt-4">
+          <Textarea
+            placeholder="Tell us about your company mission, products, and culture..."
+            rows={5}
+            {...form.register('description')}
+          />
+        </FormField>
+      </div>
+
+      {/* Section 3: Social Links */}
       <div className={sectionClassName}>
         <div className="mb-5 flex items-start gap-3">
           <div>
-            <h3 className="text-lg font-semibold text-charcoal-950">Optional Company Link</h3>
+            <h3 className="text-lg font-semibold text-charcoal-950">Social Links (Optional)</h3>
             <p className="mt-1 text-sm leading-6 text-charcoal-600">
-              You can keep signup short. Add only your LinkedIn if it is ready, and complete the rest later.
+              Add your LinkedIn and Twitter to build trust with candidates.
             </p>
           </div>
         </div>
@@ -198,12 +275,13 @@ export function CompanySignupForm({ onBack }: CompanySignupFormProps) {
           <FormField name="linkedin" label="LinkedIn URL">
             <Input placeholder="https://linkedin.com/company/techcorp" {...form.register('linkedin')} />
           </FormField>
-          <FormField name="website" label="Website">
-            <Input placeholder="https://www.techcorp.com" {...form.register('website')} />
+          <FormField name="twitter" label="Twitter URL">
+            <Input placeholder="https://twitter.com/techcorp" {...form.register('twitter')} />
           </FormField>
         </FormFieldGroup>
       </div>
 
+      {/* Section 4: Consent */}
       <div className={sectionClassName}>
         <div className="mb-5 flex items-start gap-3">
           <div className={cn(iconShellClassName, 'bg-gradient-to-br from-charcoal-700 to-charcoal-900')}>
