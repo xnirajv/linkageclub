@@ -34,13 +34,27 @@ export async function POST(req: NextRequest) {
     const validation = companySchema.safeParse(data);
 
     if (!validation.success) {
+      console.error('Validation errors:', validation.error.errors);
       return NextResponse.json(
         { error: 'Validation failed', details: validation.error.errors },
         { status: 400 }
       );
     }
 
-    const { companyName, email, password, website, location, description, linkedin, twitter } = validation.data;
+
+    const { 
+      companyName, 
+      email, 
+      password, 
+      website, 
+      industry,     
+      size,          
+      location, 
+      description, 
+      foundedYear,   
+      linkedin, 
+      twitter 
+    } = validation.data;
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
@@ -87,6 +101,8 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // TODO: Store industry, size, foundedYear in a separate CompanyProfile collection
+
     // Handle logo upload
     const logoFile = formData.get('logo') as File;
     if (logoFile) {
@@ -101,9 +117,6 @@ export async function POST(req: NextRequest) {
     } catch (error) {
       console.error('Company email send failed:', error);
     }
-
-    // Create company profile (you might want a separate Company model)
-    // Store additional company info in a separate collection
 
     return NextResponse.json(
       {
