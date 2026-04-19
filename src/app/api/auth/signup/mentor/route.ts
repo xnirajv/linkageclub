@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
+    // const hashedPassword = await bcrypt.hash(password, 10);
 
     // Generate verification token
     const verificationToken = generateToken();
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
     const user = await User.create({
       name: fullName,
       email,
-      password: hashedPassword,
+      password: password,
       role: 'mentor',
       emailVerificationToken: verificationToken,
       emailVerificationExpires: verificationExpires,

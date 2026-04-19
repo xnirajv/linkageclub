@@ -15,7 +15,7 @@ const founderSchema = z.object({
   industry: z.string(),
   lookingFor: z.array(z.string()),
   cofounderRole: z.string().optional(),
-  startupDescription: z.string().min(100).max(500),  // ✅ FIX: max 500 chars (user model limit)
+  startupDescription: z.string().min(100).max(500),  
   website: z.string().url().optional().or(z.literal('')),
   linkedin: z.string().url().optional().or(z.literal('')),
 });
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
+    // const hashedPassword = await bcrypt.hash(password, 10);
 
     // Generate verification token
     const verificationToken = generateToken();
@@ -59,11 +59,11 @@ export async function POST(req: NextRequest) {
     const user = await User.create({
       name: fullName,
       email,
-      password: hashedPassword,
+      password: password,
       role: 'founder',
       emailVerificationToken: verificationToken,
       emailVerificationExpires: verificationExpires,
-      bio: startupDescription.slice(0, 500),  // ✅ FIX: Ensure max 500 chars
+      bio: startupDescription.slice(0, 500), 
       socialLinks: {
         linkedin,
         portfolio: website,
