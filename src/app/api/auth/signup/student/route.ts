@@ -4,6 +4,7 @@ import connectDB from '@/lib/db/connect';
 import { sendVerificationEmail } from '@/lib/email/verification';
 import { generateToken } from '@/lib/utils/generateToken';
 import { z } from 'zod';
+import { getUniqueUsername } from '@/lib/utils/username';
 
 const studentSchema = z.object({
   fullName: z.string().min(2),
@@ -38,7 +39,8 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-
+    // Generate username
+    const username = await getUniqueUsername(fullName, User);
     const verificationToken = generateToken();
     const verificationExpires = new Date();
     verificationExpires.setHours(verificationExpires.getHours() + 24);
@@ -47,6 +49,7 @@ export async function POST(req: NextRequest) {
       name: fullName,
       email,
       password,
+      username,
       role: 'student',
       emailVerificationToken: verificationToken,
       emailVerificationExpires: verificationExpires,
