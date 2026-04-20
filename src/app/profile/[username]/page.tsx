@@ -23,9 +23,15 @@ interface ProfilePageProps {
 async function getUser(username: string): Promise<UserType | null> {
   await connectDB();
 
-  const query = username.includes('@')
-    ? { email: username }  // Backward compatibility
-    : { username: username }; // New username-based lookupe };
+  // Remove @ if present and convert to lowercase
+  const cleanUsername = username.replace('@', '').toLowerCase();
+
+  const query = {
+    $or: [
+      { username: cleanUsername },  // Case-insensitive already handled by toLowerCase
+      { email: username }            // Backward compatibility
+    ]
+  };
 
   const user = await User.findOne(query).lean();
 
