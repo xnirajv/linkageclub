@@ -2,7 +2,6 @@
 
 import React from 'react';
 import { useProfile } from '@/hooks/useProfile';
-import DashboardLayout from '@/app/dashboard/layout';
 import { BadgeDisplay } from '@/components/dashboard/student/BadgeDisplay';
 import { Loader2, Award } from 'lucide-react';
 import { Card } from '@/components/ui/card';
@@ -12,16 +11,13 @@ export default function StudentMyBadgesPage() {
 
   if (isLoading) {
     return (
-      <DashboardLayout>
         <div className="flex items-center justify-center h-[60vh]">
           <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
         </div>
-      </DashboardLayout>
     );
   }
 
   return (
-    <DashboardLayout>
       <div className="space-y-6 p-6">
         <div>
           <h1 className="text-2xl font-bold text-charcoal-950 dark:text-white">My Badges</h1>
@@ -46,6 +42,5 @@ export default function StudentMyBadgesPage() {
           <BadgeDisplay badges={badges} />
         )}
       </div>
-    </DashboardLayout>
   );
 }

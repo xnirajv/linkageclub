@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import DashboardLayout from '@/app/dashboard/layout'; // ✅ Fix: Use correct DashboardLayout import
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -62,21 +61,18 @@ export default function AssessmentResultsPage() {
 
   if (loading || !results) {
     return (
-      <DashboardLayout>
         <div className="flex items-center justify-center h-[60vh]">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
             <p className="mt-4 text-charcoal-600">Loading results...</p>
           </div>
         </div>
-      </DashboardLayout>
     );
   }
 
   const { results: resultData, badge } = results;
 
   return (
-    <DashboardLayout>
       <div className="max-w-4xl mx-auto space-y-6 p-6">
         {/* Header */}
         <div className="text-center">
@@ -247,6 +243,5 @@ export default function AssessmentResultsPage() {
           )}
         </div>
       </div>
-    </DashboardLayout>
   );
 }

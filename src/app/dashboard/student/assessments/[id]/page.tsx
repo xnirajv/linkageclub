@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAssessment } from '@/hooks/useAssessments';
 import { Clock, DollarSign, Award, Star } from 'lucide-react';
-import DashboardLayout from '@/app/dashboard/layout';
 import { usePayments } from '@/hooks/usePayment';
 
 export default function AssessmentDetailPage() {
@@ -18,17 +17,13 @@ export default function AssessmentDetailPage() {
 
   if (isLoading) {
     return (
-      <DashboardLayout>
         <div>Loading...</div>
-      </DashboardLayout>
     );
   }
 
   if (!assessment) {
     return (
-      <DashboardLayout>
         <div>Assessment not found</div>
-      </DashboardLayout>
     );
   }
 
@@ -48,7 +43,6 @@ export default function AssessmentDetailPage() {
   };
 
   return (
-    <DashboardLayout>
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Header */}
         <div>
@@ -179,6 +173,5 @@ export default function AssessmentDetailPage() {
           </Button>
         </div>
       </div>
-    </DashboardLayout>
   );
 }

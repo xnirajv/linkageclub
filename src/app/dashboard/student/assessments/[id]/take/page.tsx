@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Clock, AlertCircle } from 'lucide-react';
 import { useAssessment } from '@/hooks/useAssessments';
-import DashboardLayout from '@/app/dashboard/layout';
 import { Label } from '@/components/ui/lable';
 import { RadioGroup, RadioGroupItem } from '@/components/forms/RadioGroup';
 
@@ -43,9 +42,7 @@ export default function TakeAssessmentPage() {
 
   if (isLoading || !assessment) {
     return (
-      <DashboardLayout>
         <div>Loading...</div>
-      </DashboardLayout>
     );
   }
 
@@ -98,7 +95,6 @@ export default function TakeAssessmentPage() {
   const progress = (answeredCount / questions.length) * 100;
 
   return (
-    <DashboardLayout>
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="bg-card dark:bg-charcoal-800 border-b sticky top-0 z-10">
@@ -222,6 +218,5 @@ export default function TakeAssessmentPage() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
   );
 }

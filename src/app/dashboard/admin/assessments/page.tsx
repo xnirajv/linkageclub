@@ -37,7 +37,6 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatCurrency, formatNumber } from '@/lib/utils/format';
-import DashboardLayout from '../../layout';
 import { Input } from '@/components/ui/input';
 
 // Mock data - replace with actual API
@@ -142,7 +141,6 @@ export default function AdminAssessmentsPage() {
   };
 
   return (
-    <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -371,6 +369,5 @@ export default function AdminAssessmentsPage() {
           </TabsContent>
         </Tabs>
       </div>
-    </DashboardLayout>
   );
 }
