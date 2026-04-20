@@ -5,13 +5,14 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { 
-  Clock, 
-  DollarSign, 
-  Award, 
+import {
+  Clock,
+  DollarSign,
+  Award,
   Users,
   TrendingUp,
-  CheckCircle} from 'lucide-react';
+  CheckCircle
+} from 'lucide-react';
 import Link from 'next/link';
 import { formatCurrency, formatNumber } from '@/lib/utils/format';
 
@@ -42,11 +43,11 @@ interface AssessmentGridProps {
   onQuickStart?: (id: string) => void;
 }
 
-export function AssessmentGrid({ 
-  assessments, 
-  isLoading, 
+export function AssessmentGrid({
+  assessments,
+  isLoading,
   emptyMessage = 'No assessments found',
-  onQuickStart 
+  onQuickStart
 }: AssessmentGridProps) {
   const getLevelColor = (level: string) => {
     switch (level) {
@@ -157,15 +158,14 @@ export function AssessmentGrid({
                   </p>
                 </div>
               ) : (
-                <Button 
-                  className="w-full" 
+                <Button
+                  className="w-full"
                   variant="outline"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    onQuickStart?.(assessment._id);
-                  }}
+                  asChild
                 >
-                  View Details
+                  <Link href={`/dashboard/student/assessments/${assessment._id}`}>
+                    View Details
+                  </Link>
                 </Button>
               )}
             </div>
