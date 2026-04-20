@@ -139,6 +139,11 @@ const nextConfig = {
         destination: '/signup',
         permanent: true,
       },
+      {
+      source: '/@:username',
+      destination: '/profile/:username', 
+      permanent: false,
+      },
     ];
   },
 
