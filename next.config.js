@@ -142,6 +142,7 @@ const nextConfig = {
       {
       source: '/@:username',
       destination: '/:username',
+      permanent: false,
       },
     ];
   },
