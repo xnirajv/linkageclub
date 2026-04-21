@@ -99,6 +99,7 @@ export default function TakeAssessmentPage() {
       
       if (result.success) {
         router.push(`/dashboard/student/assessments/${assessment._id}/results`);
+        router.refresh();
       } else {
         alert(result.error || 'Failed to submit assessment');
       }
