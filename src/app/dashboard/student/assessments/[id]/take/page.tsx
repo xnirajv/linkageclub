@@ -15,7 +15,7 @@ export default function TakeAssessmentPage() {
   const router = useRouter();
   const assessmentId = params?.id as string;
   const { assessment, submitAssessment, isLoading } = useAssessment(assessmentId);
-  
+
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<number[]>([]);
   const [timeLeft, setTimeLeft] = useState(0);
@@ -90,39 +90,26 @@ export default function TakeAssessmentPage() {
   };
 
   const handleSubmit = async () => {
-  if (isSubmitting) return;
-  
-  console.log('=== SUBMIT DEBUG ===');
-  console.log('1. Submit button clicked');
-  console.log('2. Answers length:', answers.length);
-  console.log('3. Answers:', answers);
-  console.log('4. Time left:', timeLeft);
-  console.log('5. Assessment duration:', assessment.duration);
-  
-  const timeSpent = (assessment.duration * 60) - timeLeft;
-  console.log('6. Time spent:', timeSpent);
-  
-  setIsSubmitting(true);
-  
-  try {
-    console.log('7. Calling submitAssessment...');
-    const result = await submitAssessment(answers, timeSpent);
-    console.log('8. Result:', result);
-    
-    if (result.success) {
-      console.log('9. Success! Redirecting...');
-      router.push(`/dashboard/student/assessments/${assessmentId}/results`);
-    } else {
-      console.log('10. Failed:', result.error);
-      alert(result.error || 'Failed to submit assessment');
+    if (isSubmitting) return;
+
+    const timeSpent = (assessment.duration * 60) - timeLeft;
+
+    setIsSubmitting(true);
+
+    try {
+      const result = await submitAssessment(answers, timeSpent);
+
+      if (result.success) {
+        router.push(`/dashboard/student/assessments/${assessmentId}/results`);
+      } else {
+        alert(result.error || 'Failed to submit assessment');
+      }
+    } catch (error) {
+      alert('Something went wrong. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
-  } catch (error) {
-    console.error('11. Catch error:', error);
-    alert('Something went wrong. Please try again.');
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+  };
 
   const answeredCount = answers.filter(a => a !== -1).length;
   const progress = (answeredCount / questions.length) * 100;
@@ -139,8 +126,8 @@ export default function TakeAssessmentPage() {
                 <Clock className="h-5 w-5" />
                 <span className="font-mono text-lg">{formatTime(timeLeft)}</span>
               </div>
-              <Button 
-                variant="destructive" 
+              <Button
+                variant="destructive"
                 onClick={handleSubmit}
                 disabled={isSubmitting}
               >
@@ -228,9 +215,8 @@ export default function TakeAssessmentPage() {
                 return (
                   <button
                     key={index}
-                    className={`w-8 h-8 rounded-md text-sm font-medium ${bgColor} ${
-                      currentQuestion === index ? 'ring-2 ring-primary-500' : ''
-                    }`}
+                    className={`w-8 h-8 rounded-md text-sm font-medium ${bgColor} ${currentQuestion === index ? 'ring-2 ring-primary-500' : ''
+                      }`}
                     onClick={() => setCurrentQuestion(index)}
                   >
                     {index + 1}
