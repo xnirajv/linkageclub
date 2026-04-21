@@ -96,7 +96,7 @@ const assessmentSchema = new Schema<IAssessment>(
         answers: { type: [Number], required: true },
         timeSpent: { type: Number, required: true },
         startedAt: { type: Date, required: true },
-        completedAt: { type: Date, required: true },
+        completedAt: { type: Date, default: null },
       },
     ],
     badges: [
