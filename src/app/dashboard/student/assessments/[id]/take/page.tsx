@@ -29,14 +29,18 @@ export default function TakeAssessmentPage() {
     }
   }, [assessment]);
 
+  // Timer - only count down, NO auto submit
   useEffect(() => {
-    if (timeLeft <= 0) {
-      handleSubmit();
-      return;
-    }
+    if (timeLeft <= 0) return; // Don't auto submit, just stop timer
 
     const timer = setInterval(() => {
-      setTimeLeft(prev => prev - 1);
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
     }, 1000);
 
     return () => clearInterval(timer);
@@ -88,19 +92,16 @@ export default function TakeAssessmentPage() {
   const handleSubmit = async () => {
     if (isSubmitting) return;
     
+    // Check if any answers selected
+    const hasAnswers = answers.some(a => a !== -1);
+    if (!hasAnswers) {
+      alert('Please answer at least one question before submitting.');
+      return;
+    }
+
     setIsSubmitting(true);
     
     try {
-      // Check if all questions answered
-      const unanswered = answers.filter(a => a === -1).length;
-      if (unanswered > 0) {
-        const confirm = window.confirm(`You have ${unanswered} unanswered questions. Submit anyway?`);
-        if (!confirm) {
-          setIsSubmitting(false);
-          return;
-        }
-      }
-
       const timeSpent = (assessment.duration * 60) - timeLeft;
       const result = await submitAssessment(answers, timeSpent);
       
