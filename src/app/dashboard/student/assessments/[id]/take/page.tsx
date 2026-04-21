@@ -90,33 +90,39 @@ export default function TakeAssessmentPage() {
   };
 
   const handleSubmit = async () => {
-    if (isSubmitting) return;
+  if (isSubmitting) return;
+  
+  console.log('=== SUBMIT DEBUG ===');
+  console.log('1. Submit button clicked');
+  console.log('2. Answers length:', answers.length);
+  console.log('3. Answers:', answers);
+  console.log('4. Time left:', timeLeft);
+  console.log('5. Assessment duration:', assessment.duration);
+  
+  const timeSpent = (assessment.duration * 60) - timeLeft;
+  console.log('6. Time spent:', timeSpent);
+  
+  setIsSubmitting(true);
+  
+  try {
+    console.log('7. Calling submitAssessment...');
+    const result = await submitAssessment(answers, timeSpent);
+    console.log('8. Result:', result);
     
-    // Check if any answers selected
-    const hasAnswers = answers.some(a => a !== -1);
-    if (!hasAnswers) {
-      alert('Please answer at least one question before submitting.');
-      return;
+    if (result.success) {
+      console.log('9. Success! Redirecting...');
+      router.push(`/dashboard/student/assessments/${assessmentId}/results`);
+    } else {
+      console.log('10. Failed:', result.error);
+      alert(result.error || 'Failed to submit assessment');
     }
-
-    setIsSubmitting(true);
-    
-    try {
-      const timeSpent = (assessment.duration * 60) - timeLeft;
-      const result = await submitAssessment(answers, timeSpent);
-      
-      if (result.success) {
-        router.push(`/dashboard/student/assessments/${assessmentId}/results`);
-      } else {
-        alert(result.error || 'Failed to submit assessment');
-      }
-    } catch (error) {
-      console.error('Submit error:', error);
-      alert('Something went wrong. Please try again.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  } catch (error) {
+    console.error('11. Catch error:', error);
+    alert('Something went wrong. Please try again.');
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   const answeredCount = answers.filter(a => a !== -1).length;
   const progress = (answeredCount / questions.length) * 100;
