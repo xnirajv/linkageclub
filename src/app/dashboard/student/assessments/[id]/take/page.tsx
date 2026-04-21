@@ -91,6 +91,16 @@ export default function TakeAssessmentPage() {
     setIsSubmitting(true);
     
     try {
+      // Check if all questions answered
+      const unanswered = answers.filter(a => a === -1).length;
+      if (unanswered > 0) {
+        const confirm = window.confirm(`You have ${unanswered} unanswered questions. Submit anyway?`);
+        if (!confirm) {
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
       const timeSpent = (assessment.duration * 60) - timeLeft;
       const result = await submitAssessment(answers, timeSpent);
       
