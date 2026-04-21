@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/options';
 import Assessment from '@/lib/db/models/assessment';
+import Payment from '@/lib/db/models/payment';
 import connectDB from '@/lib/db/connect';
 import mongoose from 'mongoose';
 
@@ -25,17 +26,12 @@ export async function POST(
       return NextResponse.json({ error: 'Assessment not found' }, { status: 404 });
     }
 
-    console.log('Start API: Looking for existing incomplete attempt');
-    
-    // Find existing incomplete attempt
-    const existingAttemptIndex = assessment.attempts?.findIndex(
+    // ✅ FIX: Check for INCOMPLETE attempt only (completedAt === null)
+    const existingIncompleteAttempt = assessment.attempts?.find(
       (a: any) => a.userId?.toString() === session.user.id && a.completedAt === null
     );
 
-    if (existingAttemptIndex !== undefined && existingAttemptIndex !== -1) {
-      console.log('Start API: Found existing incomplete attempt');
-      const existingAttempt = assessment.attempts[existingAttemptIndex];
-      
+    if (existingIncompleteAttempt) {
       const questions = assessment.questions.map((q: any) => ({
         id: q._id,
         question: q.question,
@@ -44,16 +40,53 @@ export async function POST(
       }));
 
       return NextResponse.json({
-        success: true,
-        attemptId: (existingAttempt as any)._id,
+        message: 'Resuming assessment',
+        attemptId: (existingIncompleteAttempt as any)._id,
         questions,
         duration: assessment.duration,
         totalPoints: assessment.questions.reduce((acc: number, q: any) => acc + q.points, 0),
       });
     }
 
-    console.log('Start API: Creating new attempt');
-    
+    // Check for COMPLETED attempt
+    const existingCompletedAttempt = assessment.attempts?.find(
+      (a: any) => a.userId?.toString() === session.user.id && a.completedAt !== null
+    );
+
+    if (existingCompletedAttempt) {
+      return NextResponse.json(
+        { error: 'You have already completed this assessment' },
+        { status: 400 }
+      );
+    }
+
+    // Check if payment required
+    if (assessment.price > 0) {
+      const { searchParams } = new URL(req.url);
+      const paymentId = searchParams.get('paymentId');
+
+      if (!paymentId) {
+        return NextResponse.json(
+          { error: 'Payment required for this assessment' },
+          { status: 402 }
+        );
+      }
+
+      const payment = await Payment.findOne({
+        _id: paymentId,
+        userId: session.user.id,
+        assessmentId: assessment._id,
+        status: 'completed',
+      });
+
+      if (!payment) {
+        return NextResponse.json(
+          { error: 'Payment verification failed' },
+          { status: 400 }
+        );
+      }
+    }
+
     // Create new attempt
     const newAttempt = {
       userId: new mongoose.Types.ObjectId(session.user.id),
@@ -72,8 +105,7 @@ export async function POST(
     assessment.attempts.push(newAttempt);
     await assessment.save();
 
-    console.log('Start API: Attempt saved successfully');
-    
+    // Get the saved attempt
     const savedAttempt = assessment.attempts[assessment.attempts.length - 1];
 
     const questions = assessment.questions.map((q: any) => ({
@@ -84,7 +116,7 @@ export async function POST(
     }));
 
     return NextResponse.json({
-      success: true,
+      message: 'Assessment started',
       attemptId: (savedAttempt as any)._id,
       questions,
       duration: assessment.duration,
@@ -92,7 +124,10 @@ export async function POST(
     });
 
   } catch (error) {
-    console.error('Start assessment error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('Error starting assessment:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }
