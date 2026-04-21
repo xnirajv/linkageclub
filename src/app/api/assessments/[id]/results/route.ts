@@ -5,33 +5,28 @@ import Assessment from '@/lib/db/models/assessment';
 import connectDB from '@/lib/db/connect';
 
 export async function GET(
-  _req: NextRequest,
-  { params }: { params: { id: string } }
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
     
     if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     await connectDB();
+    const { id } = await params;
 
-    const assessment = await Assessment.findById(params.id);
+    const assessment = await Assessment.findById(id);
 
     if (!assessment) {
-      return NextResponse.json(
-        { error: 'Assessment not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Assessment not found' }, { status: 404 });
     }
 
     // Find user's attempt
-    const attempt = assessment.attempts.find(
-      (a: any) => a.userId.toString() === session.user.id && a.completedAt
+    const attempt = assessment.attempts?.find(
+      (a: any) => a.userId?.toString() === session.user.id && a.completedAt
     );
 
     if (!attempt) {
@@ -72,6 +67,7 @@ export async function GET(
     }
 
     return NextResponse.json({
+      success: true,
       results,
       badge,
     });
