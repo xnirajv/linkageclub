@@ -15,7 +15,6 @@ export default function TakeAssessmentPage() {
   const router = useRouter();
   const assessmentId = params?.id as string;
   const { assessment, submitAssessment, isLoading } = useAssessment(assessmentId);
-
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<number[]>([]);
   const [timeLeft, setTimeLeft] = useState(0);
@@ -29,18 +28,14 @@ export default function TakeAssessmentPage() {
     }
   }, [assessment]);
 
-  // Timer - only count down, NO auto submit
   useEffect(() => {
-    if (timeLeft <= 0) return; // Don't auto submit, just stop timer
+    if (timeLeft <= 0) {
+      handleSubmit();
+      return;
+    }
 
     const timer = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          return 0;
-        }
-        return prev - 1;
-      });
+      setTimeLeft(prev => prev - 1);
     }, 1000);
 
     return () => clearInterval(timer);
@@ -91,20 +86,20 @@ export default function TakeAssessmentPage() {
 
   const handleSubmit = async () => {
     if (isSubmitting) return;
-
-    const timeSpent = (assessment.duration * 60) - timeLeft;
-
+    
     setIsSubmitting(true);
-
+    
     try {
+      const timeSpent = (assessment.duration * 60) - timeLeft;
       const result = await submitAssessment(answers, timeSpent);
-
+      
       if (result.success) {
         router.push(`/dashboard/student/assessments/${assessmentId}/results`);
       } else {
         alert(result.error || 'Failed to submit assessment');
       }
     } catch (error) {
+      console.error('Submit error:', error);
       alert('Something went wrong. Please try again.');
     } finally {
       setIsSubmitting(false);
@@ -126,8 +121,8 @@ export default function TakeAssessmentPage() {
                 <Clock className="h-5 w-5" />
                 <span className="font-mono text-lg">{formatTime(timeLeft)}</span>
               </div>
-              <Button
-                variant="destructive"
+              <Button 
+                variant="destructive" 
                 onClick={handleSubmit}
                 disabled={isSubmitting}
               >
@@ -215,8 +210,9 @@ export default function TakeAssessmentPage() {
                 return (
                   <button
                     key={index}
-                    className={`w-8 h-8 rounded-md text-sm font-medium ${bgColor} ${currentQuestion === index ? 'ring-2 ring-primary-500' : ''
-                      }`}
+                    className={`w-8 h-8 rounded-md text-sm font-medium ${bgColor} ${
+                      currentQuestion === index ? 'ring-2 ring-primary-500' : ''
+                    }`}
                     onClick={() => setCurrentQuestion(index)}
                   >
                     {index + 1}

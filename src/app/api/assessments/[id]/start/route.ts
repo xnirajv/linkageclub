@@ -6,12 +6,13 @@ import Payment from '@/lib/db/models/payment';
 import connectDB from '@/lib/db/connect';
 import mongoose from 'mongoose';
 
+// Define interfaces for better type safety
 interface IQuestion {
   _id: mongoose.Types.ObjectId;
   question: string;
   options: string[];
   points: number;
-  correctAnswer?: number;
+  correctAnswer?: number; // This should not be sent to client
 }
 
 interface IAttempt {
@@ -35,7 +36,7 @@ interface IAssessment {
   title: string;
   description: string;
   price: number;
-  duration: number;
+  duration: number; // in minutes
   questions: IQuestion[];
   attempts: IAttempt[];
 }
@@ -46,9 +47,12 @@ export async function POST(
 ) {
   try {
     const session = await getServerSession(authOptions);
-
+    
     if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
     }
 
     await connectDB();
@@ -56,41 +60,20 @@ export async function POST(
     const assessment = await Assessment.findById(params.id) as IAssessment | null;
 
     if (!assessment) {
-      return NextResponse.json({ error: 'Assessment not found' }, { status: 404 });
+      return NextResponse.json(
+        { error: 'Assessment not found' },
+        { status: 404 }
+      );
     }
 
     // Check if user has already attempted
-    // Check if user has already attempted (INCOMPLETE only)
     const existingAttempt = assessment.attempts?.find(
-      (a: IAttempt) => a.userId.toString() === session.user.id && a.completedAt === null
+      (a: IAttempt) => a.userId.toString() === session.user.id
     );
 
     if (existingAttempt) {
-      // Resume existing attempt
-      const questions = assessment.questions.map((q: IQuestion) => ({
-        id: q._id,
-        question: q.question,
-        options: q.options,
-        points: q.points,
-      }));
-
-      return NextResponse.json({
-        message: 'Resuming assessment',
-        attemptId: existingAttempt._id,
-        questions,
-        duration: assessment.duration,
-        totalPoints: assessment.questions.reduce((acc: number, q: IQuestion) => acc + q.points, 0),
-      });
-    }
-
-    // Check for COMPLETED attempt
-    const completedAttempt = assessment.attempts?.find(
-      (a: IAttempt) => a.userId.toString() === session.user.id && a.completedAt !== null
-    );
-
-    if (completedAttempt) {
       return NextResponse.json(
-        { error: 'You have already completed this assessment' },
+        { error: 'You have already attempted this assessment' },
         { status: 400 }
       );
     }
@@ -107,6 +90,7 @@ export async function POST(
         );
       }
 
+      // Verify payment
       const payment = await Payment.findOne({
         _id: paymentId,
         userId: session.user.id,
@@ -122,7 +106,7 @@ export async function POST(
       }
     }
 
-    // Create attempt
+    // Create attempt with proper typing
     const attempt: IAttempt = {
       _id: new mongoose.Types.ObjectId(),
       userId: new mongoose.Types.ObjectId(session.user.id),
@@ -134,13 +118,15 @@ export async function POST(
       completedAt: null,
     };
 
+    // Initialize attempts array if it doesn't exist
     if (!assessment.attempts) {
       assessment.attempts = [];
     }
-
+    
     assessment.attempts.push(attempt);
-    await (assessment as any).save();
+    await (assessment as any).save(); // Use type assertion for save
 
+    // Return questions without answers (don't send correctAnswer to client)
     const questions = assessment.questions.map((q: IQuestion) => ({
       id: q._id,
       question: q.question,
@@ -148,6 +134,7 @@ export async function POST(
       points: q.points,
     }));
 
+    // Get the ID of the attempt we just added
     const attemptId = assessment.attempts[assessment.attempts.length - 1]._id;
 
     return NextResponse.json({
