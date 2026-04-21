@@ -25,12 +25,17 @@ export async function POST(
       return NextResponse.json({ error: 'Assessment not found' }, { status: 404 });
     }
 
-    // Check for existing incomplete attempt (completedAt = null)
-    const existingIncompleteAttempt = assessment.attempts?.find(
+    console.log('Start API: Looking for existing incomplete attempt');
+    
+    // Find existing incomplete attempt
+    const existingAttemptIndex = assessment.attempts?.findIndex(
       (a: any) => a.userId?.toString() === session.user.id && a.completedAt === null
     );
 
-    if (existingIncompleteAttempt) {
+    if (existingAttemptIndex !== undefined && existingAttemptIndex !== -1) {
+      console.log('Start API: Found existing incomplete attempt');
+      const existingAttempt = assessment.attempts[existingAttemptIndex];
+      
       const questions = assessment.questions.map((q: any) => ({
         id: q._id,
         question: q.question,
@@ -40,25 +45,15 @@ export async function POST(
 
       return NextResponse.json({
         success: true,
-        attemptId: (existingIncompleteAttempt as any)._id,
+        attemptId: (existingAttempt as any)._id,
         questions,
         duration: assessment.duration,
         totalPoints: assessment.questions.reduce((acc: number, q: any) => acc + q.points, 0),
       });
     }
 
-    // Check for completed attempt
-    const existingCompletedAttempt = assessment.attempts?.find(
-      (a: any) => a.userId?.toString() === session.user.id && a.completedAt !== null
-    );
-
-    if (existingCompletedAttempt) {
-      return NextResponse.json(
-        { error: 'You have already completed this assessment' },
-        { status: 400 }
-      );
-    }
-
+    console.log('Start API: Creating new attempt');
+    
     // Create new attempt
     const newAttempt = {
       userId: new mongoose.Types.ObjectId(session.user.id),
@@ -67,7 +62,7 @@ export async function POST(
       answers: [],
       timeSpent: 0,
       startedAt: new Date(),
-      completedAt: new Date(),
+      completedAt: null,
     };
 
     if (!assessment.attempts) {
@@ -77,7 +72,8 @@ export async function POST(
     assessment.attempts.push(newAttempt);
     await assessment.save();
 
-    // Get the saved attempt
+    console.log('Start API: Attempt saved successfully');
+    
     const savedAttempt = assessment.attempts[assessment.attempts.length - 1];
 
     const questions = assessment.questions.map((q: any) => ({
