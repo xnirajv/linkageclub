@@ -25,12 +25,13 @@ export async function POST(
       return NextResponse.json({ error: 'Assessment not found' }, { status: 404 });
     }
 
-    // Check for existing incomplete attempt
-    const existingAttempt = assessment.attempts?.find(
+    // ✅ Check for INCOMPLETE attempt only (for resume)
+    const existingIncompleteAttempt = assessment.attempts?.find(
       (a: any) => a.userId?.toString() === session.user.id && a.completedAt === null
     );
 
-    if (existingAttempt) {
+    // If incomplete attempt exists, resume it
+    if (existingIncompleteAttempt) {
       const questions = assessment.questions.map((q: any) => ({
         id: q._id,
         question: q.question,
@@ -40,16 +41,17 @@ export async function POST(
 
       return NextResponse.json({
         success: true,
-        attemptId: (existingAttempt as any)._id,
+        attemptId: (existingIncompleteAttempt as any)._id,
         questions,
         duration: assessment.duration,
         totalPoints: assessment.questions.reduce((acc: number, q: any) => acc + q.points, 0),
-        existingAnswers: existingAttempt.answers,
-        timeSpent: existingAttempt.timeSpent,
+        existingAnswers: existingIncompleteAttempt.answers,
+        timeSpent: existingIncompleteAttempt.timeSpent,
       });
     }
 
-    // Create new attempt
+    // ✅ ALWAYS create a NEW attempt (for both first time and retake)
+    // This ensures retake gets a fresh attempt
     const newAttempt = {
       _id: new mongoose.Types.ObjectId(),
       userId: new mongoose.Types.ObjectId(session.user.id),
@@ -84,6 +86,7 @@ export async function POST(
       existingAnswers: new Array(assessment.questions.length).fill(-1),
       timeSpent: 0,
     });
+
   } catch (error) {
     console.error('Start assessment error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

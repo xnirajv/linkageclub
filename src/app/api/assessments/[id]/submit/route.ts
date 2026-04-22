@@ -17,7 +17,7 @@ export async function POST(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -38,7 +38,7 @@ export async function POST(
       return NextResponse.json({ error: 'Assessment not found' }, { status: 404 });
     }
 
-    // Find active attempt
+    // Find active attempt (incomplete one)
     const attemptIndex = assessment.attempts?.findIndex(
       (a: any) => a.userId?.toString() === session.user.id && a.completedAt === null
     );
@@ -47,9 +47,8 @@ export async function POST(
       return NextResponse.json({ error: 'No active attempt found' }, { status: 400 });
     }
 
-    const { answers, timeSpent } = validation.data;
-    
     // Calculate score
+    const { answers, timeSpent } = validation.data;
     let totalPoints = 0;
     let earnedPoints = 0;
 
@@ -63,7 +62,7 @@ export async function POST(
     const score = totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 0;
     const passed = score >= (assessment.passingScore || 70);
 
-    // Update attempt
+    // ✅ Update the attempt
     assessment.attempts[attemptIndex].answers = answers;
     assessment.attempts[attemptIndex].score = score;
     assessment.attempts[attemptIndex].passed = passed;
@@ -78,7 +77,7 @@ export async function POST(
     // Update user if passed
     if (passed) {
       const user = await User.findById(session.user.id);
-      
+
       if (user) {
         // Update skill
         const existingSkill = user.skills?.find((s: any) => s.name === assessment.skillName);
@@ -113,7 +112,7 @@ export async function POST(
         // Update trust score
         trustScoreIncreased = Math.floor(score / 10);
         user.trustScore = Math.min(100, (user.trustScore || 0) + trustScoreIncreased);
-        
+
         await user.save();
       }
     }
