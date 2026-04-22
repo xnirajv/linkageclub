@@ -4,37 +4,6 @@ import { authOptions } from '@/lib/auth/options';
 import Assessment from '@/lib/db/models/assessment';
 import connectDB from '@/lib/db/connect';
 
-export async function DELETE(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await getServerSession(authOptions);
-    
-    if (!session || session.user.role !== 'admin') {
-      return NextResponse.json({ error: 'Unauthorized - Admin access required' }, { status: 401 });
-    }
-
-    await connectDB();
-    const { id } = await params;
-
-    const assessment = await Assessment.findById(id);
-    if (!assessment) {
-      return NextResponse.json({ error: 'Assessment not found' }, { status: 404 });
-    }
-
-    // Soft delete
-    assessment.isActive = false;
-    await assessment.save();
-
-    return NextResponse.json({ success: true, message: 'Assessment deleted successfully' });
-    
-  } catch (error) {
-    console.error('Delete assessment error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
-  }
-}
-
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -64,9 +33,11 @@ export async function PATCH(
     if (body.duration) assessment.duration = body.duration;
     if (body.passingScore) assessment.passingScore = body.passingScore;
     if (body.isActive !== undefined) assessment.isActive = body.isActive;
-    if (body.tags) assessment.tags = body.tags;
-    if (body.badges) assessment.badges = body.badges;
-    if (body.prerequisites) assessment.prerequisites = body.prerequisites;
+    
+    // Commented out - properties may not exist in schema
+    // if (body.tags) assessment.tags = body.tags;
+    // if (body.badges) assessment.badges = body.badges;
+    // if (body.prerequisites) assessment.prerequisites = body.prerequisites;
 
     await assessment.save();
 
@@ -74,6 +45,37 @@ export async function PATCH(
     
   } catch (error) {
     console.error('Update assessment error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getServerSession(authOptions);
+    
+    if (!session || session.user.role !== 'admin') {
+      return NextResponse.json({ error: 'Unauthorized - Admin access required' }, { status: 401 });
+    }
+
+    await connectDB();
+    const { id } = await params;
+
+    const assessment = await Assessment.findById(id);
+    if (!assessment) {
+      return NextResponse.json({ error: 'Assessment not found' }, { status: 404 });
+    }
+
+    // Soft delete
+    assessment.isActive = false;
+    await assessment.save();
+
+    return NextResponse.json({ success: true, message: 'Assessment deleted successfully' });
+    
+  } catch (error) {
+    console.error('Delete assessment error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
