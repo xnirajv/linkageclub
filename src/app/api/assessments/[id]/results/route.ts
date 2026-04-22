@@ -36,7 +36,7 @@ export async function GET(
       );
     }
 
-    // Prepare detailed results
+    // Prepare detailed results with options
     const results = {
       score: attempt.score,
       passed: attempt.passed,
@@ -44,6 +44,7 @@ export async function GET(
       completedAt: attempt.completedAt,
       questions: assessment.questions.map((q: any, index: number) => ({
         question: q.question,
+        options: q.options,  // ✅ ADDED: options array
         userAnswer: attempt.answers[index],
         correctAnswer: q.correctAnswer,
         isCorrect: attempt.answers[index] === q.correctAnswer,

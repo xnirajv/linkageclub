@@ -10,6 +10,7 @@ import { useAssessment } from '@/hooks/useAssessments';
 
 interface QuestionReview {
   question: string;
+  options: string[]; 
   userAnswer: number;
   correctAnswer: number;
   isCorrect: boolean;
@@ -47,7 +48,7 @@ export default function AssessmentResultsPage() {
       try {
         const data = await getResults();
         console.log('API Response:', data);
-        
+
         if (data && data.results) {
           setResults(data.results);
           setBadge(data.badge || null);
@@ -58,7 +59,7 @@ export default function AssessmentResultsPage() {
         setLoading(false);
       }
     };
-    
+
     if (assessmentId) {
       fetchResults();
     }
@@ -196,9 +197,8 @@ export default function AssessmentResultsPage() {
           {results.questions && results.questions.map((q: QuestionReview, index: number) => (
             <div
               key={index}
-              className={`p-4 rounded-lg border ${
-                q.isCorrect ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'
-              }`}
+              className={`p-4 rounded-lg border ${q.isCorrect ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'
+                }`}
             >
               <div className="flex items-start gap-3">
                 {q.isCorrect ? (
@@ -211,11 +211,18 @@ export default function AssessmentResultsPage() {
                   <div className="mt-2 text-sm">
                     <p>
                       <span className="font-medium">Your answer:</span>{' '}
-                      {q.userAnswer !== undefined && q.userAnswer !== -1 ? `Option ${q.userAnswer + 1}` : 'Not answered'}
+                      {q.userAnswer !== undefined && q.userAnswer !== -1
+                        ? (q.options && q.options[q.userAnswer])
+                          ? q.options[q.userAnswer]
+                          : `Option ${q.userAnswer + 1}`
+                        : 'Not answered'}
                     </p>
                     {!q.isCorrect && (
                       <p className="mt-1">
-                        <span className="font-medium">Correct answer:</span> Option {q.correctAnswer + 1}
+                        <span className="font-medium">Correct answer:</span>{' '}
+                        {q.options && q.options[q.correctAnswer]
+                          ? q.options[q.correctAnswer]
+                          : `Option ${q.correctAnswer + 1}`}
                       </p>
                     )}
                     {q.explanation && (

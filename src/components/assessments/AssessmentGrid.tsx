@@ -107,8 +107,37 @@ export function AssessmentGrid({
                   </h3>
                   <p className="text-sm text-charcoal-600 line-clamp-2">{assessment.description}</p>
                 </div>
-                {assessment.userAttempt?.passed && (
-                  <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
+                {/* Progress or CTA */}
+                {assessment.userAttempt ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span>Your Score</span>
+                      <span className="font-medium">{assessment.userAttempt.score}%</span>
+                    </div>
+                    <Progress value={assessment.userAttempt.score} />
+                    <p className="text-xs text-gray-500">
+                      {assessment.userAttempt.passed ? 'Passed' : 'Not passed'}
+                    </p>
+                    {assessment.userAttempt.passed ? (
+                      <Button asChild variant="outline" className="w-full mt-2">
+                        <Link href={`/dashboard/student/assessments/${assessment._id}/results`}>
+                          View Results
+                        </Link>
+                      </Button>
+                    ) : (
+                      <Button asChild variant="outline" className="w-full mt-2">
+                        <Link href={`/dashboard/student/assessments/${assessment._id}`}>
+                          Retake Assessment
+                        </Link>
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <Button asChild className="w-full">
+                    <Link href={`/dashboard/student/assessments/${assessment._id}`}>
+                      View Details
+                    </Link>
+                  </Button>
                 )}
               </div>
 
