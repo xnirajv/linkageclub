@@ -19,7 +19,7 @@ export default function StudentAssessmentsPage() {
   const [filters, setFilters] = useState<Record<string, any>>({});
   const debouncedSearch = useDebounce(searchQuery, 300);
 
-  // Get all available assessments (active, not attempted)
+  // Get all available assessments (active)
   const {
     assessments = [],
     pagination,
@@ -33,12 +33,23 @@ export default function StudentAssessmentsPage() {
   // Get user's profile with badges
   const { badges = [], isLoading: profileLoading } = useProfile();
 
+  // ✅ Get user's attempted assessments (both in-progress and completed)
   const { data: userAssessmentsData } = useSWR<{ assessments: any[] }>('/api/assessments/user', fetcher);
-  const allAssessments = userAssessmentsData?.assessments || [];
+  const allUserAssessments = userAssessmentsData?.assessments || [];
+
+  // ✅ Set of attempted assessment IDs (to filter out from Available tab)
+  const attemptedIds = useMemo(() => {
+    return new Set(allUserAssessments.map((a: any) => a.id));
+  }, [allUserAssessments]);
+
+  // ✅ Available assessments = all active assessments - attempted ones
+  const availableAssessments = useMemo(() => {
+    return assessments.filter((a: any) => !attemptedIds.has(a._id));
+  }, [assessments, attemptedIds]);
 
   // Format user assessments for display
   const formattedUserAssessments = useMemo(() => {
-    return allAssessments.map((assessment: any): UserAssessment => ({
+    return allUserAssessments.map((assessment: any): UserAssessment => ({
       id: assessment.id,
       title: assessment.title,
       skillName: assessment.skillName,
@@ -53,7 +64,7 @@ export default function StudentAssessmentsPage() {
       },
       badgeEarned: assessment.badgeEarned || false,
     }));
-  }, [allAssessments]);
+  }, [allUserAssessments]);
 
   // Filter in-progress assessments (started but not completed)
   const inProgressAssessments = useMemo(() => {
@@ -105,7 +116,7 @@ export default function StudentAssessmentsPage() {
           <TabsTrigger value="badges">My Badges</TabsTrigger>
         </TabsList>
 
-        {/* Available Assessments Tab */}
+        {/* Available Assessments Tab - Only shows assessments user hasn't attempted */}
         <TabsContent value="available" className="space-y-6 mt-6">
           <div className="space-y-4">
             <SearchInput
@@ -118,7 +129,7 @@ export default function StudentAssessmentsPage() {
             <AssessmentFilters onFilterChange={handleFilterChange} />
 
             <AssessmentGrid
-              assessments={assessments}
+              assessments={availableAssessments}
               isLoading={isLoadingAny}
               emptyMessage="No assessments found"
             />
@@ -137,7 +148,7 @@ export default function StudentAssessmentsPage() {
           </div>
         </TabsContent>
 
-        {/* In Progress Assessments Tab */}
+        {/* In Progress Assessments Tab - Shows incomplete assessments */}
         <TabsContent value="in-progress" className="mt-6">
           <AssessmentGrid
             assessments={inProgressAssessments as any}
@@ -146,7 +157,7 @@ export default function StudentAssessmentsPage() {
           />
         </TabsContent>
 
-        {/* Completed Assessments Tab */}
+        {/* Completed Assessments Tab - Shows completed assessments */}
         <TabsContent value="completed" className="mt-6">
           <AssessmentGrid
             assessments={completedAssessments as any}
@@ -155,7 +166,7 @@ export default function StudentAssessmentsPage() {
           />
         </TabsContent>
 
-        {/* Badges Tab */}
+        {/* Badges Tab - Shows earned badges */}
         <TabsContent value="badges" className="mt-6">
           <BadgeDisplay badges={badges} />
         </TabsContent>

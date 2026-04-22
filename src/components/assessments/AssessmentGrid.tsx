@@ -32,9 +32,6 @@ interface Assessment {
   userAttempt?: {
     score: number;
     passed: boolean;
-    completedAt?: string | null;
-    answers?: number[];
-    timeSpent?: number;
   };
 }
 
@@ -150,39 +147,22 @@ export function AssessmentGrid({
 
               {/* Progress or CTA */}
               {assessment.userAttempt ? (
-                <div className="space-y-3">
-                  <div>
-                    <div className="flex items-center justify-between text-sm mb-1">
-                      <span className="text-gray-600">Your Score</span>
-                      <span className="font-medium">{assessment.userAttempt.score}%</span>
-                    </div>
-                    <Progress value={assessment.userAttempt.score} />
-                    <p className="text-xs text-gray-500 mt-1">
-                      {assessment.userAttempt.passed ? '✅ Passed' : '❌ Not passed'}
-                    </p>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span>Your Score</span>
+                    <span className="font-medium">{assessment.userAttempt.score}%</span>
                   </div>
-                  {assessment.userAttempt.passed ? (
-                    <Button asChild variant="outline" className="w-full">
-                      <Link href={`/dashboard/student/assessments/${assessment._id}/results`}>
-                        View Results
-                      </Link>
-                    </Button>
-                  ) : assessment.userAttempt.score === 0 && !assessment.userAttempt.passed ? (
-                    <Button asChild variant="outline" className="w-full">
-                      <Link href={`/dashboard/student/assessments/${assessment._id}/take`}>
-                        Continue Assessment
-                      </Link>
-                    </Button>
-                  ) : (
-                    <Button asChild variant="outline" className="w-full">
-                      <Link href={`/dashboard/student/assessments/${assessment._id}`}>
-                        Retake Assessment
-                      </Link>
-                    </Button>
-                  )}
+                  <Progress value={assessment.userAttempt.score} />
+                  <p className="text-xs text-charcoal-500">
+                    {assessment.userAttempt.passed ? 'Passed' : 'Not passed'}
+                  </p>
                 </div>
               ) : (
-                <Button asChild className="w-full">
+                <Button
+                  className="w-full"
+                  variant="outline"
+                  asChild
+                >
                   <Link href={`/dashboard/student/assessments/${assessment._id}`}>
                     View Details
                   </Link>
