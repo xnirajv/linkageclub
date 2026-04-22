@@ -17,6 +17,7 @@ import Link from 'next/link';
 import { formatCurrency, formatNumber } from '@/lib/utils/format';
 
 interface Assessment {
+  id?: string;
   _id: string;
   title: string;
   description: string;
@@ -67,6 +68,11 @@ export function AssessmentGrid({
     }
   };
 
+  // Helper function to get assessment ID
+  const getAssessmentId = (assessment: Assessment) => {
+    return assessment.id || assessment._id;
+  };
+
   if (isLoading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -98,94 +104,98 @@ export function AssessmentGrid({
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {assessments.map((assessment) => (
-        <Card key={assessment._id} className="p-6 hover:shadow-lg transition-shadow group">
-          <div className="space-y-4">
-            {/* Header - Clickable title */}
-            <Link href={`/dashboard/student/assessments/${assessment._id}`}>
-              <div className="flex items-start justify-between cursor-pointer">
-                <div>
-                  <h3 className="font-semibold text-lg mb-1 group-hover:text-primary-600 transition-colors">
-                    {assessment.title}
-                  </h3>
-                  <p className="text-sm text-gray-600 line-clamp-2">{assessment.description}</p>
+      {assessments.map((assessment) => {
+        const assessmentId = getAssessmentId(assessment);
+        
+        return (
+          <Card key={assessmentId} className="p-6 hover:shadow-lg transition-shadow group">
+            <div className="space-y-4">
+              {/* Header - Clickable title */}
+              <Link href={`/dashboard/student/assessments/${assessmentId}`}>
+                <div className="flex items-start justify-between cursor-pointer">
+                  <div>
+                    <h3 className="font-semibold text-lg mb-1 group-hover:text-primary-600 transition-colors">
+                      {assessment.title}
+                    </h3>
+                    <p className="text-sm text-gray-600 line-clamp-2">{assessment.description}</p>
+                  </div>
+                  {assessment.attempt?.passed && (
+                    <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
+                  )}
                 </div>
-                {assessment.attempt?.passed && (
-                  <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
+              </Link>
+
+              {/* Skill & Level */}
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary">{assessment.skillName}</Badge>
+                <Badge className={getLevelColor(assessment.level)}>
+                  {assessment.level}
+                </Badge>
+                {assessment.badges && assessment.badges.length > 0 && (
+                  <Award className="h-4 w-4 text-yellow-500" />
                 )}
               </div>
-            </Link>
 
-            {/* Skill & Level */}
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary">{assessment.skillName}</Badge>
-              <Badge className={getLevelColor(assessment.level)}>
-                {assessment.level}
-              </Badge>
-              {assessment.badges && assessment.badges.length > 0 && (
-                <Award className="h-4 w-4 text-yellow-500" />
+              {/* Stats */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-gray-400" />
+                  <span className="text-sm text-gray-600">{assessment.duration} min</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <DollarSign className="h-4 w-4 text-gray-400" />
+                  <span className="text-sm text-gray-600">
+                    {assessment.price === 0 ? 'Free' : formatCurrency(assessment.price)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Users className="h-4 w-4 text-gray-400" />
+                  <span className="text-sm text-gray-600">{formatNumber(assessment.totalAttempts)}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-gray-400" />
+                  <span className="text-sm text-gray-600">{assessment.passRate}% pass</span>
+                </div>
+              </div>
+
+              {/* User Progress & Button */}
+              {assessment.attempt ? (
+                <div className="space-y-3">
+                  <div>
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <span className="text-gray-600">Your Score</span>
+                      <span className="font-medium">{assessment.attempt.score}%</span>
+                    </div>
+                    <Progress value={assessment.attempt.score} />
+                    <p className="text-xs text-gray-500 mt-1">
+                      {assessment.attempt.passed ? '✅ Passed' : '❌ Not passed'}
+                    </p>
+                  </div>
+                  {assessment.attempt.passed ? (
+                    <Button asChild variant="outline" className="w-full">
+                      <Link href={`/dashboard/student/assessments/${assessmentId}/results`}>
+                        View Results
+                      </Link>
+                    </Button>
+                  ) : (
+                    <Button asChild variant="outline" className="w-full">
+                      <Link href={`/dashboard/student/assessments/${assessmentId}/take`}>
+                        Continue Assessment
+                      </Link>
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <Button asChild className="w-full">
+                  <Link href={`/dashboard/student/assessments/${assessmentId}`}>
+                    View Details
+                  </Link>
+                </Button>
               )}
             </div>
-
-            {/* Stats */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-gray-400" />
-                <span className="text-sm text-gray-600">{assessment.duration} min</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <DollarSign className="h-4 w-4 text-gray-400" />
-                <span className="text-sm text-gray-600">
-                  {assessment.price === 0 ? 'Free' : formatCurrency(assessment.price)}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Users className="h-4 w-4 text-gray-400" />
-                <span className="text-sm text-gray-600">{formatNumber(assessment.totalAttempts)}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-gray-400" />
-                <span className="text-sm text-gray-600">{assessment.passRate}% pass</span>
-              </div>
-            </div>
-
-            {/* User Progress & Button */}
-            {assessment.attempt ? (
-              <div className="space-y-3">
-                <div>
-                  <div className="flex items-center justify-between text-sm mb-1">
-                    <span className="text-gray-600">Your Score</span>
-                    <span className="font-medium">{assessment.attempt.score}%</span>
-                  </div>
-                  <Progress value={assessment.attempt.score} />
-                  <p className="text-xs text-gray-500 mt-1">
-                    {assessment.attempt.passed ? '✅ Passed' : '❌ Not passed'}
-                  </p>
-                </div>
-                {assessment.attempt.passed ? (
-                  <Button asChild variant="outline" className="w-full">
-                    <Link href={`/dashboard/student/assessments/${assessment._id}/results`}>
-                      View Results
-                    </Link>
-                  </Button>
-                ) : (
-                  <Button asChild variant="outline" className="w-full">
-                    <Link href={`/dashboard/student/assessments/${assessment._id}/take`}>
-                      Continue Assessment
-                    </Link>
-                  </Button>
-                )}
-              </div>
-            ) : (
-              <Button asChild className="w-full">
-                <Link href={`/dashboard/student/assessments/${assessment._id}`}>
-                  View Details
-                </Link>
-              </Button>
-            )}
-          </div>
-        </Card>
-      ))}
+          </Card>
+        );
+      })}
     </div>
   );
 }
