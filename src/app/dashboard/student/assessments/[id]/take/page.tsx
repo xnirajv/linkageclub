@@ -8,7 +8,7 @@ import { Progress } from '@/components/ui/progress';
 import { Clock, AlertCircle } from 'lucide-react';
 import { useAssessment } from '@/hooks/useAssessments';
 import { RadioGroup, RadioGroupItem } from '@/components/forms/RadioGroup';
-import { Label } from '@/components/ui/label';
+import { Label } from '@/components/ui/lable';
 
 export default function TakeAssessmentPage() {
   const params = useParams();
