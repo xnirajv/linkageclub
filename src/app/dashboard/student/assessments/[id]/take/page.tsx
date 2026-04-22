@@ -27,15 +27,21 @@ export default function TakeAssessmentPage() {
       // Check if user has an existing incomplete attempt
       const existingAttempt = assessment.attempt;
       
-      if (existingAttempt && existingAttempt.completedAt === null && existingAttempt.answers && existingAttempt.answers.length > 0) {
+      if (existingAttempt && existingAttempt.completedAt === null) {
         // Resume existing attempt - load saved answers
-        setAnswers(existingAttempt.answers);
+        if (existingAttempt.answers && existingAttempt.answers.length > 0) {
+          setAnswers(existingAttempt.answers);
+        } else {
+          setAnswers(new Array(assessment.questions?.length || 0).fill(-1));
+        }
+        
         // Calculate remaining time (total duration - time already spent)
         const remainingTime = Math.max(0, (assessment.duration * 60) - (existingAttempt.timeSpent || 0));
         setTimeLeft(remainingTime);
         
         // Find the first unanswered question to start from
-        const firstUnanswered = existingAttempt.answers.findIndex(a => a === -1);
+        const answersArray = existingAttempt.answers || [];
+        const firstUnanswered = answersArray.findIndex(a => a === -1);
         if (firstUnanswered !== -1) {
           setCurrentQuestion(firstUnanswered);
         }
