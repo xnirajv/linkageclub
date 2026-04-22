@@ -29,7 +29,7 @@ interface Assessment {
   passRate: number;
   averageScore: number;
   badges?: Array<{ name: string }>;
-  userAttempt?: {
+  attempt?: {  // ← CHANGE: userAttempt se attempt
     score: number;
     passed: boolean;
     completedAt?: string | null;
@@ -110,7 +110,7 @@ export function AssessmentGrid({
                   </h3>
                   <p className="text-sm text-gray-600 line-clamp-2">{assessment.description}</p>
                 </div>
-                {assessment.userAttempt?.passed && (
+                {assessment.attempt?.passed && (
                   <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
                 )}
               </div>
@@ -150,19 +150,19 @@ export function AssessmentGrid({
             </div>
 
             {/* User Progress & Button */}
-            {assessment.userAttempt ? (
+            {assessment.attempt ? (
               <div className="space-y-3">
                 <div>
                   <div className="flex items-center justify-between text-sm mb-1">
                     <span className="text-gray-600">Your Score</span>
-                    <span className="font-medium">{assessment.userAttempt.score}%</span>
+                    <span className="font-medium">{assessment.attempt.score}%</span>
                   </div>
-                  <Progress value={assessment.userAttempt.score} />
+                  <Progress value={assessment.attempt.score} />
                   <p className="text-xs text-gray-500 mt-1">
-                    {assessment.userAttempt.passed ? '✅ Passed' : '❌ Not passed'}
+                    {assessment.attempt.passed ? '✅ Passed' : '❌ Not passed'}
                   </p>
                 </div>
-                {assessment.userAttempt.passed ? (
+                {assessment.attempt.passed ? (
                   <Button asChild variant="outline" className="w-full">
                     <Link href={`/dashboard/student/assessments/${assessment._id}/results`}>
                       View Results
