@@ -25,14 +25,20 @@ export default function TakeAssessmentPage() {
   useEffect(() => {
     if (assessment) {
       // Check if user has an existing incomplete attempt
-      const existingAttempt = assessment.userAttempt;
+      const existingAttempt = assessment.attempt;
       
-      if (existingAttempt && existingAttempt.completedAt === null && existingAttempt.answers) {
+      if (existingAttempt && existingAttempt.completedAt === null && existingAttempt.answers && existingAttempt.answers.length > 0) {
         // Resume existing attempt - load saved answers
         setAnswers(existingAttempt.answers);
         // Calculate remaining time (total duration - time already spent)
         const remainingTime = Math.max(0, (assessment.duration * 60) - (existingAttempt.timeSpent || 0));
         setTimeLeft(remainingTime);
+        
+        // Find the first unanswered question to start from
+        const firstUnanswered = existingAttempt.answers.findIndex(a => a === -1);
+        if (firstUnanswered !== -1) {
+          setCurrentQuestion(firstUnanswered);
+        }
       } else {
         // New attempt
         setTimeLeft(assessment.duration * 60);

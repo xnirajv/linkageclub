@@ -29,7 +29,7 @@ interface Assessment {
   passRate: number;
   averageScore: number;
   badges?: Array<{ name: string }>;
-  attempt?: {  // ← CHANGE: userAttempt se attempt
+  attempt?: {
     score: number;
     passed: boolean;
     completedAt?: string | null;
