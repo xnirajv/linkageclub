@@ -5,7 +5,6 @@ import Assessment from '@/lib/db/models/assessment';
 import connectDB from '@/lib/db/connect';
 import { z } from 'zod';
 
-// Same schema as existing POST /api/assessments
 const assessmentSchema = z.object({
   title: z.string().min(1),
   description: z.string().min(1),
@@ -84,7 +83,7 @@ export async function GET(req: NextRequest) {
     const searchParams = req.nextUrl.searchParams;
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '20');
-    const status = searchParams.get('status'); // active, draft, all
+    const status = searchParams.get('status');
 
     const query: any = {};
     if (status === 'active') query.isActive = true;
