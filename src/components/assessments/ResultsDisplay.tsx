@@ -1,166 +1,129 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import {
-  CheckCircle,
-  XCircle,
-  Award,
-  TrendingUp,
-  Clock,
-  Share2,
-  Download,
-  RotateCcw,
-  BarChart3,
-} from 'lucide-react';
+import { CheckCircle, XCircle, Award, TrendingUp, Clock, Share2, Download, RotateCcw, BarChart3 } from 'lucide-react';
 import { QuestionDisplay } from './QuestionDisplay';
 
-interface Question {
-  _id?: string;
+interface QuestionResult {
   question: string;
   options: string[];
+  userAnswer: number;
   correctAnswer: number;
+  isCorrect: boolean;
   explanation?: string;
   points: number;
-  userAnswer?: number | number[];
-  isCorrect?: boolean;
+}
+
+interface ResultsData {
+  score: number;
+  passed: boolean;
+  totalPoints: number;
+  earnedPoints: number;
+  passingScore: number;
+  timeSpent: number;
+  totalTime: number;
+  trustScoreIncreased: number;
+  badgeEarned: string | null;
+  questions: QuestionResult[];
 }
 
 interface ResultsDisplayProps {
-  results: {
-    score: number;
-    passed: boolean;
-    totalPoints: number;
-    earnedPoints: number;
-    passingScore: number;
-    timeSpent: number;
-    totalTime: number;
-    questions: Question[];
-  };
-  badge?: {
-    name: string;
-    description: string;
-    image: string;
-  };
+  results: ResultsData;
+  badge?: { name: string; description: string };
   onRetry?: () => void;
   onShare?: () => void;
   onDownload?: () => void;
-  onReviewQuestion?: (index: number) => void;
 }
 
-export function ResultsDisplay({
-  results,
-  badge,
-  onRetry,
-  onShare,
-  onDownload,
-  onReviewQuestion,
-}: ResultsDisplayProps) {
-  const [selectedQuestion, setSelectedQuestion] = React.useState<number | null>(null);
+export function ResultsDisplay({ results, badge, onRetry, onShare, onDownload }: ResultsDisplayProps) {
+  const [selectedQuestion, setSelectedQuestion] = useState<number | null>(null);
 
   const formatTime = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
+    const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${hours.toString().padStart(2, '0')}:${minutes
-      .toString()
-      .padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${mins}m ${secs}s`;
   };
 
-  const correctAnswers = results.questions.filter(q => q.isCorrect).length;
-  const incorrectAnswers = results.questions.filter(q => q.isCorrect === false).length;
-  const unattempted = results.questions.filter(q => q.userAnswer === undefined).length;
-
-  const getScoreColor = (score: number) => {
-    if (score >= 80) return 'text-green-600';
-    if (score >= 60) return 'text-yellow-600';
-    return 'text-red-600';
-  };
-
-  const getScoreMessage = () => {
-    if (results.passed) {
-      if (results.score >= 90) return 'Excellent! You\'re a master!';
-      if (results.score >= 80) return 'Great job! You\'ve done well!';
-      return 'Good job! You passed!';
-    }
-    return 'Keep practicing! You\'ll get it next time.';
-  };
+  const correctCount = results.questions.filter(q => q.isCorrect).length;
+  const accuracy = Math.round((correctCount / results.questions.length) * 100);
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="text-center">
-        <h1 className="text-2xl font-bold mb-2">Assessment Results</h1>
-        <p className="text-charcoal-600">{getScoreMessage()}</p>
+        {results.passed ? (
+          <>
+            <div className="mb-4 flex justify-center">
+              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center">
+                <CheckCircle className="h-10 w-10 text-green-600" />
+              </div>
+            </div>
+            <h1 className="text-2xl font-bold">🎉 Congratulations! You Passed!</h1>
+            <p className="text-gray-600">You've successfully completed the assessment</p>
+          </>
+        ) : (
+          <>
+            <div className="mb-4 flex justify-center">
+              <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center">
+                <XCircle className="h-10 w-10 text-red-600" />
+              </div>
+            </div>
+            <h1 className="text-2xl font-bold">Assessment Completed</h1>
+            <p className="text-gray-600">Keep practicing and try again</p>
+          </>
+        )}
       </div>
 
       {/* Score Card */}
       <Card className="p-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Score Circle */}
-          <div className="flex flex-col items-center justify-center">
-            <div className="relative w-40 h-40">
-              <svg className="w-40 h-40 transform -rotate-90">
+          <div className="text-center">
+            <p className="text-sm text-gray-500 mb-2">Your Score</p>
+            <div className="relative inline-flex">
+              <svg className="w-32 h-32" viewBox="0 0 128 128">
+                <circle className="text-gray-200" strokeWidth="8" stroke="currentColor" fill="transparent" r="56" cx="64" cy="64" />
                 <circle
-                  cx="80"
-                  cy="80"
-                  r="72"
-                  stroke="currentColor"
-                  strokeWidth="8"
-                  fill="none"
-                  className="text-charcoal-200"
-                />
-                <circle
-                  cx="80"
-                  cy="80"
-                  r="72"
-                  stroke="currentColor"
-                  strokeWidth="8"
-                  fill="none"
-                  strokeDasharray={2 * Math.PI * 72}
-                  strokeDashoffset={2 * Math.PI * 72 * (1 - results.score / 100)}
                   className={results.passed ? 'text-green-500' : 'text-red-500'}
+                  strokeWidth="8"
+                  strokeDasharray={2 * Math.PI * 56}
+                  strokeDashoffset={2 * Math.PI * 56 * (1 - results.score / 100)}
+                  strokeLinecap="round"
+                  stroke="currentColor"
+                  fill="transparent"
+                  r="56"
+                  cx="64"
+                  cy="64"
                 />
               </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className={`text-3xl font-bold ${getScoreColor(results.score)}`}>
-                  {results.score}%
-                </span>
-                <span className="text-xs text-charcoal-500">Final Score</span>
-              </div>
+              <span className="absolute inset-0 flex items-center justify-center text-2xl font-bold">{results.score}%</span>
             </div>
-            <Badge variant={results.passed ? 'success' : 'error'} className="mt-2">
-              {results.passed ? 'PASSED' : 'NOT PASSED'}
-            </Badge>
           </div>
-
-          {/* Stats Grid */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="text-center p-3 bg-charcoal-100/50 rounded-lg">
-              <CheckCircle className="h-5 w-5 text-green-600 mx-auto mb-1" />
-              <p className="text-xs text-charcoal-500">Correct</p>
-              <p className="text-xl font-bold text-green-600">{correctAnswers}</p>
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm text-gray-500">Passing Score</p>
+              <p className="text-lg font-semibold">{results.passingScore}%</p>
             </div>
-            <div className="text-center p-3 bg-charcoal-100/50 rounded-lg">
-              <XCircle className="h-5 w-5 text-red-600 mx-auto mb-1" />
-              <p className="text-xs text-charcoal-500">Incorrect</p>
-              <p className="text-xl font-bold text-red-600">{incorrectAnswers}</p>
+            <div>
+              <p className="text-sm text-gray-500">Time Taken</p>
+              <p className="text-lg font-semibold">{formatTime(results.timeSpent)}</p>
             </div>
-            <div className="text-center p-3 bg-charcoal-100/50 rounded-lg">
-              <Clock className="h-5 w-5 text-blue-600 mx-auto mb-1" />
-              <p className="text-xs text-charcoal-500">Time Taken</p>
-              <p className="text-xl font-bold text-blue-600">{formatTime(results.timeSpent)}</p>
+            <div>
+              <p className="text-sm text-gray-500">Points Earned</p>
+              <p className="text-lg font-semibold">{results.earnedPoints}/{results.totalPoints}</p>
             </div>
-            <div className="text-center p-3 bg-charcoal-100/50 rounded-lg">
-              <TrendingUp className="h-5 w-5 text-purple-600 mx-auto mb-1" />
-              <p className="text-xs text-charcoal-500">Accuracy</p>
-              <p className="text-xl font-bold text-purple-600">
-                {Math.round((correctAnswers / results.questions.length) * 100)}%
-              </p>
-            </div>
+          </div>
+        </div>
+        <div className="mt-4">
+          <div className="flex justify-between text-sm mb-1">
+            <span>Score</span>
+            <span>{results.score}%</span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-2">
+            <div className={`h-2 rounded-full ${results.passed ? 'bg-green-500' : 'bg-red-500'}`} style={{ width: `${results.score}%` }} />
           </div>
         </div>
       </Card>
@@ -173,81 +136,43 @@ export function ResultsDisplay({
               <Award className="h-8 w-8 text-yellow-600" />
             </div>
             <div className="flex-1">
-              <h3 className="font-semibold text-lg mb-1">Badge Earned!</h3>
-              <p className="text-xl font-bold text-yellow-700 mb-1">{badge.name}</p>
-              <p className="text-sm text-charcoal-600">{badge.description}</p>
+              <h3 className="font-semibold text-lg">🏆 Badge Earned!</h3>
+              <p className="text-xl font-bold text-yellow-700">{badge.name}</p>
+              <p className="text-sm text-gray-600">{badge.description}</p>
             </div>
-            <Button variant="outline" onClick={onShare}>
-              <Share2 className="h-4 w-4 mr-2" />
-              Share
-            </Button>
+            <Button variant="outline" onClick={onShare}><Share2 className="h-4 w-4 mr-2" />Share</Button>
           </div>
         </Card>
       )}
 
-      {/* Performance Analytics */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Performance Analytics</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Score Distribution */}
-          <div>
-            <h4 className="text-sm font-medium text-charcoal-500 mb-3">Score Distribution</h4>
-            <div className="space-y-3">
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span>Correct Answers</span>
-                  <span className="font-medium">{correctAnswers}</span>
-                </div>
-                <Progress value={(correctAnswers / results.questions.length) * 100} />
-              </div>
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span>Incorrect Answers</span>
-                  <span className="font-medium">{incorrectAnswers}</span>
-                </div>
-                <Progress 
-                  value={(incorrectAnswers / results.questions.length) * 100} 
-                  indicatorClassName="bg-red-500"
-                />
-              </div>
-              {unattempted > 0 && (
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span>Not Attempted</span>
-                    <span className="font-medium">{unattempted}</span>
-                  </div>
-                  <Progress 
-                    value={(unattempted / results.questions.length) * 100}
-                    indicatorClassName="bg-charcoal-500"
-                  />
-                </div>
-              )}
+      {/* Trust Score Increase */}
+      {results.trustScoreIncreased > 0 && (
+        <Card className="p-4 bg-green-50 border-green-200">
+          <div className="flex items-center gap-3">
+            <TrendingUp className="h-6 w-6 text-green-600" />
+            <div>
+              <p className="font-medium text-green-800">Trust Score Increased!</p>
+              <p className="text-sm text-green-700">You earned +{results.trustScoreIncreased} points to your Trust Score</p>
             </div>
           </div>
+        </Card>
+      )}
 
-          {/* Time Analysis */}
+      {/* Performance Stats */}
+      <Card className="p-6">
+        <h2 className="text-lg font-semibold mb-4">Performance Stats</h2>
+        <div className="grid grid-cols-3 gap-4 text-center">
           <div>
-            <h4 className="text-sm font-medium text-charcoal-500 mb-3">Time Analysis</h4>
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span>Time Taken</span>
-                <span className="font-medium">{formatTime(results.timeSpent)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span>Total Time</span>
-                <span className="font-medium">{formatTime(results.totalTime)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span>Time Remaining</span>
-                <span className="font-medium">{formatTime(results.totalTime - results.timeSpent)}</span>
-              </div>
-              <div className="w-full bg-charcoal-100 h-2 rounded-full mt-2">
-                <div
-                  className="bg-primary-600 h-2 rounded-full"
-                  style={{ width: `${(results.timeSpent / results.totalTime) * 100}%` }}
-                />
-              </div>
-            </div>
+            <p className="text-2xl font-bold text-green-600">{correctCount}</p>
+            <p className="text-xs text-gray-500">Correct</p>
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-red-600">{results.questions.length - correctCount}</p>
+            <p className="text-xs text-gray-500">Incorrect</p>
+          </div>
+          <div>
+            <p className="text-2xl font-bold text-blue-600">{accuracy}%</p>
+            <p className="text-xs text-gray-500">Accuracy</p>
           </div>
         </div>
       </Card>
@@ -255,61 +180,40 @@ export function ResultsDisplay({
       {/* Question Review */}
       <Card className="p-6">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold">Question Review</h3>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => setSelectedQuestion(null)}>
-              <BarChart3 className="h-4 w-4 mr-2" />
-              Summary
-            </Button>
-          </div>
+          <h2 className="text-lg font-semibold">Question Review</h2>
+          {selectedQuestion !== null && (
+            <Button variant="ghost" size="sm" onClick={() => setSelectedQuestion(null)}>Back to Summary</Button>
+          )}
         </div>
-
         {selectedQuestion !== null ? (
-          <div className="space-y-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setSelectedQuestion(null)}
-              className="mb-2"
-            >
-              ← Back to Summary
-            </Button>
-            <QuestionDisplay
-              question={results.questions[selectedQuestion]}
-              index={selectedQuestion}
-              totalQuestions={results.questions.length}
-              selectedAnswer={results.questions[selectedQuestion].userAnswer}
-              showExplanation={true}
-              readOnly={true}
-              isCorrect={results.questions[selectedQuestion].isCorrect} onAnswer={function (_answer: number | number[]): void {
-                throw new Error('Function not implemented.');
-              } }            />
-          </div>
+          <QuestionDisplay
+            question={results.questions[selectedQuestion]}
+            index={selectedQuestion}
+            totalQuestions={results.questions.length}
+            selectedAnswer={results.questions[selectedQuestion].userAnswer}
+            showExplanation={true}
+            readOnly={true}
+            isCorrect={results.questions[selectedQuestion].isCorrect}
+            onAnswer={() => {}}
+          />
         ) : (
           <div className="space-y-3">
-            {results.questions.map((q, index) => (
+            {results.questions.map((q, idx) => (
               <button
-                key={index}
-                onClick={() => onReviewQuestion?.(index) || setSelectedQuestion(index)}
-                className="w-full text-left p-3 border rounded-lg hover:bg-charcoal-100/50 transition-colors"
+                key={idx}
+                onClick={() => setSelectedQuestion(idx)}
+                className="w-full text-left p-3 border rounded-lg hover:bg-gray-50 transition-colors"
               >
                 <div className="flex items-center gap-3">
                   {q.isCorrect ? (
                     <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
-                  ) : q.userAnswer === undefined ? (
-                    <div className="h-5 w-5 rounded-full border-2 border-charcoal-300 shrink-0" />
                   ) : (
                     <XCircle className="h-5 w-5 text-red-500 shrink-0" />
                   )}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{q.question}</p>
                     <div className="flex items-center gap-2 mt-1">
-                      <span className="text-xs text-charcoal-500">
-                        Points: {q.isCorrect ? q.points : 0}/{q.points}
-                      </span>
-                      {q.explanation && (
-                        <span className="text-xs text-primary-600">View Explanation →</span>
-                      )}
+                      <span className="text-xs text-gray-500">Points: {q.isCorrect ? q.points : 0}/{q.points}</span>
                     </div>
                   </div>
                 </div>
@@ -321,24 +225,9 @@ export function ResultsDisplay({
 
       {/* Actions */}
       <div className="flex flex-wrap gap-4 justify-center">
-        {onRetry && (
-          <Button onClick={onRetry} variant="default">
-            <RotateCcw className="mr-2 h-4 w-4" />
-            Retake Assessment
-          </Button>
-        )}
-        {onShare && (
-          <Button onClick={onShare} variant="outline">
-            <Share2 className="mr-2 h-4 w-4" />
-            Share Results
-          </Button>
-        )}
-        {onDownload && (
-          <Button onClick={onDownload} variant="outline">
-            <Download className="mr-2 h-4 w-4" />
-            Download Certificate
-          </Button>
-        )}
+        {onRetry && <Button onClick={onRetry}><RotateCcw className="mr-2 h-4 w-4" />Retake Assessment</Button>}
+        {onShare && <Button variant="outline" onClick={onShare}><Share2 className="mr-2 h-4 w-4" />Share Results</Button>}
+        {onDownload && <Button variant="outline" onClick={onDownload}><Download className="mr-2 h-4 w-4" />Download Certificate</Button>}
       </div>
     </div>
   );

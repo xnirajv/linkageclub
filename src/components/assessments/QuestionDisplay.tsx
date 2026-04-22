@@ -4,12 +4,12 @@ import React from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AlertCircle, CheckCircle, XCircle } from 'lucide-react';
-import { Checkbox } from '../forms/Checkbox';
+import { RadioGroup, RadioGroupItem } from '@/components/forms/RadioGroup';
+import { Checkbox } from '@/components/forms/Checkbox';
 import { Label } from '../ui/lable';
-import { RadioGroup, RadioGroupItem } from '../forms/RadioGroup';
 
 interface Question {
-  _id?: string;
+  id?: string;
   question: string;
   options: string[];
   correctAnswer?: number;
@@ -42,34 +42,17 @@ export function QuestionDisplay({
   readOnly = false,
   isCorrect,
 }: QuestionDisplayProps) {
-  const isMultiSelect = question.options.length > 4; // Heuristic for multiple correct answers
-  const selectedArray = Array.isArray(selectedAnswer) ? selectedAnswer : [];
-
   const handleSingleSelect = (value: string) => {
-    if (!readOnly) {
-      onAnswer(parseInt(value));
-    }
+    if (!readOnly) onAnswer(parseInt(value));
   };
 
-  const handleMultiSelect = (optionIndex: number, checked: boolean) => {
-    if (!readOnly) {
-      const newSelection = checked
-        ? [...selectedArray, optionIndex]
-        : selectedArray.filter(i => i !== optionIndex);
-      onAnswer(newSelection);
-    }
-  };
-
-  const getOptionLetter = (index: number) => {
-    return String.fromCharCode(65 + index); // A, B, C, D, ...
-  };
+  const getOptionLetter = (idx: number) => String.fromCharCode(65 + idx);
 
   return (
     <Card className="p-6">
-      {/* Question Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-charcoal-500">
+          <span className="text-sm font-medium text-gray-500">
             Question {index + 1} of {totalQuestions}
           </span>
           <span className="text-sm font-medium text-primary-600">
@@ -77,71 +60,32 @@ export function QuestionDisplay({
           </span>
         </div>
         {onMarkForReview && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onMarkForReview}
-            className={isMarked ? 'text-yellow-600' : ''}
-          >
+          <Button variant="ghost" size="sm" onClick={onMarkForReview} className={isMarked ? 'text-yellow-600' : ''}>
             <AlertCircle className="h-4 w-4 mr-2" />
             {isMarked ? 'Marked for Review' : 'Mark for Review'}
           </Button>
         )}
       </div>
 
-      {/* Question Text */}
-      <div className="mb-6">
-        <h3 className="text-lg font-medium text-charcoal-950">{question.question}</h3>
-      </div>
+      <h3 className="text-lg font-medium mb-6">{question.question}</h3>
 
-      {/* Options */}
-      {isMultiSelect ? (
-        <div className="space-y-3">
-          {question.options.map((option, optIndex) => (
-            <div key={optIndex} className="flex items-start space-x-3">
-              <Checkbox
-                id={`q${index}-opt${optIndex}`}
-                checked={selectedArray.includes(optIndex)}
-                onCheckedChange={(checked) => handleMultiSelect(optIndex, checked as boolean)}
-                disabled={readOnly}
-              />
-              <Label
-                htmlFor={`q${index}-opt${optIndex}`}
-                className="text-sm leading-relaxed cursor-pointer"
-              >
-                <span className="font-medium mr-2">{getOptionLetter(optIndex)}.</span>
-                {option}
-              </Label>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <RadioGroup
-          value={selectedAnswer?.toString()}
-          onValueChange={handleSingleSelect}
-          disabled={readOnly}
-          className="space-y-3"
-        >
-          {question.options.map((option, optIndex) => (
-            <div key={optIndex} className="flex items-start space-x-3">
-              <RadioGroupItem
-                value={optIndex.toString()}
-                id={`q${index}-opt${optIndex}`}
-                disabled={readOnly}
-              />
-              <Label
-                htmlFor={`q${index}-opt${optIndex}`}
-                className="text-sm leading-relaxed cursor-pointer"
-              >
-                <span className="font-medium mr-2">{getOptionLetter(optIndex)}.</span>
-                {option}
-              </Label>
-            </div>
-          ))}
-        </RadioGroup>
-      )}
+      <RadioGroup
+        value={selectedAnswer?.toString()}
+        onValueChange={handleSingleSelect}
+        disabled={readOnly}
+        className="space-y-3"
+      >
+        {question.options.map((option, optIdx) => (
+          <div key={optIdx} className="flex items-start space-x-3">
+            <RadioGroupItem value={optIdx.toString()} id={`q${index}-opt${optIdx}`} disabled={readOnly} />
+            <Label htmlFor={`q${index}-opt${optIdx}`} className="text-sm leading-relaxed cursor-pointer">
+              <span className="font-medium mr-2">{getOptionLetter(optIdx)}.</span>
+              {option}
+            </Label>
+          </div>
+        ))}
+      </RadioGroup>
 
-      {/* Feedback/Explanation */}
       {showExplanation && question.explanation && (
         <div className="mt-6 p-4 bg-blue-50 rounded-lg">
           <h4 className="text-sm font-medium text-blue-800 mb-2">Explanation</h4>
@@ -149,11 +93,8 @@ export function QuestionDisplay({
         </div>
       )}
 
-      {/* Correct/Incorrect Indicator */}
       {readOnly && isCorrect !== undefined && (
-        <div className={`mt-4 p-3 rounded-lg flex items-center gap-2 ${
-          isCorrect ? 'bg-green-50' : 'bg-red-50'
-        }`}>
+        <div className={`mt-4 p-3 rounded-lg flex items-center gap-2 ${isCorrect ? 'bg-green-50' : 'bg-red-50'}`}>
           {isCorrect ? (
             <>
               <CheckCircle className="h-5 w-5 text-green-600" />

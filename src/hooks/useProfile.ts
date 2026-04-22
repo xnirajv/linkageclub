@@ -11,7 +11,7 @@ interface ProfileResponse {
 }
 
 export function useProfile() {
-  const { user, isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAuth();
 
   const { data, error, mutate } = useSWR<ProfileResponse>(
     isAuthenticated ? '/api/users/profile' : null,
@@ -126,6 +126,7 @@ export function useProfile() {
     preferences: data?.user?.preferences,
     skills: data?.user?.skills || [],
     badges: data?.user?.badges || [],
+    trustScore: data?.user?.trustScore || 0,  // ✅ ADD THIS LINE
     verification: data?.user?.verification,
     isLoading: !error && !data,
     isUpdating: false,

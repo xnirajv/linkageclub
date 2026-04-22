@@ -24,59 +24,44 @@ export async function GET(
       return NextResponse.json({ error: 'Assessment not found' }, { status: 404 });
     }
 
-    // Find user's attempt
+    // Find user's completed attempt
     const attempt = assessment.attempts?.find(
-      (a: any) => a.userId?.toString() === session.user.id && a.completedAt
+      (a: any) => a.userId?.toString() === session.user.id && a.completedAt !== null
     );
 
     if (!attempt) {
-      return NextResponse.json(
-        { error: 'No completed attempt found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'No completed attempt found' }, { status: 404 });
     }
 
-    // Prepare detailed results with options
+    // Prepare results
     const results = {
       score: attempt.score,
       passed: attempt.passed,
       timeSpent: attempt.timeSpent,
-      completedAt: attempt.completedAt,
-      questions: assessment.questions.map((q: any, index: number) => ({
-        question: q.question,
-        options: q.options,  // ✅ ADDED: options array
-        userAnswer: attempt.answers[index],
-        correctAnswer: q.correctAnswer,
-        isCorrect: attempt.answers[index] === q.correctAnswer,
-        explanation: q.explanation,
-        points: q.points,
-      })),
+      totalTime: assessment.duration * 60,
       totalPoints: assessment.questions.reduce((acc: number, q: any) => acc + q.points, 0),
       earnedPoints: assessment.questions.reduce(
         (acc: number, q: any, index: number) => 
           acc + (attempt.answers[index] === q.correctAnswer ? q.points : 0),
         0
       ),
+      passingScore: assessment.passingScore,
+      trustScoreIncreased: attempt.passed ? Math.floor(attempt.score / 10) : 0,
+      badgeEarned: attempt.passed && assessment.badges?.length > 0 ? assessment.badges[0]?.name : null,
+      questions: assessment.questions.map((q: any, index: number) => ({
+        question: q.question,
+        options: q.options,
+        userAnswer: attempt.answers[index],
+        correctAnswer: q.correctAnswer,
+        isCorrect: attempt.answers[index] === q.correctAnswer,
+        explanation: q.explanation,
+        points: q.points,
+      })),
     };
 
-    // Get badge if earned
-    let badge: Record<string, unknown> | null = null;
-    if (attempt.passed && assessment.badges) {
-      badge = assessment.badges.find(
-        (b: any) => attempt.score >= b.requiredScore
-      ) ?? null;
-    }
-
-    return NextResponse.json({
-      success: true,
-      results,
-      badge,
-    });
+    return NextResponse.json({ success: true, results });
   } catch (error) {
     console.error('Error fetching results:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

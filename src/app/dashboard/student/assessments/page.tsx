@@ -1,174 +1,216 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import useSWR from 'swr';
-import { fetcher } from '@/lib/api/client';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { AssessmentGrid } from '@/components/assessments/AssessmentGrid';
 import { AssessmentFilters } from '@/components/assessments/AssessmentFilters';
 import { SearchInput } from '@/components/forms/SearchInput';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { useAssessments } from '@/hooks/useAssessments';
-import { useDebounce } from '@/hooks/useDebounce';
 import { BadgeDisplay } from '@/components/dashboard/student/BadgeDisplay';
+import { useAssessments } from '@/hooks/useAssessments';
 import { useProfile } from '@/hooks/useProfile';
-import { Assessment, UserAssessment } from '@/types/assessment';
+import { useDebounce } from '@/hooks/useDebounce';
+import { RecommendedSection } from '@/components/assessments/RecommendedSection';
+import { PopularSection } from '@/components/assessments/PopularSection';
+import useSWR from 'swr';
+import { fetcher } from '@/lib/api/client';
+
+interface UserAssessmentsResponse {
+  assessments: Array<{
+    id: string;
+    title: string;
+    skillName: string;
+    level: string;
+    passingScore: number;
+    attempt: {
+      score: number;
+      passed: boolean;
+      timeSpent: number;
+      startedAt: string;
+      completedAt: string | null;
+      answers: number[];
+    };
+    badgeEarned: boolean;
+  }>;
+}
+
+interface RecommendedResponse {
+  assessments: Array<{
+    id: string;
+    title: string;
+    skillName: string;
+    level: string;
+    price: number;
+    duration: number;
+    passRate: number;
+    matchScore: number;
+    trustBoost: number;
+    badgeName: string | null;
+  }>;
+}
+
+interface PopularResponse {
+  assessments: Array<{
+    id: string;
+    title: string;
+    skillName: string;
+    level: string;
+    price: number;
+    duration: number;
+    takenCount: number;
+    rating: number;
+    ratingCount: number;
+  }>;
+}
 
 export default function StudentAssessmentsPage() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [filters, setFilters] = useState<Record<string, any>>({});
+  const [filters, setFilters] = useState({});
   const debouncedSearch = useDebounce(searchQuery, 300);
 
-  // Get all available assessments (active)
-  const {
-    assessments = [],
-    pagination,
-    isLoading,
-    applyFilters
-  } = useAssessments({
+  const { assessments, pagination, isLoading, applyFilters } = useAssessments({
     search: debouncedSearch,
     ...filters,
   });
 
-  // Get user's profile with badges
-  const { badges = [], isLoading: profileLoading } = useProfile();
+  const { badges } = useProfile();
 
-  // ✅ Get user's attempted assessments (both in-progress and completed)
-  const { data: userAssessmentsData } = useSWR<{ assessments: any[] }>('/api/assessments/user', fetcher);
-  const allUserAssessments = userAssessmentsData?.assessments || [];
+  const { data: userData } = useSWR<UserAssessmentsResponse>('/api/assessments/user', fetcher);
+  const allUserAssessments = userData?.assessments || [];
 
-  // ✅ Set of attempted assessment IDs (to filter out from Available tab)
-  const attemptedIds = useMemo(() => {
-    return new Set(allUserAssessments.map((a: any) => a.id));
-  }, [allUserAssessments]);
+  const attemptedIds = new Set(allUserAssessments.map((a: any) => a.id));
 
-  // ✅ Available assessments = all active assessments - attempted ones
-  const availableAssessments = useMemo(() => {
-    return assessments.filter((a: any) => !attemptedIds.has(a._id));
-  }, [assessments, attemptedIds]);
-
-  // Format user assessments for display
-  const formattedUserAssessments = useMemo(() => {
-    return allUserAssessments.map((assessment: any): UserAssessment => ({
-      id: assessment.id,
-      title: assessment.title,
-      skillName: assessment.skillName,
-      level: assessment.level,
-      passingScore: assessment.passingScore,
-      attempt: {
-        score: assessment.attempt?.score || 0,
-        passed: assessment.attempt?.passed || false,
-        timeSpent: assessment.attempt?.timeSpent || 0,
-        startedAt: assessment.attempt?.startedAt || new Date(),
-        completedAt: assessment.attempt?.completedAt || null,
-      },
-      badgeEarned: assessment.badgeEarned || false,
-    }));
-  }, [allUserAssessments]);
-
-  // Filter in-progress assessments (started but not completed)
+  // ✅ Transform user assessments to match AssessmentGrid type
   const inProgressAssessments = useMemo(() => {
-    return formattedUserAssessments.filter(
-      (ua: UserAssessment) => !ua.attempt.completedAt
-    );
-  }, [formattedUserAssessments]);
+    return allUserAssessments
+      .filter((a: any) => a.attempt?.completedAt === null)
+      .map((a: any) => ({
+        _id: a.id,
+        id: a.id,
+        title: a.title,
+        description: '', // User API doesn't return description
+        skillName: a.skillName,
+        level: a.level,
+        price: 0,
+        duration: 0,
+        passingScore: a.passingScore,
+        totalAttempts: 0,
+        passRate: 0,
+        averageScore: 0,
+        userAttempt: {
+          score: a.attempt?.score || 0,
+          passed: a.attempt?.passed || false,
+          completedAt: a.attempt?.completedAt,
+          answers: a.attempt?.answers || [],
+          timeSpent: a.attempt?.timeSpent || 0,
+        },
+      }));
+  }, [allUserAssessments]);
 
-  // Filter completed assessments
+  // ✅ Transform completed assessments to match AssessmentGrid type
   const completedAssessments = useMemo(() => {
-    return formattedUserAssessments.filter(
-      (ua: UserAssessment) => ua.attempt.completedAt
-    );
-  }, [formattedUserAssessments]);
+    return allUserAssessments
+      .filter((a: any) => a.attempt?.completedAt !== null)
+      .map((a: any) => ({
+        _id: a.id,
+        id: a.id,
+        title: a.title,
+        description: '',
+        skillName: a.skillName,
+        level: a.level,
+        price: 0,
+        duration: 0,
+        passingScore: a.passingScore,
+        totalAttempts: 0,
+        passRate: 0,
+        averageScore: 0,
+        userAttempt: {
+          score: a.attempt?.score || 0,
+          passed: a.attempt?.passed || false,
+          completedAt: a.attempt?.completedAt,
+          answers: a.attempt?.answers || [],
+          timeSpent: a.attempt?.timeSpent || 0,
+        },
+      }));
+  }, [allUserAssessments]);
 
-  const handleSearch = (value: string) => {
-    setSearchQuery(value);
-  };
+  const availableAssessments = assessments.filter(
+    (a: any) => !attemptedIds.has(a._id)
+  );
 
-  const handleFilterChange = (newFilters: Record<string, any>) => {
-    setFilters(newFilters);
-    applyFilters(newFilters);
-  };
+  const { data: recommendedData } = useSWR<RecommendedResponse>('/api/assessments/recommended', fetcher);
+  const { data: popularData } = useSWR<PopularResponse>('/api/assessments/featured', fetcher);
 
-  const handleLoadMore = () => {
-    if (pagination?.page < pagination?.pages) {
-      applyFilters({ page: (pagination.page || 1) + 1 });
-    }
-  };
-
-  const isLoadingAny = isLoading || profileLoading;
+  const recommendedAssessments = recommendedData?.assessments ?? [];
+  const popularAssessments = popularData?.assessments ?? [];
 
   return (
     <div className="space-y-6 p-6">
       <div>
-        <h1 className="text-2xl font-bold text-charcoal-950 dark:text-white">
-          Skill Assessments
-        </h1>
-        <p className="text-charcoal-600 dark:text-charcoal-400">
-          Get verified and earn badges to boost your profile
-        </p>
+        <h1 className="text-2xl font-bold">Skill Assessments</h1>
+        <p className="text-gray-500">Get verified and earn badges to boost your profile</p>
       </div>
 
       <Tabs defaultValue="available">
         <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="available">Available</TabsTrigger>
-          <TabsTrigger value="in-progress">In Progress</TabsTrigger>
-          <TabsTrigger value="completed">Completed</TabsTrigger>
-          <TabsTrigger value="badges">My Badges</TabsTrigger>
+          <TabsTrigger value="available">Available ({assessments.length})</TabsTrigger>
+          <TabsTrigger value="in-progress">In Progress ({inProgressAssessments.length})</TabsTrigger>
+          <TabsTrigger value="completed">Completed ({completedAssessments.length})</TabsTrigger>
+          <TabsTrigger value="badges">My Badges ({badges?.length || 0})</TabsTrigger>
         </TabsList>
 
-        {/* Available Assessments Tab - Only shows assessments user hasn't attempted */}
         <TabsContent value="available" className="space-y-6 mt-6">
-          <div className="space-y-4">
-            <SearchInput
-              placeholder="Search assessments by skill or title..."
-              value={searchQuery}
-              onChange={(e) => handleSearch(e.target.value)}
-              onClear={() => handleSearch('')}
-            />
+          {recommendedAssessments.length > 0 && (
+            <div className="mb-8">
+              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                🎯 Recommended For You
+                <span className="text-sm font-normal text-gray-500">(Based on your profile)</span>
+              </h2>
+              <RecommendedSection assessments={recommendedAssessments} />
+            </div>
+          )}
 
-            <AssessmentFilters onFilterChange={handleFilterChange} />
+          {popularAssessments.length > 0 && (
+            <div className="mb-8">
+              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                🔥 Popular Assessments
+              </h2>
+              <PopularSection assessments={popularAssessments} />
+            </div>
+          )}
 
-            <AssessmentGrid
-              assessments={availableAssessments}
-              isLoading={isLoadingAny}
-              emptyMessage="No assessments found"
-            />
-
-            {pagination && pagination.page < pagination.pages && (
-              <div className="flex justify-center mt-8">
-                <Button
-                  variant="outline"
-                  onClick={handleLoadMore}
-                  disabled={isLoadingAny}
-                >
-                  Load More Assessments
-                </Button>
-              </div>
-            )}
+          <div>
+            <h2 className="text-lg font-semibold mb-4">📚 All Assessments</h2>
+            <div className="space-y-4">
+              <SearchInput
+                placeholder="Search assessments by skill or title..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onClear={() => setSearchQuery('')}
+              />
+              <AssessmentFilters onFilterChange={setFilters} />
+              <AssessmentGrid assessments={availableAssessments} isLoading={isLoading} />
+              {pagination && pagination.page < pagination.pages && (
+                <div className="flex justify-center mt-8">
+                  <Button variant="outline" onClick={() => applyFilters({ page: pagination.page + 1 })}>
+                    Load More
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
         </TabsContent>
 
-        {/* In Progress Assessments Tab - Shows incomplete assessments */}
         <TabsContent value="in-progress" className="mt-6">
-          <AssessmentGrid
-            assessments={inProgressAssessments as any}
-            isLoading={isLoadingAny}
-            emptyMessage="No assessments in progress"
-          />
+          <AssessmentGrid assessments={inProgressAssessments} emptyMessage="No assessments in progress" />
         </TabsContent>
 
-        {/* Completed Assessments Tab - Shows completed assessments */}
         <TabsContent value="completed" className="mt-6">
-          <AssessmentGrid
-            assessments={completedAssessments as any}
-            isLoading={isLoadingAny}
-            emptyMessage="No completed assessments"
-          />
+          <AssessmentGrid assessments={completedAssessments} emptyMessage="No completed assessments" />
         </TabsContent>
 
-        {/* Badges Tab - Shows earned badges */}
         <TabsContent value="badges" className="mt-6">
-          <BadgeDisplay badges={badges} />
+          <BadgeDisplay badges={badges || []} />
         </TabsContent>
       </Tabs>
     </div>

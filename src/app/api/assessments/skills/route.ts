@@ -6,23 +6,11 @@ export async function GET() {
   try {
     await connectDB();
 
-    const skills = await Assessment.aggregate([
-      { $match: { isActive: true } },
-      { $group: {
-        _id: '$skillName',
-        count: { $sum: 1 },
-        levels: { $addToSet: '$level' },
-        averagePrice: { $avg: '$price' },
-      }},
-      { $sort: { count: -1 } },
-    ]);
-
-    return NextResponse.json({ skills });
+    const skills = await Assessment.distinct('skillName', { isActive: true });
+    
+    return NextResponse.json({ skills: skills.sort() });
   } catch (error) {
     console.error('Error fetching skills:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

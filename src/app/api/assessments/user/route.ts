@@ -9,16 +9,13 @@ export async function GET(req: NextRequest) {
     const session = await getServerSession(authOptions);
     
     if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     await connectDB();
 
     const searchParams = req.nextUrl.searchParams;
-    const status = searchParams.get('status'); // completed, in-progress, all
+    const status = searchParams.get('status');
 
     let query: any = { 'attempts.userId': session.user.id };
 
@@ -29,11 +26,13 @@ export async function GET(req: NextRequest) {
     }
 
     const assessments = await Assessment.find(query)
-      .select('title skillName level passingScore badges attempts');
+      .select('title skillName level passingScore badges attempts')
+      .lean();
 
-    // Format response
     const userAssessments = assessments.map(assessment => {
-      const attempt = assessment.attempts[0];
+      const attempt = assessment.attempts?.find(
+        (a: any) => a.userId?.toString() === session.user.id
+      );
       return {
         id: assessment._id,
         title: assessment.title,
@@ -46,10 +45,10 @@ export async function GET(req: NextRequest) {
           timeSpent: attempt?.timeSpent || 0,
           startedAt: attempt?.startedAt,
           completedAt: attempt?.completedAt || null,
-          answers: attempt?.answers || [],  // ✅ ADDED
+          answers: attempt?.answers || [],
         },
         badgeEarned: attempt?.passed && assessment.badges?.some(
-          (b: any) => attempt.score >= b.requiredScore
+          (b: any) => (attempt?.score || 0) >= b.requiredScore
         ),
       };
     });
@@ -57,9 +56,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ assessments: userAssessments });
   } catch (error) {
     console.error('Error fetching user assessments:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

@@ -8,58 +8,48 @@ import { z } from 'zod';
 
 const submitSchema = z.object({
   answers: z.array(z.number()),
-  timeSpent: z.number(), // in seconds
+  timeSpent: z.number(),
 });
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
     
     if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const body = await req.json();
     const validation = submitSchema.safeParse(body);
 
     if (!validation.success) {
-      return NextResponse.json(
-        { error: 'Validation failed', details: validation.error.errors },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Validation failed' }, { status: 400 });
     }
 
     await connectDB();
+    const { id } = await params;
 
-    const assessment = await Assessment.findById(params.id);
+    const assessment = await Assessment.findById(id);
 
     if (!assessment) {
-      return NextResponse.json(
-        { error: 'Assessment not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Assessment not found' }, { status: 404 });
     }
 
-    // Find user's attempt
+    // Find active attempt
     const attemptIndex = assessment.attempts?.findIndex(
-      (a: any) => a.userId?.toString() === session.user.id && !a.completedAt
+      (a: any) => a.userId?.toString() === session.user.id && a.completedAt === null
     );
 
     if (attemptIndex === -1 || attemptIndex === undefined) {
-      return NextResponse.json(
-        { error: 'No active attempt found' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'No active attempt found' }, { status: 400 });
     }
 
-    // Calculate score
     const { answers, timeSpent } = validation.data;
+    
+    // Calculate score
     let totalPoints = 0;
     let earnedPoints = 0;
 
@@ -71,7 +61,7 @@ export async function POST(
     });
 
     const score = totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 0;
-    const passed = score >= (assessment.passingScore || 0);
+    const passed = score >= (assessment.passingScore || 70);
 
     // Update attempt
     assessment.attempts[attemptIndex].answers = answers;
@@ -82,66 +72,50 @@ export async function POST(
 
     await assessment.save();
 
-    // Update user's skills if passed
+    let trustScoreIncreased = 0;
+    let earnedBadge: string | null = null;  // ✅ FIX: Explicit type with string | null
+
+    // Update user if passed
     if (passed) {
       const user = await User.findById(session.user.id);
-
-      // Check if user exists
-      if (!user) {
-        return NextResponse.json(
-          { error: 'User not found' },
-          { status: 404 }
-        );
-      }
-
-      // Initialize arrays if they don't exist
-      if (!user.skills) {
-        user.skills = [];
-      }
-      if (!user.badges) {
-        user.badges = [];
-      }
-
-      // Check if skill already exists
-      const existingSkillIndex = user.skills.findIndex(
-        (s: any) => s.name === assessment.skillName
-      );
-
-      if (existingSkillIndex >= 0) {
-        // Update existing skill
-        user.skills[existingSkillIndex] = {
-          ...user.skills[existingSkillIndex],
-          verified: true,
-          level: assessment.level,
-          verifiedAt: new Date(),
-        };
-      } else {
-        // Add new skill
-        user.skills.push({
-          name: assessment.skillName,
-          level: assessment.level,
-          verified: true,
-          verifiedAt: new Date(),
-        });
-      }
-
-      // Add badge if applicable
-      if (assessment.badges && assessment.badges.length > 0) {
-        const badge = assessment.badges.find(
-          (b: any) => score >= (b.requiredScore || 0)
-        );
-
-        if (badge) {
-          user.badges.push({
-            name: badge.name,
-            description: badge.description,
-            image: badge.image,
-            earnedAt: new Date(),
+      
+      if (user) {
+        // Update skill
+        const existingSkill = user.skills?.find((s: any) => s.name === assessment.skillName);
+        if (existingSkill) {
+          existingSkill.verified = true;
+          existingSkill.verifiedAt = new Date();
+        } else {
+          if (!user.skills) user.skills = [];
+          user.skills.push({
+            name: assessment.skillName,
+            level: assessment.level,
+            verified: true,
+            verifiedAt: new Date(),
           });
         }
-      }
 
-      await user.save();
+        // Add badge
+        if (assessment.badges && assessment.badges.length > 0) {
+          const badge = assessment.badges.find((b: any) => score >= b.requiredScore);
+          if (badge) {
+            if (!user.badges) user.badges = [];
+            user.badges.push({
+              name: badge.name,
+              description: badge.description,
+              image: badge.image,
+              earnedAt: new Date(),
+            });
+            earnedBadge = badge.name;  // ✅ Now works - string can be assigned
+          }
+        }
+
+        // Update trust score
+        trustScoreIncreased = Math.floor(score / 10);
+        user.trustScore = Math.min(100, (user.trustScore || 0) + trustScoreIncreased);
+        
+        await user.save();
+      }
     }
 
     // Prepare results
@@ -150,11 +124,14 @@ export async function POST(
       passed,
       totalPoints,
       earnedPoints,
-      passingScore: assessment.passingScore,
+      passingScore: assessment.passingScore || 70,
       timeSpent,
-      totalTime: (assessment.duration || 0) * 60,
+      totalTime: assessment.duration * 60,
+      trustScoreIncreased,
+      badgeEarned: earnedBadge,
       questions: assessment.questions.map((q: any, index: number) => ({
         question: q.question,
+        options: q.options,
         userAnswer: answers[index],
         correctAnswer: q.correctAnswer,
         isCorrect: answers[index] === q.correctAnswer,
@@ -163,22 +140,14 @@ export async function POST(
       })),
     };
 
-    // Award badge if passed
-    let badge: Record<string, unknown> | null = null;
-    if (passed && assessment.badges) {
-      badge = assessment.badges.find((b: any) => score >= (b.requiredScore || 0)) ?? null;
-    }
-
     return NextResponse.json({
+      success: true,
       message: passed ? 'Congratulations! You passed!' : 'Assessment completed',
       results,
-      badge,
     });
+
   } catch (error) {
-    console.error('Error submitting assessment:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    console.error('Submit error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
