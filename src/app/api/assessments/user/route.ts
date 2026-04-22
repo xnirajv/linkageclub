@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
     }
 
     const assessments = await Assessment.find(query)
-      .select('title skillName level passingScore badges attempts.$');
+      .select('title skillName level passingScore badges attempts');
 
     // Format response
     const userAssessments = assessments.map(assessment => {
@@ -41,13 +41,14 @@ export async function GET(req: NextRequest) {
         level: assessment.level,
         passingScore: assessment.passingScore,
         attempt: {
-          score: attempt.score,
-          passed: attempt.passed,
-          timeSpent: attempt.timeSpent,
-          startedAt: attempt.startedAt,
-          completedAt: attempt.completedAt,
+          score: attempt?.score || 0,
+          passed: attempt?.passed || false,
+          timeSpent: attempt?.timeSpent || 0,
+          startedAt: attempt?.startedAt,
+          completedAt: attempt?.completedAt || null,
+          answers: attempt?.answers || [],  // ✅ ADDED
         },
-        badgeEarned: attempt.passed && assessment.badges?.some(
+        badgeEarned: attempt?.passed && assessment.badges?.some(
           (b: any) => attempt.score >= b.requiredScore
         ),
       };
