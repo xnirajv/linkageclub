@@ -18,64 +18,91 @@ export default function StudentAssessmentsPage() {
   const [activeTab, setActiveTab] = useState('available');
   const debouncedSearch = useDebounce(searchQuery, 300);
 
+  // Available tab - exclude completed
   const {
     assessments = [],
     pagination,
-    isLoading,
+    isLoading: isLoadingAvailable,
     applyFilters,
     loadMore,
-    mutate, // ✅ Get mutate
+    mutate: mutateAvailable,
   } = useAssessments({
     search: debouncedSearch,
-    excludeCompleted: activeTab === 'available',
+    excludeCompleted: true, // Always exclude for Available
+  });
+
+  // ✅ Completed tab - include all (separate instance to avoid cache conflict)
+  const {
+    assessments: allAssessments = [],
+    isLoading: isLoadingAll,
+    mutate: mutateAll,
+  } = useAssessments({
+    excludeCompleted: false, // Show all
+    limit: 50, // Get more for filtering
   });
 
   const { badges = [], isLoading: profileLoading } = useProfile();
 
-  // ✅ Force refresh on mount
-  useEffect(() => {
-    mutate();
-  }, []); // Empty = on mount only
+  // ✅ Filter completed - only those with completedAt
+  const completedAssessments = useMemo(() => {
+    return allAssessments.filter((a: any) => {
+      // Check if user has any completed attempt
+      const hasCompletedAttempt = a.attempts?.some(
+        (att: any) => att.completedAt
+      );
+      return hasCompletedAttempt || a.userAttempt?.completedAt;
+    });
+  }, [allAssessments]);
 
-  // ✅ Force refresh when tab changes
+  // Filter in-progress - started but not completed
+  const inProgressAssessments = useMemo(() => {
+    return allAssessments.filter((a: any) => {
+      const hasIncompleteAttempt = a.attempts?.some(
+        (att: any) => !att.completedAt
+      );
+      // Exclude if already in completed
+      const isCompleted = completedAssessments.some((c: any) => c._id === a._id);
+      return hasIncompleteAttempt && !isCompleted;
+    });
+  }, [allAssessments, completedAssessments]);
+
+  // ✅ Refresh all data when tab changes or page becomes visible
+  const refreshAll = useCallback(() => {
+    mutateAvailable();
+    mutateAll();
+  }, [mutateAvailable, mutateAll]);
+
+  // Refresh on tab change
   const handleTabChange = useCallback((value: string) => {
     setActiveTab(value);
-    // Force refresh after tab switch
-    setTimeout(() => mutate(), 50);
-  }, [mutate]);
+    setTimeout(refreshAll, 100);
+  }, [refreshAll]);
 
-  // ✅ Force refresh when page becomes visible again
+  // Refresh on mount
+  useEffect(() => {
+    refreshAll();
+  }, []);
+
+  // Refresh when page becomes visible (user returns from taking assessment)
   useEffect(() => {
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
-        mutate();
+        refreshAll();
       }
     };
 
+    const handleFocus = () => {
+      refreshAll();
+    };
+
     document.addEventListener('visibilitychange', handleVisibility);
-    window.addEventListener('focus', () => mutate());
+    window.addEventListener('focus', handleFocus);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibility);
-      window.removeEventListener('focus', () => mutate());
+      window.removeEventListener('focus', handleFocus);
     };
-  }, [mutate]);
-
-  // All assessments for other tabs
-  const { assessments: allAssessments = [], mutate: mutateAll } = useAssessments({
-    excludeCompleted: false,
-  });
-
-  const completedAssessments = useMemo(() => {
-    return allAssessments.filter((a: any) => a.userAttempt?.completedAt);
-  }, [allAssessments]);
-
-  const inProgressAssessments = useMemo(() => {
-    return allAssessments.filter(
-      (a: any) =>
-        a.attempts?.some((att: any) => att.userId && !att.completedAt)
-    );
-  }, [allAssessments]);
+  }, [refreshAll]);
 
   const handleSearch = (value: string) => {
     setSearchQuery(value);
@@ -89,7 +116,7 @@ export default function StudentAssessmentsPage() {
     router.push(`/dashboard/student/assessments/${id}`);
   };
 
-  const isLoadingAny = isLoading || profileLoading;
+  const isLoadingAny = isLoadingAvailable || isLoadingAll || profileLoading;
 
   return (
     <div className="space-y-6 p-6">
@@ -104,12 +131,33 @@ export default function StudentAssessmentsPage() {
 
       <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="available">Available</TabsTrigger>
-          <TabsTrigger value="in-progress">In Progress</TabsTrigger>
-          <TabsTrigger value="completed">Completed</TabsTrigger>
-          <TabsTrigger value="badges">My Badges</TabsTrigger>
+          <TabsTrigger value="available">
+            Available
+            {assessments.length > 0 && (
+              <span className="ml-1 text-xs opacity-60">({assessments.length})</span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="in-progress">
+            In Progress
+            {inProgressAssessments.length > 0 && (
+              <span className="ml-1 text-xs opacity-60">({inProgressAssessments.length})</span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="completed">
+            Completed
+            {completedAssessments.length > 0 && (
+              <span className="ml-1 text-xs opacity-60">({completedAssessments.length})</span>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="badges">
+            My Badges
+            {badges.length > 0 && (
+              <span className="ml-1 text-xs opacity-60">({badges.length})</span>
+            )}
+          </TabsTrigger>
         </TabsList>
 
+        {/* Available */}
         <TabsContent value="available" className="space-y-6 mt-6">
           <div className="space-y-4">
             <SearchInput
@@ -122,7 +170,7 @@ export default function StudentAssessmentsPage() {
             <AssessmentGrid
               assessments={assessments}
               isLoading={isLoadingAny}
-              emptyMessage="No assessments available. You've completed all!"
+              emptyMessage="All assessments completed! 🎉"
               onQuickStart={handleQuickStart}
             />
             {pagination && pagination.page < pagination.pages && (
@@ -135,6 +183,7 @@ export default function StudentAssessmentsPage() {
           </div>
         </TabsContent>
 
+        {/* In Progress */}
         <TabsContent value="in-progress" className="mt-6">
           <AssessmentGrid
             assessments={inProgressAssessments as any}
@@ -144,15 +193,17 @@ export default function StudentAssessmentsPage() {
           />
         </TabsContent>
 
+        {/* Completed */}
         <TabsContent value="completed" className="mt-6">
           <AssessmentGrid
             assessments={completedAssessments as any}
             isLoading={isLoadingAny}
-            emptyMessage="No completed assessments yet. Start one!"
+            emptyMessage="No completed assessments yet. Start your first assessment!"
             onQuickStart={handleQuickStart}
           />
         </TabsContent>
 
+        {/* Badges */}
         <TabsContent value="badges" className="mt-6">
           <BadgeDisplay badges={badges} />
         </TabsContent>

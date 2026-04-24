@@ -49,11 +49,8 @@ export async function GET(req: NextRequest) {
     const level = searchParams.get('level');
     const price = searchParams.get('price');
     const search = searchParams.get('search');
-    
-    // ✅ NEW: Filter to exclude completed assessments
     const excludeCompleted = searchParams.get('excludeCompleted') === 'true';
 
-    // Build query
     const query: Record<string, any> = { isActive: true };
 
     if (skill) query.skillName = skill;
@@ -77,17 +74,15 @@ export async function GET(req: NextRequest) {
     const session = await getServerSession(authOptions);
     const skip = (page - 1) * limit;
 
-    // ✅ If user logged in and excludeCompleted=true, filter out completed
+    // ✅ If logged in and excludeCompleted=true, exclude completed
     if (session?.user?.id && excludeCompleted) {
-      // Get IDs of assessments user has completed
-      const completedAssessmentIds = await Assessment.find({
+      const completedIds = await Assessment.find({
         'attempts.userId': session.user.id,
         'attempts.completedAt': { $ne: null },
       }).distinct('_id');
 
-      // Exclude completed assessments from query
-      if (completedAssessmentIds.length > 0) {
-        query._id = { $nin: completedAssessmentIds };
+      if (completedIds.length > 0) {
+        query._id = { $nin: completedIds };
       }
     }
 
@@ -101,22 +96,32 @@ export async function GET(req: NextRequest) {
       Assessment.countDocuments(query),
     ]);
 
-    // Add user attempt info if logged in
+    // ✅ Add user attempt - GET LATEST completed attempt
     let assessmentsWithAttempts = assessments;
 
     if (session?.user?.id) {
       assessmentsWithAttempts = assessments.map((assessment: any) => {
-        const userAttempt = assessment.attempts?.find(
-          (a: any) => a.userId?.toString() === session.user.id && a.completedAt
-        );
+        // ✅ FIX: Get ALL completed attempts and pick LATEST by completedAt
+        const userAttempts = (assessment.attempts || [])
+          .filter(
+            (a: any) =>
+              a.userId?.toString() === session.user.id && a.completedAt
+          )
+          .sort(
+            (a: any, b: any) =>
+              new Date(b.completedAt).getTime() -
+              new Date(a.completedAt).getTime()
+          );
+
+        const latestAttempt = userAttempts[0] || null;
 
         return {
           ...assessment,
-          userAttempt: userAttempt
+          userAttempt: latestAttempt
             ? {
-                score: userAttempt.score,
-                passed: userAttempt.passed,
-                completedAt: userAttempt.completedAt,
+                score: latestAttempt.score,
+                passed: latestAttempt.passed,
+                completedAt: latestAttempt.completedAt,
               }
             : undefined,
         };
