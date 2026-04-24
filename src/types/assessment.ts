@@ -47,6 +47,12 @@ export interface Assessment {
   createdBy: string;
   createdAt: string;
   updatedAt: string;
+  // ✅ ADDED: userAttempt property for UI display
+  userAttempt?: {
+    score: number;
+    passed: boolean;
+    completedAt?: Date | string;
+  };
 }
 
 export interface AssessmentWithUserAttempt extends Assessment {
