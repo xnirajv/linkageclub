@@ -19,7 +19,7 @@ interface UseAssessmentsOptions {
   level?: string;
   price?: string;
   search?: string;
-  excludeCompleted?: boolean; // ✅ NEW
+  excludeCompleted?: boolean;
 }
 
 export function useAssessments(options: UseAssessmentsOptions = {}) {
@@ -35,11 +35,13 @@ export function useAssessments(options: UseAssessmentsOptions = {}) {
   const queryString = queryParams.toString();
   const url = `/api/assessments${queryString ? `?${queryString}` : ''}`;
 
+  // ✅ FIX: dedupingInterval 0 = no cache dedup, always fresh
   const { data, error, mutate, isLoading } = useSWR(url, fetcher, {
     revalidateOnFocus: true,
-    revalidateOnReconnect:true,
-    dedupingInterval: 2000,
-    refreshInterval:0,
+    revalidateOnReconnect: true,
+    dedupingInterval: 0,        // ✅ No cache! Always fetch fresh
+    revalidateOnMount: true,     // ✅ Re-fetch on mount
+    refreshInterval: 0,
   });
 
   const applyFilters = useCallback(
@@ -91,7 +93,7 @@ export function useAssessments(options: UseAssessmentsOptions = {}) {
     applyFilters,
     loadMore,
     startAssessment,
-    mutate,
+    mutate, // ✅ Expose mutate for manual refresh
   };
 }
 
@@ -99,7 +101,8 @@ export function useAssessment(id: string) {
   const url = id ? `/api/assessments/${id}` : null;
 
   const { data, error, mutate, isLoading } = useSWR(url, fetcher, {
-    revalidateOnFocus: false,
+    revalidateOnFocus: true,
+    dedupingInterval: 0, // ✅ No cache
   });
 
   const submitAssessment = useCallback(
@@ -117,7 +120,7 @@ export function useAssessment(id: string) {
         }
 
         const data = await response.json();
-        mutate();
+        mutate(); // Refresh single assessment
         return { success: true, data };
       } catch (error: any) {
         return { success: false, error: error.message };
@@ -149,6 +152,6 @@ export function useAssessment(id: string) {
     error,
     submitAssessment,
     getResults,
-    mutate,
+    mutate, 
   };
 }
