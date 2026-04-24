@@ -11,38 +11,62 @@ export async function GET() {
         $facet: {
           totalAssessments: [{ $count: 'count' }],
           byLevel: [
-            { $group: {
-              _id: '$level',
-              count: { $sum: 1 },
-            }},
+            {
+              $group: {
+                _id: '$level',
+                count: { $sum: 1 },
+              },
+            },
+            { $sort: { _id: 1 } },
           ],
           bySkill: [
-            { $group: {
-              _id: '$skillName',
-              count: { $sum: 1 },
-              averageScore: { $avg: '$averageScore' },
-              passRate: { $avg: '$passRate' },
-            }},
+            {
+              $group: {
+                _id: '$skillName',
+                count: { $sum: 1 },
+                averageScore: { $avg: '$averageScore' },
+                passRate: { $avg: '$passRate' },
+              },
+            },
             { $sort: { count: -1 } },
             { $limit: 10 },
+            {
+              $project: {
+                _id: 0,
+                skill: '$_id',
+                count: 1,
+                averageScore: { $round: ['$averageScore', 1] },
+                passRate: { $round: ['$passRate', 1] },
+              },
+            },
           ],
           overall: [
-            { $group: {
-              _id: null,
-              totalAttempts: { $sum: '$totalAttempts' },
-              avgPassRate: { $avg: '$passRate' },
-              avgScore: { $avg: '$averageScore' },
-            }},
+            {
+              $group: {
+                _id: null,
+                totalAttempts: { $sum: '$totalAttempts' },
+                avgPassRate: { $avg: '$passRate' },
+                avgScore: { $avg: '$averageScore' },
+              },
+            },
+            {
+              $project: {
+                _id: 0,
+                totalAttempts: 1,
+                avgPassRate: { $round: ['$avgPassRate', 1] },
+                avgScore: { $round: ['$avgScore', 1] },
+              },
+            },
           ],
         },
       },
     ]);
 
     const result = {
-      totalAssessments: stats[0].totalAssessments[0]?.count || 0,
-      byLevel: stats[0].byLevel,
-      bySkill: stats[0].bySkill,
-      overall: stats[0].overall[0] || {
+      totalAssessments: stats[0]?.totalAssessments[0]?.count || 0,
+      byLevel: stats[0]?.byLevel || [],
+      bySkill: stats[0]?.bySkill || [],
+      overall: stats[0]?.overall[0] || {
         totalAttempts: 0,
         avgPassRate: 0,
         avgScore: 0,

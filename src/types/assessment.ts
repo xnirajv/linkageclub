@@ -9,21 +9,21 @@ export interface AssessmentQuestion {
   points: number;
 }
 
+export interface AssessmentBadge {
+  name: string;
+  description: string;
+  image?: string;
+  requiredScore: number;
+}
+
 export interface AssessmentAttempt {
   userId: string;
   score: number;
   passed: boolean;
   answers: number[];
-  timeSpent: number; // in seconds
-  startedAt: Date;
-  completedAt: Date;
-}
-
-export interface AssessmentBadge {
-  name: string;
-  description: string;
-  image: string;
-  requiredScore: number;
+  timeSpent: number;
+  startedAt: Date | string;
+  completedAt: Date | string | null;
 }
 
 export interface Assessment {
@@ -33,7 +33,7 @@ export interface Assessment {
   skillName: string;
   level: AssessmentLevel;
   price: number;
-  duration: number; // in minutes
+  duration: number;
   passingScore: number;
   questions: AssessmentQuestion[];
   attempts: AssessmentAttempt[];
@@ -45,29 +45,16 @@ export interface Assessment {
   averageScore: number;
   isActive: boolean;
   createdBy: string;
-  createdAt: Date;
-  updatedAt: Date;
-  
-  // For UI
-  userAttempt?: AssessmentAttempt;
+  createdAt: string;
+  updatedAt: string;
 }
 
-export interface AssessmentResult {
-  score: number;
-  passed: boolean;
-  totalPoints: number;
-  earnedPoints: number;
-  passingScore: number;
-  timeSpent: number;
-  totalTime: number;
-  questions: Array<{
-    question: string;
-    userAnswer: number;
-    correctAnswer: number;
-    isCorrect: boolean;
-    explanation?: string;
-    points: number;
-  }>;
+export interface AssessmentWithUserAttempt extends Assessment {
+  userAttempt?: {
+    score: number;
+    passed: boolean;
+    completedAt: Date | string;
+  };
 }
 
 export interface UserAssessment {
@@ -80,8 +67,46 @@ export interface UserAssessment {
     score: number;
     passed: boolean;
     timeSpent: number;
-    startedAt: Date;
-    completedAt: Date;
+    startedAt: Date | string;
+    completedAt: Date | string;
   };
   badgeEarned: boolean;
+}
+
+export interface AssessmentResults {
+  score: number;
+  passed: boolean;
+  totalPoints: number;
+  earnedPoints: number;
+  passingScore: number;
+  timeSpent: number;
+  totalTime: number;
+  questions: {
+    question: string;
+    options: string[];
+    userAnswer: number;
+    correctAnswer: number;
+    isCorrect: boolean;
+    explanation: string;
+    points: number;
+  }[];
+}
+
+export interface AssessmentsResponse {
+  assessments: AssessmentWithUserAttempt[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+}
+
+export interface AssessmentFilters {
+  skill?: string;
+  level?: AssessmentLevel;
+  price?: 'free' | 'paid' | 'all';
+  search?: string;
+  page?: number;
+  limit?: number;
 }

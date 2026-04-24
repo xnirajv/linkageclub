@@ -1,25 +1,24 @@
+'use client';
+
 import useSWR from 'swr';
-import { useCallback, useState } from 'react';
-import { fetcher } from '@/lib/api/client';
+import { useState, useCallback } from 'react';
+
+const fetcher = async (url: string) => {
+  const res = await fetch(url);
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.error || 'Failed to fetch');
+  }
+  return res.json();
+};
 
 interface UseAssessmentsOptions {
   page?: number;
   limit?: number;
   skill?: string;
   level?: string;
-  price?: 'free' | 'paid' | 'all';
+  price?: string;
   search?: string;
-}
-
-// ✅ ADD THIS INTERFACE
-interface AssessmentsResponse {
-  assessments: any[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    pages: number;
-  };
 }
 
 export function useAssessments(options: UseAssessmentsOptions = {}) {
@@ -27,99 +26,126 @@ export function useAssessments(options: UseAssessmentsOptions = {}) {
 
   const queryParams = new URLSearchParams();
   Object.entries(filters).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== 'all') {
-      queryParams.append(key, value.toString());
+    if (value !== undefined && value !== null && value !== '') {
+      queryParams.append(key, String(value));
     }
   });
 
-  // ✅ FIX: Add type to useSWR
-  const { data, error, mutate } = useSWR<AssessmentsResponse>(
-    `/api/assessments?${queryParams.toString()}`,
-    fetcher
+  const queryString = queryParams.toString();
+  const url = `/api/assessments${queryString ? `?${queryString}` : ''}`;
+
+  const { data, error, mutate, isLoading } = useSWR(url, fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 5000,
+  });
+
+  const applyFilters = useCallback(
+    (newFilters: Partial<UseAssessmentsOptions>) => {
+      setFilters((prev) => ({ ...prev, ...newFilters, page: 1 }));
+    },
+    []
   );
 
-  const applyFilters = useCallback((newFilters: Partial<UseAssessmentsOptions>) => {
-    setFilters(prev => ({ ...prev, ...newFilters, page: 1 }));
-  }, []);
+  const loadMore = useCallback(() => {
+    if (data?.pagination && data.pagination.page < data.pagination.pages) {
+      setFilters((prev) => ({
+        ...prev,
+        page: (prev.page || 1) + 1,
+      }));
+    }
+  }, [data]);
+
+  const startAssessment = useCallback(
+    async (assessmentId: string, paymentId?: string) => {
+      try {
+        const url = paymentId
+          ? `/api/assessments/${assessmentId}/start?paymentId=${paymentId}`
+          : `/api/assessments/${assessmentId}/start`;
+
+        const response = await fetch(url, { method: 'POST' });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to start assessment');
+        }
+
+        const data = await response.json();
+        return { success: true, data };
+      } catch (error: any) {
+        return { success: false, error: error.message };
+      }
+    },
+    []
+  );
 
   return {
     assessments: data?.assessments || [],
     pagination: data?.pagination,
-    isLoading: !error && !data,
-    isError: error,
+    isLoading,
+    isError: !!error,
+    error,
     filters,
     applyFilters,
+    loadMore,
+    startAssessment,
     mutate,
   };
 }
 
-// ✅ ADD THIS INTERFACE
-interface AssessmentResponse {
-  assessment: any;
-}
-
 export function useAssessment(id: string) {
-  const [attemptStarted, setAttemptStarted] = useState(false);
-  const [assessmentData, setAssessmentData] = useState<any>(null);
+  const url = id ? `/api/assessments/${id}` : null;
 
-  // ✅ FIX: Add type to useSWR
-  const { data, error, mutate } = useSWR<AssessmentResponse>(
-    id ? `/api/assessments/${id}` : null,
-    fetcher
+  const { data, error, mutate, isLoading } = useSWR(url, fetcher, {
+    revalidateOnFocus: false,
+  });
+
+  const submitAssessment = useCallback(
+    async (answers: number[], timeSpent: number) => {
+      try {
+        const response = await fetch(`/api/assessments/${id}/submit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ answers, timeSpent }),
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to submit');
+        }
+
+        const data = await response.json();
+        mutate();
+        return { success: true, data };
+      } catch (error: any) {
+        return { success: false, error: error.message };
+      }
+    },
+    [id, mutate]
   );
-
-  const assessment = data?.assessment;
-
-  const startAssessment = useCallback(async (assessmentId: string) => {
-    try {
-      const response = await fetch(`/api/assessments/${assessmentId}/start`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed to start assessment');
-      
-      setAssessmentData(data);
-      setAttemptStarted(true);
-      return { success: true, data };
-    } catch (error) {
-      return { success: false, error: (error as Error).message };
-    }
-  }, []);
-
-  const submitAssessment = useCallback(async (answers: number[], timeSpent: number) => {
-    try {
-      const response = await fetch(`/api/assessments/${id}/submit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ answers, timeSpent }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed to submit assessment');
-      return { success: true, data };
-    } catch (error) {
-      return { success: false, error: (error as Error).message };
-    }
-  }, [id]);
 
   const getResults = useCallback(async () => {
     try {
       const response = await fetch(`/api/assessments/${id}/results`);
-      const data = await response.json();
-      return data;
-    } catch (error) {
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to fetch results');
+      }
+
+      return await response.json();
+    } catch (error: any) {
+      console.error('Error fetching results:', error);
       return null;
     }
   }, [id]);
 
   return {
-    assessment: assessmentData?.questions ? assessmentData : assessment,
-    isLoading: !error && !data && !assessmentData,
-    isError: error,
-    startAssessment,
+    assessment: data?.assessment,
+    isLoading,
+    isError: !!error,
+    error,
     submitAssessment,
     getResults,
-    attemptStarted,
     mutate,
   };
 }

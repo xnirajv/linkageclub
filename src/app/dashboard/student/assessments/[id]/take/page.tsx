@@ -1,163 +1,302 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Clock, AlertCircle } from 'lucide-react';
-import { RadioGroup, RadioGroupItem } from '@/components/forms/RadioGroup';
+import { QuestionDisplay } from '@/components/assessments/QuestionDisplay';
+import { QuestionPalette } from '@/components/assessments/QuestionPalette';
+import { Timer } from '@/components/assessments/Timer';
 import { useAssessment } from '@/hooks/useAssessments';
-import { Label } from '@/components/ui/lable';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Loader2, AlertTriangle } from 'lucide-react';
 
 export default function TakeAssessmentPage() {
   const params = useParams();
   const router = useRouter();
-  const id = params?.id as string;
-  const { assessment, startAssessment, submitAssessment, isLoading } = useAssessment(id);
-  
+  const assessmentId = params.id as string;
+
+  const { assessment, submitAssessment, isLoading } = useAssessment(assessmentId);
+
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<number[]>([]);
-  const [timeLeft, setTimeLeft] = useState(0);
   const [markedForReview, setMarkedForReview] = useState<number[]>([]);
+  const [timeLeft, setTimeLeft] = useState(0);
+  const [startedAt, setStartedAt] = useState<Date | null>(null);
+  const [showSubmitDialog, setShowSubmitDialog] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [attemptStarted, setAttemptStarted] = useState(false);
+  const [attemptId, setAttemptId] = useState<string | null>(null);
 
+  // Initialize assessment
   useEffect(() => {
-    const init = async () => {
-      if (!attemptStarted && id) {
-        const result = await startAssessment(id);
-        if (result.success && result.data) {
-          setAnswers(result.data.existingAnswers || new Array(result.data.questions?.length || 0).fill(-1));
-          setTimeLeft((result.data.duration * 60) - (result.data.timeSpent || 0));
-          setAttemptStarted(true);
+    const initAssessment = async () => {
+      try {
+        const response = await fetch(
+          `/api/assessments/${assessmentId}/start`,
+          { method: 'POST' }
+        );
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error);
         }
+
+        const data = await response.json();
+        setAttemptId(data.attemptId);
+        setTimeLeft(data.timeLeft || data.duration * 60);
+        setStartedAt(new Date(data.startedAt));
+        
+        // Initialize answers array
+        const questionCount = data.questions?.length || 0;
+        setAnswers(new Array(questionCount).fill(-1));
+        setCurrentQuestion(0);
+      } catch (error: any) {
+        console.error('Failed to start assessment:', error);
+        alert(error.message || 'Failed to start assessment');
+        router.push(`/dashboard/student/assessments/${assessmentId}`);
       }
     };
-    init();
-  }, [id, startAssessment, attemptStarted]);
 
-  useEffect(() => {
-    if (timeLeft <= 0) return;
-    const timer = setInterval(() => setTimeLeft(prev => Math.max(0, prev - 1)), 1000);
-    return () => clearInterval(timer);
-  }, [timeLeft]);
+    initAssessment();
+  }, [assessmentId, router]);
 
-  if (isLoading || !assessment || !attemptStarted) {
-    return <div className="flex justify-center items-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div></div>;
-  }
+  const handleTimeUp = useCallback(() => {
+    handleSubmit();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [answers]);
 
-  const questions = assessment.questions || [];
-  const currentQ = questions[currentQuestion];
-  const total = questions.length;
-
-  const formatTime = (sec: number) => {
-    const mins = Math.floor(sec / 60);
-    const secs = sec % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const handleAnswer = (value: string) => {
+  const handleAnswer = (answer: number | number[]) => {
     const newAnswers = [...answers];
-    newAnswers[currentQuestion] = parseInt(value);
+    newAnswers[currentQuestion] = Array.isArray(answer) ? answer[0] : answer;
     setAnswers(newAnswers);
   };
 
   const handleMarkForReview = () => {
-    setMarkedForReview(prev =>
-      prev.includes(currentQuestion) ? prev.filter(q => q !== currentQuestion) : [...prev, currentQuestion]
+    setMarkedForReview((prev) =>
+      prev.includes(currentQuestion)
+        ? prev.filter((q) => q !== currentQuestion)
+        : [...prev, currentQuestion]
     );
   };
 
-  const handleNext = () => currentQuestion < total - 1 && setCurrentQuestion(prev => prev + 1);
-  const handlePrevious = () => currentQuestion > 0 && setCurrentQuestion(prev => prev - 1);
+  const handleNext = () => {
+    if (currentQuestion < answers.length - 1) {
+      setCurrentQuestion((prev) => prev + 1);
+    }
+  };
+
+  const handlePrevious = () => {
+    if (currentQuestion > 0) {
+      setCurrentQuestion((prev) => prev - 1);
+    }
+  };
 
   const handleSubmit = async () => {
     if (isSubmitting) return;
+
     setIsSubmitting(true);
-    try {
-      const timeSpent = (assessment.duration * 60) - timeLeft;
-      const result = await submitAssessment(answers, timeSpent);
-      if (result.success) {
-        router.push(`/dashboard/student/assessments/${id}/results`);
-      } else {
-        alert(result.error || 'Failed to submit');
-      }
-    } catch (error) {
-      alert('Something went wrong');
-    } finally {
+    setShowSubmitDialog(false);
+    
+    const timeSpent = Math.floor(
+      (Date.now() - (startedAt?.getTime() || Date.now())) / 1000
+    );
+
+    const result = await submitAssessment(answers, timeSpent);
+
+    if (result.success) {
+      router.push(
+        `/dashboard/student/assessments/${assessmentId}/results`
+      );
+    } else {
+      alert(result.error || 'Failed to submit assessment');
       setIsSubmitting(false);
     }
   };
 
-  const answeredCount = answers.filter(a => a !== -1).length;
-  const progress = (answeredCount / total) * 100;
+  if (isLoading || !assessment || answers.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
+      </div>
+    );
+  }
+
+  const questions = assessment.questions || [];
+  const currentQ = questions[currentQuestion];
+  const answeredCount = answers.filter((a) => a !== -1 && a !== undefined).length;
+  const progress = questions.length > 0 ? (answeredCount / questions.length) * 100 : 0;
 
   return (
     <div className="max-w-6xl mx-auto">
-      <div className="bg-white border-b sticky top-0 z-10">
+      {/* Header */}
+      <div className="bg-white dark:bg-gray-800 border-b sticky top-0 z-10 shadow-sm">
         <div className="px-6 py-4">
           <div className="flex items-center justify-between">
-            <h1 className="text-xl font-semibold">{assessment.title}</h1>
+            <h1 className="text-xl font-semibold truncate max-w-md">
+              {assessment.title}
+            </h1>
             <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 text-gray-600"><Clock className="h-5 w-5" /><span className={`font-mono text-lg ${timeLeft < 60 ? 'text-red-600' : ''}`}>{formatTime(timeLeft)}</span></div>
-              <Button variant="destructive" onClick={handleSubmit} disabled={isSubmitting}>{isSubmitting ? 'Submitting...' : 'Submit'}</Button>
+              <Timer
+                duration={assessment.duration * 60}
+                onTimeUp={handleTimeUp}
+                size="sm"
+                showProgress={false}
+                className="border-0 shadow-none p-0"
+              />
+              <Button
+                variant="destructive"
+                onClick={() => setShowSubmitDialog(true)}
+                disabled={isSubmitting}
+                size="sm"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Submitting...
+                  </>
+                ) : (
+                  'Submit'
+                )}
+              </Button>
             </div>
           </div>
           <Progress value={progress} className="mt-2" />
-          <p className="text-xs text-gray-400 mt-1 text-right">{answeredCount} of {total} answered</p>
         </div>
       </div>
 
       <div className="p-6 grid grid-cols-1 lg:grid-cols-4 gap-6">
-        <div className="lg:col-span-3">
-          <Card className="p-6">
-            <div className="mb-4 flex items-center justify-between">
-              <span className="text-sm text-gray-500">Question {currentQuestion + 1} of {total}</span>
-              {markedForReview.includes(currentQuestion) && <span className="text-sm text-yellow-600 flex items-center gap-1"><AlertCircle className="h-4 w-4" /> Marked for Review</span>}
+        {/* Question Area */}
+        <div className="lg:col-span-3 space-y-4">
+          {currentQ && (
+            <QuestionDisplay
+              question={currentQ}
+              index={currentQuestion}
+              totalQuestions={questions.length}
+              selectedAnswer={answers[currentQuestion]}
+              onAnswer={handleAnswer}
+              onMarkForReview={handleMarkForReview}
+              isMarked={markedForReview.includes(currentQuestion)}
+            />
+          )}
+
+          {/* Navigation */}
+          <div className="flex items-center justify-between pt-4">
+            <Button
+              variant="outline"
+              onClick={handlePrevious}
+              disabled={currentQuestion === 0}
+            >
+              Previous
+            </Button>
+            <div className="flex gap-2">
+              {currentQuestion === questions.length - 1 ? (
+                <Button
+                  onClick={() => setShowSubmitDialog(true)}
+                  disabled={isSubmitting}
+                >
+                  Submit Assessment
+                </Button>
+              ) : (
+                <Button onClick={handleNext}>Next</Button>
+              )}
             </div>
-            <h2 className="text-lg font-medium mb-6">{currentQ?.question}</h2>
-            <RadioGroup value={answers[currentQuestion]?.toString()} onValueChange={handleAnswer} className="space-y-3">
-              {currentQ?.options?.map((opt: string, idx: number) => (
-                <div key={idx} className="flex items-center space-x-2">
-                  <RadioGroupItem value={idx.toString()} id={`opt-${idx}`} />
-                  <Label htmlFor={`opt-${idx}`}>{opt}</Label>
-                </div>
-              ))}
-            </RadioGroup>
-            <div className="flex items-center justify-between mt-8 pt-4 border-t">
-              <Button variant="outline" onClick={handlePrevious} disabled={currentQuestion === 0}>Previous</Button>
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={handleMarkForReview}>{markedForReview.includes(currentQuestion) ? 'Unmark' : 'Mark for Review'}</Button>
-                {currentQuestion === total - 1 ? (
-                  <Button onClick={handleSubmit} disabled={isSubmitting}>{isSubmitting ? 'Submitting...' : 'Submit'}</Button>
-                ) : (
-                  <Button onClick={handleNext}>Next</Button>
-                )}
-              </div>
-            </div>
-          </Card>
+          </div>
         </div>
 
+        {/* Question Palette */}
         <div className="lg:col-span-1">
-          <Card className="p-4 sticky top-24">
-            <h3 className="font-medium mb-3">Question Palette</h3>
-            <div className="grid grid-cols-5 gap-2">
-              {questions.map((_: any, idx: number) => {
-                let bg = 'bg-gray-100';
-                if (answers[idx] !== -1) bg = 'bg-green-100 text-green-700';
-                else if (markedForReview.includes(idx)) bg = 'bg-yellow-100 text-yellow-700';
-                return <button key={idx} onClick={() => setCurrentQuestion(idx)} className={`w-8 h-8 rounded-md text-sm font-medium ${bg} ${currentQuestion === idx ? 'ring-2 ring-primary-500' : ''}`}>{idx + 1}</button>;
-              })}
-            </div>
-            <div className="mt-4 space-y-2 text-sm">
-              <div className="flex items-center gap-2"><div className="w-4 h-4 bg-green-100 rounded" />Answered</div>
-              <div className="flex items-center gap-2"><div className="w-4 h-4 bg-yellow-100 rounded" />Marked for Review</div>
-              <div className="flex items-center gap-2"><div className="w-4 h-4 bg-gray-100 rounded" />Not Visited</div>
-            </div>
-          </Card>
+          <QuestionPalette
+            totalQuestions={questions.length}
+            currentQuestion={currentQuestion}
+            answers={answers}
+            markedForReview={markedForReview}
+            onQuestionSelect={setCurrentQuestion}
+            onSubmit={() => setShowSubmitDialog(true)}
+            timeLeft={timeLeft}
+          />
         </div>
       </div>
+
+      {/* Submit Confirmation Dialog - Using Dialog instead of AlertDialog */}
+      <Dialog open={showSubmitDialog} onOpenChange={setShowSubmitDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-yellow-600" />
+              Submit Assessment
+            </DialogTitle>
+            <DialogDescription>
+              <div className="space-y-3 mt-2">
+                <p className="text-gray-700 dark:text-gray-300">
+                  Are you sure you want to submit this assessment?
+                </p>
+                <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg text-sm space-y-1">
+                  <p>
+                    <strong>Total Questions:</strong> {questions.length}
+                  </p>
+                  <p>
+                    <strong>Answered:</strong>{' '}
+                    <span className="text-green-600 font-medium">{answeredCount}</span>
+                  </p>
+                  <p>
+                    <strong>Not Answered:</strong>{' '}
+                    <span className="text-red-600 font-medium">
+                      {questions.length - answeredCount}
+                    </span>
+                  </p>
+                  <p>
+                    <strong>Marked for Review:</strong>{' '}
+                    <span className="text-yellow-600 font-medium">
+                      {markedForReview.length}
+                    </span>
+                  </p>
+                  {timeLeft > 0 && (
+                    <p>
+                      <strong>Time Left:</strong>{' '}
+                      {Math.floor(timeLeft / 60)}m {timeLeft % 60}s
+                    </p>
+                  )}
+                </div>
+                {questions.length - answeredCount > 0 && (
+                  <p className="text-yellow-600 text-sm font-medium">
+                    ⚠️ Warning: You have {questions.length - answeredCount} unanswered questions!
+                  </p>
+                )}
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="sm:justify-between">
+            <Button
+              variant="outline"
+              onClick={() => setShowSubmitDialog(false)}
+              className="w-full sm:w-auto"
+            >
+              Continue Assessment
+            </Button>
+            <Button
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+              className="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Submitting...
+                </>
+              ) : (
+                'Submit Assessment'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

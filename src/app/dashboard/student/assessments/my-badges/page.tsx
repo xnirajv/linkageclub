@@ -1,39 +1,71 @@
 'use client';
 
 import React from 'react';
-import { Card } from '@/components/ui/card';
-import { Award, Star, TrendingUp } from 'lucide-react';
 import { useProfile } from '@/hooks/useProfile';
 import { BadgeDisplay } from '@/components/assessments/BadgeDisplay';
+import { Loader2, Award } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
 
 export default function MyBadgesPage() {
-  const { badges, skills, trustScore, isLoading } = useProfile();
+  const { badges, isLoading } = useProfile();
 
   if (isLoading) {
-    return <div className="flex justify-center items-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div></div>;
+    return (
+      <div className="flex items-center justify-center h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
+      </div>
+    );
   }
-
-  const verifiedSkills = skills?.filter((s: any) => s.verified) || [];
-  const totalBadges = badges?.length || 0;
 
   return (
     <div className="space-y-6 p-6">
-      <div><h1 className="text-2xl font-bold">My Badges</h1><p className="text-gray-500">Badges and verified skills you've earned</p></div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="p-4 text-center"><Award className="h-8 w-8 text-yellow-500 mx-auto mb-2" /><p className="text-2xl font-bold">{totalBadges}</p><p className="text-sm text-gray-500">Badges Earned</p></Card>
-        <Card className="p-4 text-center"><Star className="h-8 w-8 text-blue-500 mx-auto mb-2" /><p className="text-2xl font-bold">{verifiedSkills.length}</p><p className="text-sm text-gray-500">Verified Skills</p></Card>
-        <Card className="p-4 text-center"><TrendingUp className="h-8 w-8 text-green-500 mx-auto mb-2" /><p className="text-2xl font-bold">{trustScore || 0}</p><p className="text-sm text-gray-500">Trust Score</p></Card>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-950 dark:text-white">
+            My Badges
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            Badges you have earned by completing skill assessments
+          </p>
+        </div>
+        <Link href="/dashboard/student/assessments">
+          <Button variant="outline">Browse Assessments</Button>
+        </Link>
       </div>
 
-      <div><h2 className="text-lg font-semibold mb-4">🏆 Earned Badges</h2><BadgeDisplay badges={badges || []} size="lg" /></div>
-
-      {verifiedSkills.length > 0 && (
-        <div><h2 className="text-lg font-semibold mb-4">✅ Verified Skills</h2><div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">{verifiedSkills.map((skill: any, idx: number) => (<Card key={idx} className="p-3 text-center"><p className="font-medium">{skill.name}</p><p className="text-xs text-gray-500 capitalize mt-1">{skill.level}</p>{skill.verifiedAt && <p className="text-xs text-gray-400 mt-1">Verified {new Date(skill.verifiedAt).toLocaleDateString()}</p>}</Card>))}</div></div>
-      )}
-
-      {totalBadges === 0 && verifiedSkills.length === 0 && (
-        <Card className="p-12 text-center"><Award className="h-12 w-12 text-gray-400 mx-auto mb-4" /><h3 className="text-lg font-medium mb-2">No badges yet</h3><p className="text-gray-500">Complete skill assessments to earn badges</p></Card>
+      {!badges || badges.length === 0 ? (
+        <Card className="p-12 text-center">
+          <div className="flex flex-col items-center">
+            <div className="p-4 bg-gray-100 dark:bg-gray-800 rounded-full mb-4">
+              <Award className="h-8 w-8 text-gray-400" />
+            </div>
+            <h3 className="text-lg font-medium mb-2">No badges yet</h3>
+            <p className="text-gray-500 dark:text-gray-400 max-w-md">
+              Complete skill assessments to earn badges and showcase your
+              expertise. Each badge verifies your skills and increases your
+              trust score.
+            </p>
+            <Link
+              href="/dashboard/student/assessments"
+              className="mt-4"
+            >
+              <Button>Start an Assessment</Button>
+            </Link>
+          </div>
+        </Card>
+      ) : (
+        <>
+          <div className="flex items-center gap-3 mb-6">
+            <div className="px-4 py-2 bg-primary-100 dark:bg-primary-900/30 rounded-lg">
+              <span className="text-sm font-medium text-primary-700 dark:text-primary-300">
+                Total Badges: {badges.length}
+              </span>
+            </div>
+          </div>
+          <BadgeDisplay badges={badges} size="lg" />
+        </>
       )}
     </div>
   );

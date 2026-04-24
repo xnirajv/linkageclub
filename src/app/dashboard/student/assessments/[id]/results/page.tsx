@@ -5,98 +5,329 @@ import { useParams, useRouter } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle, XCircle, Award, TrendingUp, Clock, Share2, Download, RotateCcw } from 'lucide-react';
+import { QuestionDisplay } from '@/components/assessments/QuestionDisplay';
+import {
+  CheckCircle,
+  XCircle,
+  Award,
+  Clock,
+  TrendingUp,
+  Download,
+  RotateCcw,
+  ChevronDown,
+  ChevronUp,
+} from 'lucide-react';
 import { useAssessment } from '@/hooks/useAssessments';
+import { Loader2 } from 'lucide-react';
 
 export default function AssessmentResultsPage() {
   const params = useParams();
   const router = useRouter();
-  const id = params?.id as string;
-  const { getResults } = useAssessment(id);
+  const assessmentId = params.id as string;
+  const { getResults } = useAssessment(assessmentId);
   const [results, setResults] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [expandedQuestions, setExpandedQuestions] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     const fetchResults = async () => {
-      const data = await getResults();
-      if (data?.results) setResults(data.results);
-      setLoading(false);
+      try {
+        const data = await getResults();
+        setResults(data);
+      } catch (error) {
+        console.error('Error fetching results:', error);
+      } finally {
+        setLoading(false);
+      }
     };
-    if (id) fetchResults();
-  }, [id, getResults]);
 
-  if (loading) return <div className="flex justify-center items-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div></div>;
-  if (!results) return <div className="text-center py-12"><p className="text-gray-500">No results found</p><Button className="mt-4" onClick={() => router.back()}>Go Back</Button></div>;
+    if (assessmentId) {
+      fetchResults();
+    }
+  }, [assessmentId, getResults]);
 
-  const formatTime = (sec: number) => {
-    const mins = Math.floor(sec / 60);
-    const secs = sec % 60;
-    return `${mins}m ${secs}s`;
+  if (loading || !results) {
+    return (
+      <div className="flex items-center justify-center h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
+      </div>
+    );
+  }
+
+  const { results: resultData, badge, assessmentTitle, skillName } = results;
+  const correctAnswers = resultData.questions.filter((q: any) => q.isCorrect).length;
+  const incorrectAnswers = resultData.questions.filter(
+    (q: any) => q.isCorrect === false
+  ).length;
+  const unattempted = resultData.questions.filter(
+    (q: any) => q.userAnswer === -1 || q.userAnswer === undefined
+  ).length;
+
+  const formatTime = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    if (hours > 0) {
+      return `${hours}h ${minutes}m ${secs}s`;
+    }
+    return `${minutes}m ${secs}s`;
   };
 
-  const correctCount = results.questions?.filter((q: any) => q.isCorrect).length || 0;
-  const total = results.questions?.length || 0;
+  const getScoreColor = (score: number) => {
+    if (score >= 80) return 'text-green-600 dark:text-green-400';
+    if (score >= 60) return 'text-yellow-600 dark:text-yellow-400';
+    return 'text-red-600 dark:text-red-400';
+  };
+
+  const toggleQuestion = (index: number) => {
+    setExpandedQuestions((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(index)) {
+        newSet.delete(index);
+      } else {
+        newSet.add(index);
+      }
+      return newSet;
+    });
+  };
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 p-6">
+      {/* Header */}
       <div className="text-center">
-        {results.passed ? (
+        {resultData.passed ? (
           <>
-            <div className="mb-4 flex justify-center"><div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center"><CheckCircle className="h-10 w-10 text-green-600" /></div></div>
-            <h1 className="text-2xl font-bold">🎉 Congratulations! You Passed!</h1>
-            <p className="text-gray-600">You've successfully completed the assessment</p>
+            <div className="mb-4 flex justify-center">
+              <div className="w-20 h-20 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                <CheckCircle className="h-10 w-10 text-green-600 dark:text-green-400" />
+              </div>
+            </div>
+            <h1 className="text-2xl font-bold text-gray-950 dark:text-white">
+              Congratulations! You Passed!
+            </h1>
           </>
         ) : (
           <>
-            <div className="mb-4 flex justify-center"><div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center"><XCircle className="h-10 w-10 text-red-600" /></div></div>
-            <h1 className="text-2xl font-bold">Assessment Completed</h1>
-            <p className="text-gray-600">Keep practicing and try again</p>
+            <div className="mb-4 flex justify-center">
+              <div className="w-20 h-20 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
+                <XCircle className="h-10 w-10 text-red-600 dark:text-red-400" />
+              </div>
+            </div>
+            <h1 className="text-2xl font-bold text-gray-950 dark:text-white">
+              Assessment Completed
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400 mt-2">
+              Keep practicing and try again
+            </p>
           </>
+        )}
+        {assessmentTitle && (
+          <p className="text-gray-500 dark:text-gray-400 mt-1 text-sm">
+            {assessmentTitle} {skillName && `• ${skillName}`}
+          </p>
         )}
       </div>
 
+      {/* Score Card */}
       <Card className="p-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="text-center">
-            <p className="text-sm text-gray-500 mb-2">Your Score</p>
-            <div className="relative inline-flex">
-              <svg className="w-32 h-32" viewBox="0 0 128 128">
-                <circle className="text-gray-200" strokeWidth="8" stroke="currentColor" fill="transparent" r="56" cx="64" cy="64" />
-                <circle className={results.passed ? 'text-green-500' : 'text-red-500'} strokeWidth="8" strokeDasharray={2 * Math.PI * 56} strokeDashoffset={2 * Math.PI * 56 * (1 - results.score / 100)} strokeLinecap="round" stroke="currentColor" fill="transparent" r="56" cx="64" cy="64" />
+          {/* Score Circle */}
+          <div className="flex flex-col items-center justify-center">
+            <div className="relative w-40 h-40">
+              <svg className="w-40 h-40 transform -rotate-90">
+                <circle
+                  cx="80"
+                  cy="80"
+                  r="72"
+                  stroke="currentColor"
+                  strokeWidth="8"
+                  fill="none"
+                  className="text-gray-200 dark:text-gray-700"
+                />
+                <circle
+                  cx="80"
+                  cy="80"
+                  r="72"
+                  stroke="currentColor"
+                  strokeWidth="8"
+                  fill="none"
+                  strokeDasharray={2 * Math.PI * 72}
+                  strokeDashoffset={2 * Math.PI * 72 * (1 - resultData.score / 100)}
+                  className={resultData.passed ? 'text-green-500' : 'text-red-500'}
+                  strokeLinecap="round"
+                />
               </svg>
-              <span className="absolute inset-0 flex items-center justify-center text-2xl font-bold">{results.score}%</span>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className={`text-3xl font-bold ${getScoreColor(resultData.score)}`}>
+                  {resultData.score}%
+                </span>
+                <span className="text-xs text-gray-500">Final Score</span>
+              </div>
+            </div>
+            <Badge
+              variant={resultData.passed ? 'success' : 'error'}
+              className="mt-2 text-sm px-3 py-1"
+            >
+              {resultData.passed ? 'PASSED' : 'NOT PASSED'}
+            </Badge>
+          </div>
+
+          {/* Stats Grid */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="text-center p-3 bg-gray-100/50 dark:bg-gray-800/50 rounded-lg">
+              <CheckCircle className="h-5 w-5 text-green-600 mx-auto mb-1" />
+              <p className="text-xs text-gray-500">Correct</p>
+              <p className="text-xl font-bold text-green-600">{correctAnswers}</p>
+            </div>
+            <div className="text-center p-3 bg-gray-100/50 dark:bg-gray-800/50 rounded-lg">
+              <XCircle className="h-5 w-5 text-red-600 mx-auto mb-1" />
+              <p className="text-xs text-gray-500">Incorrect</p>
+              <p className="text-xl font-bold text-red-600">{incorrectAnswers}</p>
+            </div>
+            <div className="text-center p-3 bg-gray-100/50 dark:bg-gray-800/50 rounded-lg">
+              <Clock className="h-5 w-5 text-blue-600 mx-auto mb-1" />
+              <p className="text-xs text-gray-500">Time</p>
+              <p className="text-lg font-bold text-blue-600">
+                {formatTime(resultData.timeSpent)}
+              </p>
+            </div>
+            <div className="text-center p-3 bg-gray-100/50 dark:bg-gray-800/50 rounded-lg">
+              <TrendingUp className="h-5 w-5 text-purple-600 mx-auto mb-1" />
+              <p className="text-xs text-gray-500">Accuracy</p>
+              <p className="text-xl font-bold text-purple-600">
+                {Math.round((correctAnswers / resultData.questions.length) * 100)}%
+              </p>
             </div>
           </div>
-          <div className="space-y-4">
-            <div><p className="text-sm text-gray-500">Passing Score</p><p className="text-lg font-semibold">{results.passingScore}%</p></div>
-            <div><p className="text-sm text-gray-500">Time Taken</p><p className="text-lg font-semibold">{formatTime(results.timeSpent)}</p></div>
-            <div><p className="text-sm text-gray-500">Points Earned</p><p className="text-lg font-semibold">{results.earnedPoints}/{results.totalPoints}</p></div>
+        </div>
+
+        {/* Quick Stats */}
+        <div className="mt-6 grid grid-cols-3 gap-4 text-center text-sm">
+          <div>
+            <p className="text-gray-500">Passing Score</p>
+            <p className="font-semibold">{resultData.passingScore}%</p>
+          </div>
+          <div>
+            <p className="text-gray-500">Points Earned</p>
+            <p className="font-semibold">{resultData.earnedPoints}/{resultData.totalPoints}</p>
+          </div>
+          <div>
+            <p className="text-gray-500">Attempt #{resultData.attemptNumber || 1}</p>
+            <p className="font-semibold">{resultData.questions.length} Questions</p>
           </div>
         </div>
-        <div className="mt-4"><div className="flex justify-between text-sm mb-1"><span>Score</span><span>{results.score}%</span></div><div className="w-full bg-gray-200 rounded-full h-2"><div className={`h-2 rounded-full ${results.passed ? 'bg-green-500' : 'bg-red-500'}`} style={{ width: `${results.score}%` }} /></div></div>
       </Card>
 
-      {results.badgeEarned && (
-        <Card className="p-6 bg-gradient-to-r from-yellow-50 to-orange-50">
-          <div className="flex items-center gap-4"><div className="p-3 bg-yellow-100 rounded-full"><Award className="h-8 w-8 text-yellow-600" /></div><div><h3 className="font-semibold text-lg">🏆 Badge Earned!</h3><p className="text-xl font-bold text-yellow-700">{results.badgeEarned}</p></div></div>
+      {/* Badge Earned */}
+      {badge && (
+        <Card className="p-6 bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border-yellow-200 dark:border-yellow-800">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-yellow-100 dark:bg-yellow-900/30 rounded-full">
+              <Award className="h-8 w-8 text-yellow-600" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-semibold text-lg">Badge Earned!</h3>
+              <p className="text-gray-700 dark:text-gray-300 font-medium">{badge.name}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{badge.description}</p>
+            </div>
+          </div>
         </Card>
       )}
 
-      {results.trustScoreIncreased > 0 && (
-        <Card className="p-4 bg-green-50 border-green-200">
-          <div className="flex items-center gap-3"><TrendingUp className="h-6 w-6 text-green-600" /><div><p className="font-medium text-green-800">Trust Score Increased!</p><p className="text-sm text-green-700">You earned +{results.trustScoreIncreased} points</p></div></div>
-        </Card>
-      )}
+      {/* Question Review */}
+      <Card className="p-6">
+        <h2 className="text-lg font-semibold mb-4">Question Review</h2>
+        <div className="space-y-2">
+          {resultData.questions.map((q: any, index: number) => {
+            const isExpanded = expandedQuestions.has(index);
+            
+            return (
+              <div
+                key={index}
+                className={`border rounded-lg transition-colors ${
+                  q.isCorrect
+                    ? 'border-green-200 dark:border-green-800'
+                    : q.userAnswer === -1 || q.userAnswer === undefined
+                    ? 'border-gray-200 dark:border-gray-700'
+                    : 'border-red-200 dark:border-red-800'
+                }`}
+              >
+                <button
+                  onClick={() => toggleQuestion(index)}
+                  className="w-full text-left p-3 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-lg transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    {q.isCorrect ? (
+                      <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
+                    ) : q.userAnswer === -1 || q.userAnswer === undefined ? (
+                      <div className="h-5 w-5 rounded-full border-2 border-gray-300 dark:border-gray-600 shrink-0" />
+                    ) : (
+                      <XCircle className="h-5 w-5 text-red-500 shrink-0" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        Q{index + 1}: {q.question}
+                      </p>
+                      <div className="flex items-center gap-3 mt-1">
+                        <span className="text-xs text-gray-500">
+                          {q.isCorrect ? '+' : ''}{q.isCorrect ? q.points : 0}/{q.points} pts
+                        </span>
+                        <span className="text-xs text-primary-600">
+                          {isExpanded ? 'Hide details' : 'View details'}
+                        </span>
+                      </div>
+                    </div>
+                    {isExpanded ? (
+                      <ChevronUp className="h-4 w-4 text-gray-400 shrink-0" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4 text-gray-400 shrink-0" />
+                    )}
+                  </div>
+                </button>
 
-      <Card className="p-6"><h2 className="text-lg font-semibold mb-4">Performance Stats</h2><div className="grid grid-cols-3 gap-4 text-center"><div><p className="text-2xl font-bold text-green-600">{correctCount}</p><p className="text-xs text-gray-500">Correct</p></div><div><p className="text-2xl font-bold text-red-600">{total - correctCount}</p><p className="text-xs text-gray-500">Incorrect</p></div><div><p className="text-2xl font-bold text-blue-600">{Math.round((correctCount / total) * 100)}%</p><p className="text-xs text-gray-500">Accuracy</p></div></div></Card>
+                {isExpanded && (
+                  <div className="p-4 border-t dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/30">
+                    <QuestionDisplay
+                      question={q}
+                      index={index}
+                      totalQuestions={resultData.questions.length}
+                      selectedAnswer={q.userAnswer}
+                      onAnswer={() => {}}
+                      showExplanation={true}
+                      readOnly={true}
+                      isCorrect={q.isCorrect}
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </Card>
 
-      <Card className="p-6"><h2 className="text-lg font-semibold mb-4">Detailed Review</h2><div className="space-y-4">{results.questions?.map((q: any, idx: number) => (<div key={idx} className={`p-4 rounded-lg border ${q.isCorrect ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}><div className="flex items-start gap-3">{q.isCorrect ? <CheckCircle className="h-5 w-5 text-green-600 shrink-0 mt-0.5" /> : <XCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />}<div className="flex-1"><p className="font-medium">{q.question}</p><div className="mt-2 text-sm"><p><span className="font-medium">Your answer:</span> {q.userAnswer !== -1 ? q.options[q.userAnswer] : 'Not answered'}</p>{!q.isCorrect && <p className="mt-1"><span className="font-medium">Correct answer:</span> {q.options[q.correctAnswer]}</p>}{q.explanation && <p className="mt-2 text-gray-600">{q.explanation}</p>}</div></div><Badge variant={q.isCorrect ? 'default' : 'destructive'}>{q.points} pts</Badge></div></div>))}</div></Card>
-
+      {/* Actions */}
       <div className="flex flex-wrap gap-4 justify-center">
-        <Button variant="outline" onClick={() => router.push('/dashboard/student/assessments')}>Browse More Assessments</Button>
-        <Button variant="outline"><Share2 className="mr-2 h-4 w-4" />Share on LinkedIn</Button>
-        <Button variant="outline"><Download className="mr-2 h-4 w-4" />Download Certificate</Button>
-        {!results.passed && <Button onClick={() => router.push(`/dashboard/student/assessments/${id}`)}><RotateCcw className="mr-2 h-4 w-4" />Retake Assessment</Button>}
+        <Button
+          variant="outline"
+          onClick={() => router.push('/dashboard/student/assessments')}
+        >
+          Browse More Assessments
+        </Button>
+        <Button
+          variant="outline"
+          onClick={() =>
+            router.push(`/dashboard/student/assessments/${assessmentId}/take`)
+          }
+        >
+          <RotateCcw className="mr-2 h-4 w-4" />
+          Retake Assessment
+        </Button>
+        {resultData.passed && (
+          <Button variant="outline">
+            <Download className="mr-2 h-4 w-4" />
+            Download Certificate
+          </Button>
+        )}
       </div>
     </div>
   );

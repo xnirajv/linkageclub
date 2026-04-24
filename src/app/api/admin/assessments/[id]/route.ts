@@ -5,107 +5,119 @@ import Assessment from '@/lib/db/models/assessment';
 import connectDB from '@/lib/db/connect';
 
 export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  _req: NextRequest,
+  { params }: { params: { id: string } }
 ) {
   try {
     const session = await getServerSession(authOptions);
-    
-    if (!session || session.user.role !== 'admin') {
-      return NextResponse.json({ error: 'Unauthorized - Admin access required' }, { status: 401 });
+
+    if (!session?.user || session.user.role !== 'admin') {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 403 }
+      );
     }
 
     await connectDB();
-    const { id } = await params;
 
-    const assessment = await Assessment.findById(id).lean();
+    const assessment = await Assessment.findById(params.id)
+      .populate('createdBy', 'name email')
+      .lean();
+
     if (!assessment) {
-      return NextResponse.json({ error: 'Assessment not found' }, { status: 404 });
+      return NextResponse.json(
+        { error: 'Assessment not found' },
+        { status: 404 }
+      );
     }
 
-    // Remove correctAnswer from questions
-    if (assessment.questions) {
-      assessment.questions = assessment.questions.map((q: any) => {
-        const { correctAnswer, ...rest } = q;
-        return rest;
-      });
-    }
-
-    return NextResponse.json({ success: true, assessment });
-    
+    return NextResponse.json({ assessment });
   } catch (error) {
-    console.error('Get assessment error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('Error fetching assessment:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }
 
-export async function PATCH(
+export async function PUT(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
     const session = await getServerSession(authOptions);
-    
-    if (!session || session.user.role !== 'admin') {
-      return NextResponse.json({ error: 'Unauthorized - Admin access required' }, { status: 401 });
+
+    if (!session?.user || session.user.role !== 'admin') {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 403 }
+      );
     }
 
-    await connectDB();
-    const { id } = await params;
     const body = await req.json();
 
-    const assessment = await Assessment.findById(id);
+    await connectDB();
+
+    const assessment = await Assessment.findByIdAndUpdate(
+      params.id,
+      { $set: body },
+      { new: true, runValidators: true }
+    );
+
     if (!assessment) {
-      return NextResponse.json({ error: 'Assessment not found' }, { status: 404 });
+      return NextResponse.json(
+        { error: 'Assessment not found' },
+        { status: 404 }
+      );
     }
 
-    // Update allowed fields
-    if (body.title) assessment.title = body.title;
-    if (body.description) assessment.description = body.description;
-    if (body.skillName) assessment.skillName = body.skillName;
-    if (body.level) assessment.level = body.level;
-    if (body.price !== undefined) assessment.price = body.price;
-    if (body.duration) assessment.duration = body.duration;
-    if (body.passingScore) assessment.passingScore = body.passingScore;
-    if (body.isActive !== undefined) assessment.isActive = body.isActive;
-
-    await assessment.save();
-
-    return NextResponse.json({ success: true, message: 'Assessment updated successfully' });
-    
+    return NextResponse.json({
+      message: 'Assessment updated successfully',
+      assessment,
+    });
   } catch (error) {
-    console.error('Update assessment error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('Error updating assessment:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }
 
 export async function DELETE(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  _req: NextRequest,
+  { params }: { params: { id: string } }
 ) {
   try {
     const session = await getServerSession(authOptions);
-    
-    if (!session || session.user.role !== 'admin') {
-      return NextResponse.json({ error: 'Unauthorized - Admin access required' }, { status: 401 });
+
+    if (!session?.user || session.user.role !== 'admin') {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 403 }
+      );
     }
 
     await connectDB();
-    const { id } = await params;
 
-    const assessment = await Assessment.findById(id);
+    const assessment = await Assessment.findByIdAndDelete(params.id);
+
     if (!assessment) {
-      return NextResponse.json({ error: 'Assessment not found' }, { status: 404 });
+      return NextResponse.json(
+        { error: 'Assessment not found' },
+        { status: 404 }
+      );
     }
 
-    // Soft delete
-    assessment.isActive = false;
-    await assessment.save();
-
-    return NextResponse.json({ success: true, message: 'Assessment deleted successfully' });
-    
+    return NextResponse.json({
+      message: 'Assessment deleted permanently',
+    });
   } catch (error) {
-    console.error('Delete assessment error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('Error deleting assessment:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }

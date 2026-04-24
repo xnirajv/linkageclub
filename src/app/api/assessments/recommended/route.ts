@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth/options';
 import Assessment from '@/lib/db/models/assessment';
@@ -8,42 +8,56 @@ import connectDB from '@/lib/db/connect';
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
-    
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    if (!session?.user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
     }
 
     await connectDB();
 
-    const user = await User.findById(session.user.id).select('skills');
-    const userSkills = user?.skills?.map((s: any) => s.name) || [];
+    const user = await User.findById(session.user.id).select('skills').lean();
 
-    const assessments = await Assessment.find({ isActive: true })
-      .select('title skillName level price duration passRate badges')
-      .limit(10)
-      .lean();
+    // If no skills, return popular assessments
+    if (!user?.skills?.length) {
+      const popular = await Assessment.find({ isActive: true })
+        .select('-questions.correctAnswer -questions.explanation')
+        .sort({ totalAttempts: -1 })
+        .limit(6)
+        .lean();
 
-    const recommended = assessments.map((a: any) => {
-      const matchScore = userSkills.includes(a.skillName) ? 95 : 70;
-      const trustBoost = Math.floor(matchScore / 10);
-      
-      return {
-        id: a._id,
-        title: a.title,
-        skillName: a.skillName,
-        level: a.level,
-        price: a.price,
-        duration: a.duration,
-        passRate: a.passRate,
-        matchScore,
-        trustBoost,
-        badgeName: a.badges?.[0]?.name || null,
-      };
-    });
+      return NextResponse.json({ assessments: popular });
+    }
 
-    return NextResponse.json({ assessments: recommended.slice(0, 4) });
+    const userSkills = user.skills.map((s: any) => s.name);
+
+    // Find assessments matching user's skills or related
+    const assessments = await Assessment.aggregate([
+      { $match: { isActive: true } },
+      {
+        $addFields: {
+          skillMatch: {
+            $cond: {
+              if: { $in: ['$skillName', userSkills] },
+              then: 2,
+              else: 1,
+            },
+          },
+        },
+      },
+      { $sort: { skillMatch: -1, totalAttempts: -1, averageScore: -1 } },
+      { $limit: 6 },
+      { $project: { 'questions.correctAnswer': 0, 'questions.explanation': 0 } },
+    ]);
+
+    return NextResponse.json({ assessments });
   } catch (error) {
-    console.error('Error fetching recommended:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('Error fetching recommendations:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }

@@ -1,37 +1,41 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Search, X, Filter, ChevronDown, ChevronUp } from 'lucide-react';
-import useSWR from 'swr';
-import { fetcher } from '@/lib/api/client';
-
-// ✅ ADD THIS INTERFACE
-interface SkillsResponse {
-  skills: string[];
-}
 
 interface AssessmentFiltersProps {
   onFilterChange: (filters: any) => void;
+  initialFilters?: {
+    skill?: string;
+    level?: string;
+    price?: string;
+    search?: string;
+  };
+  skills?: string[];
 }
 
-export function AssessmentFilters({ onFilterChange }: AssessmentFiltersProps) {
+export function AssessmentFilters({
+  onFilterChange,
+  initialFilters = {},
+  skills = [],
+}: AssessmentFiltersProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [filters, setFilters] = useState({
-    skill: 'all',
-    level: 'all',
-    price: 'all',
+    skill: initialFilters.skill || '',
+    level: initialFilters.level || '',
+    price: initialFilters.price || 'all',
+    search: initialFilters.search || '',
   });
 
-  // ✅ FIX: Add type to useSWR
-  const { data: skillsData } = useSWR<SkillsResponse>('/api/assessments/skills', fetcher);
-  const skills = skillsData?.skills || [];
+  const [selectedSkills, setSelectedSkills] = useState<string[]>(
+    initialFilters.skill ? [initialFilters.skill] : []
+  );
 
   const levels = [
-    { value: 'all', label: 'All Levels' },
     { value: 'beginner', label: 'Beginner' },
     { value: 'intermediate', label: 'Intermediate' },
     { value: 'advanced', label: 'Advanced' },
@@ -44,54 +48,79 @@ export function AssessmentFilters({ onFilterChange }: AssessmentFiltersProps) {
     { value: 'paid', label: 'Paid' },
   ];
 
-  const handleFilterChange = (key: string, value: string) => {
+  const handleFilterChange = (key: string, value: any) => {
     const newFilters = { ...filters, [key]: value };
     setFilters(newFilters);
     onFilterChange(newFilters);
   };
 
-  const clearFilters = () => {
-    setFilters({ skill: 'all', level: 'all', price: 'all' });
-    onFilterChange({});
+  const handleSkillToggle = (skill: string) => {
+    const newSkills = selectedSkills.includes(skill)
+      ? selectedSkills.filter((s) => s !== skill)
+      : [...selectedSkills, skill];
+    setSelectedSkills(newSkills);
+    handleFilterChange('skill', newSkills.join(','));
   };
 
-  const activeFilterCount = Object.values(filters).filter(v => v !== 'all').length;
+  const clearFilters = () => {
+    const resetFilters = {
+      skill: '',
+      level: '',
+      price: 'all',
+      search: '',
+    };
+    setFilters(resetFilters);
+    setSelectedSkills([]);
+    onFilterChange(resetFilters);
+  };
+
+  const getActiveFilterCount = () => {
+    let count = 0;
+    if (filters.level) count++;
+    if (filters.price !== 'all') count++;
+    if (selectedSkills.length > 0) count++;
+    return count;
+  };
 
   return (
     <Card className="p-4">
       <div className="space-y-4">
+        {/* Search Bar */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            placeholder="Search assessments..."
+            value={filters.search}
+            onChange={(e) => handleFilterChange('search', e.target.value)}
+            className="pl-9"
+          />
+        </div>
+
         {/* Mobile Toggle */}
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="w-full flex items-center justify-between p-2 bg-gray-100 rounded-lg md:hidden"
+          className="w-full flex items-center justify-between p-2 bg-gray-100/50 dark:bg-gray-800/50 rounded-lg md:hidden"
         >
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4" />
             <span className="font-medium">Filters</span>
-            {activeFilterCount > 0 && (
-              <Badge variant="destructive" className="ml-1">{activeFilterCount}</Badge>
+            {getActiveFilterCount() > 0 && (
+              <Badge variant="destructive" size="sm">
+                {getActiveFilterCount()}
+              </Badge>
             )}
           </div>
-          {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          {isExpanded ? (
+            <ChevronUp className="h-4 w-4" />
+          ) : (
+            <ChevronDown className="h-4 w-4" />
+          )}
         </button>
 
         {/* Filter Content */}
-        <div className={`${isExpanded ? 'block' : 'hidden'} md:block space-y-4`}>
-          {/* Skill Filter */}
-          <div>
-            <h4 className="text-sm font-medium mb-2">Skill</h4>
-            <select
-              value={filters.skill}
-              onChange={(e) => handleFilterChange('skill', e.target.value)}
-              className="w-full rounded-md border border-gray-300 bg-white py-2 px-3 text-sm"
-            >
-              <option value="all">All Skills</option>
-              {skills.map((skill: string) => (
-                <option key={skill} value={skill}>{skill}</option>
-              ))}
-            </select>
-          </div>
-
+        <div
+          className={`${isExpanded ? 'block' : 'hidden'} md:block space-y-4`}
+        >
           {/* Level Filter */}
           <div>
             <h4 className="text-sm font-medium mb-2">Difficulty Level</h4>
@@ -99,11 +128,16 @@ export function AssessmentFilters({ onFilterChange }: AssessmentFiltersProps) {
               {levels.map((level) => (
                 <button
                   key={level.value}
-                  onClick={() => handleFilterChange('level', level.value)}
+                  onClick={() =>
+                    handleFilterChange(
+                      'level',
+                      level.value === filters.level ? '' : level.value
+                    )
+                  }
                   className={`px-3 py-1 rounded-full text-sm transition-colors ${
                     filters.level === level.value
                       ? 'bg-primary-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
                   }`}
                 >
                   {level.label}
@@ -123,7 +157,7 @@ export function AssessmentFilters({ onFilterChange }: AssessmentFiltersProps) {
                   className={`px-3 py-1 rounded-full text-sm transition-colors ${
                     filters.price === option.value
                       ? 'bg-primary-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
                   }`}
                 >
                   {option.label}
@@ -132,35 +166,84 @@ export function AssessmentFilters({ onFilterChange }: AssessmentFiltersProps) {
             </div>
           </div>
 
+          {/* Skills Filter */}
+          {skills.length > 0 && (
+            <div>
+              <h4 className="text-sm font-medium mb-2">Skills</h4>
+              <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-1">
+                {skills.map((skill) => (
+                  <button
+                    key={skill}
+                    onClick={() => handleSkillToggle(skill)}
+                    className={`px-2 py-1 rounded text-xs transition-colors ${
+                      selectedSkills.includes(skill)
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    {skill}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Active Filters */}
-          {activeFilterCount > 0 && (
-            <div className="pt-2 border-t">
+          {getActiveFilterCount() > 0 && (
+            <div className="pt-2 border-t dark:border-gray-700">
               <div className="flex items-center justify-between mb-2">
                 <h4 className="text-sm font-medium">Active Filters</h4>
-                <Button variant="ghost" size="sm" onClick={clearFilters} className="h-8 px-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearFilters}
+                  className="h-8 px-2"
+                >
                   <X className="h-3 w-3 mr-1" />
                   Clear all
                 </Button>
               </div>
               <div className="flex flex-wrap gap-2">
-                {filters.skill !== 'all' && (
-                  <Badge variant="secondary" className="flex items-center gap-1">
-                    Skill: {filters.skill}
-                    <X className="h-3 w-3 cursor-pointer" onClick={() => handleFilterChange('skill', 'all')} />
-                  </Badge>
-                )}
-                {filters.level !== 'all' && (
-                  <Badge variant="secondary" className="flex items-center gap-1">
+                {filters.level && (
+                  <Badge
+                    variant="destructive"
+                    size="sm"
+                    className="flex items-center gap-1"
+                  >
                     Level: {filters.level}
-                    <X className="h-3 w-3 cursor-pointer" onClick={() => handleFilterChange('level', 'all')} />
+                    <X
+                      className="h-3 w-3 cursor-pointer"
+                      onClick={() => handleFilterChange('level', '')}
+                    />
                   </Badge>
                 )}
                 {filters.price !== 'all' && (
-                  <Badge variant="secondary" className="flex items-center gap-1">
-                    Price: {filters.price === 'free' ? 'Free' : 'Paid'}
-                    <X className="h-3 w-3 cursor-pointer" onClick={() => handleFilterChange('price', 'all')} />
+                  <Badge
+                    variant="destructive"
+                    size="sm"
+                    className="flex items-center gap-1"
+                  >
+                    Price: {filters.price}
+                    <X
+                      className="h-3 w-3 cursor-pointer"
+                      onClick={() => handleFilterChange('price', 'all')}
+                    />
                   </Badge>
                 )}
+                {selectedSkills.map((skill) => (
+                  <Badge
+                    key={skill}
+                    variant="destructive"
+                    size="sm"
+                    className="flex items-center gap-1"
+                  >
+                    {skill}
+                    <X
+                      className="h-3 w-3 cursor-pointer"
+                      onClick={() => handleSkillToggle(skill)}
+                    />
+                  </Badge>
+                ))}
               </div>
             </div>
           )}

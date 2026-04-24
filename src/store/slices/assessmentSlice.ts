@@ -1,15 +1,14 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import { Assessment } from '@/types/assessment';
 
 interface AssessmentState {
-  assessments: Assessment[];
-  currentAssessment: Assessment | null;
+  assessments: any[];
+  currentAssessment: any | null;
   currentAttempt: any | null;
   results: any | null;
   filters: {
     skill?: string;
     level?: string;
-    price?: 'free' | 'paid' | 'all';
+    price?: string;
     search?: string;
   };
   pagination: {
@@ -48,7 +47,12 @@ export const fetchAssessments = createAsyncThunk(
     try {
       const queryParams = new URLSearchParams(params).toString();
       const response = await fetch(`/api/assessments?${queryParams}`);
-      if (!response.ok) throw new Error('Failed to fetch assessments');
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to fetch');
+      }
+
       return await response.json();
     } catch (error: any) {
       return rejectWithValue(error.message);
@@ -61,7 +65,12 @@ export const fetchAssessmentById = createAsyncThunk(
   async (id: string, { rejectWithValue }) => {
     try {
       const response = await fetch(`/api/assessments/${id}`);
-      if (!response.ok) throw new Error('Failed to fetch assessment');
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to fetch');
+      }
+
       return await response.json();
     } catch (error: any) {
       return rejectWithValue(error.message);
@@ -71,13 +80,22 @@ export const fetchAssessmentById = createAsyncThunk(
 
 export const startAssessment = createAsyncThunk(
   'assessments/start',
-  async ({ id, paymentId }: { id: string; paymentId?: string }, { rejectWithValue }) => {
+  async (
+    { id, paymentId }: { id: string; paymentId?: string },
+    { rejectWithValue }
+  ) => {
     try {
-      const url = paymentId 
+      const url = paymentId
         ? `/api/assessments/${id}/start?paymentId=${paymentId}`
         : `/api/assessments/${id}/start`;
+
       const response = await fetch(url, { method: 'POST' });
-      if (!response.ok) throw new Error('Failed to start assessment');
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to start');
+      }
+
       return await response.json();
     } catch (error: any) {
       return rejectWithValue(error.message);
@@ -87,14 +105,26 @@ export const startAssessment = createAsyncThunk(
 
 export const submitAssessment = createAsyncThunk(
   'assessments/submit',
-  async ({ id, answers, timeSpent }: { id: string; answers: number[]; timeSpent: number }, { rejectWithValue }) => {
+  async (
+    {
+      id,
+      answers,
+      timeSpent,
+    }: { id: string; answers: number[]; timeSpent: number },
+    { rejectWithValue }
+  ) => {
     try {
       const response = await fetch(`/api/assessments/${id}/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ answers, timeSpent }),
       });
-      if (!response.ok) throw new Error('Failed to submit assessment');
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to submit');
+      }
+
       return await response.json();
     } catch (error: any) {
       return rejectWithValue(error.message);
@@ -107,7 +137,12 @@ export const fetchUserAssessments = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const response = await fetch('/api/assessments/user');
-      if (!response.ok) throw new Error('Failed to fetch user assessments');
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to fetch');
+      }
+
       return await response.json();
     } catch (error: any) {
       return rejectWithValue(error.message);
@@ -120,7 +155,12 @@ export const fetchUserBadges = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const response = await fetch('/api/assessments/user/badges');
-      if (!response.ok) throw new Error('Failed to fetch badges');
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to fetch');
+      }
+
       return await response.json();
     } catch (error: any) {
       return rejectWithValue(error.message);
@@ -132,7 +172,10 @@ const assessmentSlice = createSlice({
   name: 'assessments',
   initialState,
   reducers: {
-    setFilters: (state, action: PayloadAction<Partial<AssessmentState['filters']>>) => {
+    setFilters: (
+      state,
+      action: PayloadAction<Partial<AssessmentState['filters']>>
+    ) => {
       state.filters = { ...state.filters, ...action.payload };
       state.pagination.page = 1;
     },
@@ -152,10 +195,13 @@ const assessmentSlice = createSlice({
     clearResults: (state) => {
       state.results = null;
     },
+    clearError: (state) => {
+      state.error = null;
+    },
   },
   extraReducers: (builder) => {
     builder
-      // Fetch assessments
+      // Fetch all assessments
       .addCase(fetchAssessments.pending, (state) => {
         state.isLoading = true;
         state.error = null;
@@ -169,7 +215,7 @@ const assessmentSlice = createSlice({
         state.isLoading = false;
         state.error = action.payload as string;
       })
-      // Fetch assessment by id
+      // Fetch single assessment
       .addCase(fetchAssessmentById.pending, (state) => {
         state.isLoading = true;
         state.error = null;
@@ -186,10 +232,16 @@ const assessmentSlice = createSlice({
       .addCase(startAssessment.fulfilled, (state, action) => {
         state.currentAttempt = action.payload;
       })
+      .addCase(startAssessment.rejected, (state, action) => {
+        state.error = action.payload as string;
+      })
       // Submit assessment
       .addCase(submitAssessment.fulfilled, (state, action) => {
         state.results = action.payload.results;
         state.currentAttempt = null;
+      })
+      .addCase(submitAssessment.rejected, (state, action) => {
+        state.error = action.payload as string;
       })
       // Fetch user assessments
       .addCase(fetchUserAssessments.fulfilled, (state, action) => {
@@ -209,6 +261,7 @@ export const {
   clearCurrentAssessment,
   clearAttempt,
   clearResults,
+  clearError,
 } = assessmentSlice.actions;
 
 export default assessmentSlice.reducer;

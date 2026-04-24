@@ -5,60 +5,99 @@ import Assessment from '@/lib/db/models/assessment';
 import connectDB from '@/lib/db/connect';
 
 export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  _req: NextRequest,
+  { params }: { params: { id: string } }
 ) {
   try {
     await connectDB();
-    const { id } = await params;
 
-    const assessment = await Assessment.findById(id).lean();
+    const assessment = await Assessment.findById(params.id).lean();
 
     if (!assessment) {
-      return NextResponse.json({ error: 'Assessment not found' }, { status: 404 });
+      return NextResponse.json(
+        { error: 'Assessment not found' },
+        { status: 404 }
+      );
     }
 
-    const session = await getServerSession(authOptions);
-    let userAttempt: {
-      score: number;
-      passed: boolean;
-      completedAt: Date | null;
-      answers: number[];
-      timeSpent: number;
-    } | null = null;
+    // Remove correct answers for security
+    const sanitizedAssessment = {
+      ...assessment,
+      questions: assessment.questions.map((q: any) => {
+        const { correctAnswer, explanation, ...rest } = q;
+        return rest;
+      }),
+    };
 
-    if (session) {
-      const attempt = assessment.attempts?.find(
+    // Add user attempt if logged in
+    const session = await getServerSession(authOptions);
+    
+    if (session?.user?.id) {
+      const userAttempt = assessment.attempts?.find(
         (a: any) => a.userId?.toString() === session.user.id
       );
-      if (attempt) {
-        userAttempt = {
-          score: attempt.score,
-          passed: attempt.passed,
-          completedAt: attempt.completedAt,
-          answers: attempt.answers,
-          timeSpent: attempt.timeSpent,
-        };
-      }
+
+      return NextResponse.json({
+        assessment: {
+          ...sanitizedAssessment,
+          userAttempt: userAttempt
+            ? {
+                score: userAttempt.score,
+                passed: userAttempt.passed,
+                completedAt: userAttempt.completedAt,
+              }
+            : undefined,
+        },
+      });
     }
 
-    const questions = assessment.questions.map((q: any) => ({
-      id: q._id,
-      question: q.question,
-      options: q.options,
-      points: q.points,
-    }));
-
-    return NextResponse.json({
-      assessment: {
-        ...assessment,
-        _id: assessment._id.toString(),
-        questions,
-        userAttempt,
-      },
-    });
+    return NextResponse.json({ assessment: sanitizedAssessment });
   } catch (error) {
     console.error('Error fetching assessment:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const session = await getServerSession(authOptions);
+
+    if (!session?.user || session.user.role !== 'admin') {
+      return NextResponse.json(
+        { error: 'Only admins can delete assessments' },
+        { status: 403 }
+      );
+    }
+
+    await connectDB();
+
+    const assessment = await Assessment.findById(params.id);
+
+    if (!assessment) {
+      return NextResponse.json(
+        { error: 'Assessment not found' },
+        { status: 404 }
+      );
+    }
+
+    // Soft delete
+    assessment.isActive = false;
+    await assessment.save();
+
+    return NextResponse.json({
+      message: 'Assessment deactivated successfully',
+    });
+  } catch (error) {
+    console.error('Error deleting assessment:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }
