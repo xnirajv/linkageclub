@@ -11,7 +11,7 @@ import { useAssessments } from '@/hooks/useAssessments';
 import { useProfile } from '@/hooks/useProfile';
 import { useDebounce } from '@/hooks/useDebounce';
 import { RecommendedSection } from '@/components/assessments/RecommendedSection';
-import { PopularSection } from '@/components/assessments/PopularSection';
+// import { PopularSection } from '@/components/assessments/PopularSection';
 import useSWR from 'swr';
 import { fetcher } from '@/lib/api/client';
 
@@ -170,14 +170,14 @@ export default function StudentAssessmentsPage() {
             </div>
           )}
 
-          {popularAssessments.length > 0 && (
+          {/* {popularAssessments.length > 0 && (
             <div className="mb-8">
               <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
                 🔥 Popular Assessments
               </h2>
               <PopularSection assessments={popularAssessments} />
             </div>
-          )}
+          )} */}
 
           <div>
             <h2 className="text-lg font-semibold mb-4">📚 All Assessments</h2>
