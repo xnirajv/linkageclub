@@ -5,7 +5,7 @@ import Assessment from '@/lib/db/models/assessment';
 import User from '@/lib/db/models/user';
 import connectDB from '@/lib/db/connect';
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     const session = await getServerSession(authOptions);
     
@@ -15,22 +15,17 @@ export async function GET(req: NextRequest) {
 
     await connectDB();
 
-    const user = await User.findById(session.user.id).select('skills assessments');
+    const user = await User.findById(session.user.id).select('skills');
     const userSkills = user?.skills?.map((s: any) => s.name) || [];
 
-    // Get assessments matching user's skills
-    let recommended = await Assessment.find({ isActive: true })
-      .select('title skillName level price duration totalAttempts passRate badges')
+    const assessments = await Assessment.find({ isActive: true })
+      .select('title skillName level price duration passRate badges')
       .limit(10)
       .lean();
 
-    // Calculate match score based on user skills
-    const recommendedWithMatch = recommended.map((a: any) => {
-      const matchScore = userSkills.includes(a.skillName) 
-        ? Math.floor(Math.random() * 20) + 80  // 80-100% match
-        : Math.floor(Math.random() * 30) + 50; // 50-80% match
-      
-      const trustBoost = matchScore >= 85 ? Math.floor(matchScore / 10) : 0;
+    const recommended = assessments.map((a: any) => {
+      const matchScore = userSkills.includes(a.skillName) ? 95 : 70;
+      const trustBoost = Math.floor(matchScore / 10);
       
       return {
         id: a._id,
@@ -46,10 +41,7 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    // Sort by match score
-    recommendedWithMatch.sort((a, b) => b.matchScore - a.matchScore);
-
-    return NextResponse.json({ assessments: recommendedWithMatch.slice(0, 4) });
+    return NextResponse.json({ assessments: recommended.slice(0, 4) });
   } catch (error) {
     console.error('Error fetching recommended:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

@@ -30,9 +30,14 @@ export async function GET(req: NextRequest) {
       .lean();
 
     const userAssessments = assessments.map(assessment => {
-      const attempt = assessment.attempts?.find(
+      const userAttempts = assessment.attempts?.filter(
         (a: any) => a.userId?.toString() === session.user.id
-      );
+      ) || [];
+      
+      const latestAttempt = userAttempts.sort((a: any, b: any) => 
+        new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
+      )[0];
+
       return {
         id: assessment._id,
         title: assessment.title,
@@ -40,15 +45,15 @@ export async function GET(req: NextRequest) {
         level: assessment.level,
         passingScore: assessment.passingScore,
         attempt: {
-          score: attempt?.score || 0,
-          passed: attempt?.passed || false,
-          timeSpent: attempt?.timeSpent || 0,
-          startedAt: attempt?.startedAt,
-          completedAt: attempt?.completedAt || null,
-          answers: attempt?.answers || [],
+          score: latestAttempt?.score || 0,
+          passed: latestAttempt?.passed || false,
+          timeSpent: latestAttempt?.timeSpent || 0,
+          startedAt: latestAttempt?.startedAt,
+          completedAt: latestAttempt?.completedAt || null,
+          answers: latestAttempt?.answers || [],
         },
-        badgeEarned: attempt?.passed && assessment.badges?.some(
-          (b: any) => (attempt?.score || 0) >= b.requiredScore
+        badgeEarned: latestAttempt?.passed && assessment.badges?.some(
+          (b: any) => (latestAttempt?.score || 0) >= b.requiredScore
         ),
       };
     });

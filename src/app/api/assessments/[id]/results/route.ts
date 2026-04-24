@@ -24,36 +24,40 @@ export async function GET(
       return NextResponse.json({ error: 'Assessment not found' }, { status: 404 });
     }
 
-    // Find user's completed attempt
-    const attempt = assessment.attempts?.find(
+    // Find all completed attempts by this user
+    const completedAttempts = assessment.attempts?.filter(
       (a: any) => a.userId?.toString() === session.user.id && a.completedAt !== null
     );
 
-    if (!attempt) {
+    if (!completedAttempts || completedAttempts.length === 0) {
       return NextResponse.json({ error: 'No completed attempt found' }, { status: 404 });
     }
 
-    // Prepare results
+    // Get the latest attempt
+    const latestAttempt = completedAttempts.sort((a: any, b: any) => 
+      new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime()
+    )[0];
+
     const results = {
-      score: attempt.score,
-      passed: attempt.passed,
-      timeSpent: attempt.timeSpent,
+      score: latestAttempt.score,
+      passed: latestAttempt.passed,
+      timeSpent: latestAttempt.timeSpent,
       totalTime: assessment.duration * 60,
       totalPoints: assessment.questions.reduce((acc: number, q: any) => acc + q.points, 0),
       earnedPoints: assessment.questions.reduce(
         (acc: number, q: any, index: number) => 
-          acc + (attempt.answers[index] === q.correctAnswer ? q.points : 0),
+          acc + (latestAttempt.answers[index] === q.correctAnswer ? q.points : 0),
         0
       ),
       passingScore: assessment.passingScore,
-      trustScoreIncreased: attempt.passed ? Math.floor(attempt.score / 10) : 0,
-      badgeEarned: attempt.passed && assessment.badges?.length > 0 ? assessment.badges[0]?.name : null,
+      trustScoreIncreased: latestAttempt.passed ? Math.floor(latestAttempt.score / 10) : 0,
+      badgeEarned: latestAttempt.passed && assessment.badges?.length > 0 ? assessment.badges[0]?.name : null,
       questions: assessment.questions.map((q: any, index: number) => ({
         question: q.question,
         options: q.options,
-        userAnswer: attempt.answers[index],
+        userAnswer: latestAttempt.answers[index],
         correctAnswer: q.correctAnswer,
-        isCorrect: attempt.answers[index] === q.correctAnswer,
+        isCorrect: latestAttempt.answers[index] === q.correctAnswer,
         explanation: q.explanation,
         points: q.points,
       })),

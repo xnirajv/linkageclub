@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
 
     const searchParams = req.nextUrl.searchParams;
     const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '10');
+    const limit = parseInt(searchParams.get('limit') || '12');
     const skill = searchParams.get('skill');
     const level = searchParams.get('level');
     const price = searchParams.get('price');

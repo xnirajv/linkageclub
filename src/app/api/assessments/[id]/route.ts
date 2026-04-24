@@ -25,7 +25,8 @@ export async function GET(
       completedAt: Date | null;
       answers: number[];
       timeSpent: number;
-    } | null = null;  
+    } | null = null;
+
     if (session) {
       const attempt = assessment.attempts?.find(
         (a: any) => a.userId?.toString() === session.user.id
@@ -41,7 +42,6 @@ export async function GET(
       }
     }
 
-    // Remove correct answers from questions
     const questions = assessment.questions.map((q: any) => ({
       id: q._id,
       question: q.question,

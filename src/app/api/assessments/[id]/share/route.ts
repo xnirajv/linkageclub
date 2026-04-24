@@ -35,19 +35,15 @@ export async function POST(
     }
 
     // Generate shareable link
-    const shareId = Buffer.from(
-      JSON.stringify({
-        assessmentId: assessment._id,
-        userId: user._id,
-        score: attempt.score,
-        date: attempt.completedAt,
-      })
-    ).toString('base64url');
+    const shareId = Buffer.from(JSON.stringify({
+      assessmentId: assessment._id,
+      userId: user._id,
+      score: attempt.score,
+      date: attempt.completedAt,
+    })).toString('base64url');
 
     const shareUrl = `${process.env.NEXT_PUBLIC_APP_URL}/share/certificate/${shareId}`;
-
-    // LinkedIn share text
-    const shareText = `I just earned my ${assessment.title} certification on InternHub with a score of ${attempt.score}%! 🎉 #InternHub #Certification #SkillDevelopment`;
+    const shareText = `I just earned my ${assessment.title} certification on InternHub with a score of ${attempt.score}%! 🎉 #InternHub #Certification`;
 
     return NextResponse.json({
       success: true,

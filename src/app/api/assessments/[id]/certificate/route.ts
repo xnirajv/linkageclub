@@ -27,7 +27,7 @@ export async function GET(
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
-    // Find user's attempt
+    // Find user's passed attempt
     const attempt = assessment.attempts?.find(
       (a: any) => a.userId?.toString() === session.user.id && a.passed === true
     );
@@ -36,10 +36,7 @@ export async function GET(
       return NextResponse.json({ error: 'No passed attempt found' }, { status: 404 });
     }
 
-    // ✅ FIX: Handle null completedAt
     const completedDate = attempt.completedAt ? new Date(attempt.completedAt) : new Date();
-
-    // Generate PDF
     const doc = new PDFDocument({ size: 'A4', layout: 'landscape' });
     const chunks: Buffer[] = [];
 
@@ -101,7 +98,7 @@ export async function GET(
     doc.font('Helvetica');
     doc.text(`with a score of ${attempt.score}%`, 421, 420, { align: 'center' });
 
-    // Date - ✅ FIXED: Use completedDate variable
+    // Date
     const date = completedDate.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
@@ -118,10 +115,7 @@ export async function GET(
 
     doc.end();
 
-    // Wait for PDF to finish
-    await new Promise((resolve) => {
-      doc.on('end', resolve);
-    });
+    await new Promise((resolve) => { doc.on('end', resolve); });
 
     const pdfBuffer = Buffer.concat(chunks);
 

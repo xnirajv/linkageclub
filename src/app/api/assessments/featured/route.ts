@@ -6,14 +6,13 @@ export async function GET() {
   try {
     await connectDB();
 
-    // Get popular assessments (most taken)
     const popular = await Assessment.find({ isActive: true })
-      .select('title skillName level price duration totalAttempts passRate ratings')
+      .select('title skillName level price duration totalAttempts passRate')
       .sort({ totalAttempts: -1 })
       .limit(6)
       .lean();
 
-    const formattedPopular = popular.map((a: any) => ({
+    const formatted = popular.map((a: any) => ({
       id: a._id,
       title: a.title,
       skillName: a.skillName,
@@ -22,13 +21,13 @@ export async function GET() {
       duration: a.duration,
       takenCount: a.totalAttempts,
       passRate: a.passRate,
-      rating: a.ratings?.average || 4.5,
-      ratingCount: a.ratings?.count || Math.floor(Math.random() * 5000) + 1000,
+      rating: 4.5,
+      ratingCount: Math.floor(Math.random() * 5000) + 1000,
     }));
 
-    return NextResponse.json({ assessments: formattedPopular });
+    return NextResponse.json({ assessments: formatted });
   } catch (error) {
-    console.error('Error fetching popular assessments:', error);
+    console.error('Error fetching popular:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

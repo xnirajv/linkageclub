@@ -25,12 +25,11 @@ export async function POST(
       return NextResponse.json({ error: 'Assessment not found' }, { status: 404 });
     }
 
-    // ✅ Sirf INCOMPLETE attempt check karo (resume ke liye)
+    // Check for incomplete attempt (resume)
     const existingIncompleteAttempt = assessment.attempts?.find(
       (a: any) => a.userId?.toString() === session.user.id && a.completedAt === null
     );
 
-    // Agar incomplete attempt hai toh resume karo
     if (existingIncompleteAttempt) {
       const questions = assessment.questions.map((q: any) => ({
         id: q._id,
@@ -50,7 +49,7 @@ export async function POST(
       });
     }
 
-    // ✅ Naya attempt hamesha banao (chaahe pehli baar ho ya retake)
+    // Create new attempt (first time or retake)
     const newAttempt = {
       _id: new mongoose.Types.ObjectId(),
       userId: new mongoose.Types.ObjectId(session.user.id),
