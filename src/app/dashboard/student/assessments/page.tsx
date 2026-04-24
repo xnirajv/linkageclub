@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { AssessmentGrid } from '@/components/assessments/AssessmentGrid';
 import { AssessmentFilters } from '@/components/assessments/AssessmentFilters';
@@ -25,10 +25,35 @@ export default function StudentAssessmentsPage() {
     isLoading,
     applyFilters,
     loadMore,
+    mutate, // ✅ mutate function
   } = useAssessments({
     search: debouncedSearch,
-    excludeCompleted: activeTab === 'available', // ✅ Exclude when Available tab
+    excludeCompleted: activeTab === 'available',
   });
+
+  // ✅ Force refresh when page becomes visible
+  useEffect(() => {
+    const handleFocus = () => {
+      mutate(); // Refresh data
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        mutate();
+      }
+    });
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [mutate]);
+
+  // ✅ Also refresh when tab changes
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    setTimeout(() => mutate(), 100); // Small delay for state update
+  };
 
   const { badges = [], isLoading: profileLoading } = useProfile();
 

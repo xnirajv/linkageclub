@@ -36,8 +36,10 @@ export function useAssessments(options: UseAssessmentsOptions = {}) {
   const url = `/api/assessments${queryString ? `?${queryString}` : ''}`;
 
   const { data, error, mutate, isLoading } = useSWR(url, fetcher, {
-    revalidateOnFocus: false,
-    dedupingInterval: 5000,
+    revalidateOnFocus: true,
+    revalidateOnReconnect:true,
+    dedupingInterval: 2000,
+    refreshInterval:0,
   });
 
   const applyFilters = useCallback(
