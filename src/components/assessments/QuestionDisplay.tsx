@@ -4,9 +4,8 @@ import React from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AlertCircle, CheckCircle, XCircle } from 'lucide-react';
-import { Checkbox } from '@/components/forms/Checkbox';
 import { Label } from '@/components/ui/lable';
-import { RadioGroup, RadioGroupItem } from '@/components/forms/RadioGroup';
+import { cn } from '@/lib/utils/cn';
 
 interface Question {
   _id?: string;
@@ -43,26 +42,14 @@ export function QuestionDisplay({
   readOnly = false,
   isCorrect,
 }: QuestionDisplayProps) {
-  const isMultiSelect = question.options.length > 4;
-  const selectedArray = Array.isArray(selectedAnswer) ? selectedAnswer : [];
-
-  const handleSingleSelect = (value: string) => {
-    if (!readOnly) {
-      onAnswer(parseInt(value));
-    }
-  };
-
-  const handleMultiSelect = (optionIndex: number, checked: boolean) => {
-    if (!readOnly) {
-      const newSelection = checked
-        ? [...selectedArray, optionIndex]
-        : selectedArray.filter((i) => i !== optionIndex);
-      onAnswer(newSelection);
-    }
-  };
-
   const getOptionLetter = (index: number) => {
     return String.fromCharCode(65 + index);
+  };
+
+  const handleOptionClick = (optIndex: number) => {
+    if (!readOnly) {
+      onAnswer(optIndex);
+    }
   };
 
   return (
@@ -97,49 +84,79 @@ export function QuestionDisplay({
         </h3>
       </div>
 
-      {/* Options */}
+      {/* Options - Custom radio buttons without RadioGroup */}
       <div className="space-y-3">
-        {question.options.map((option, optIndex) => (
-          <div
-            key={optIndex}
-            className={`flex items-start space-x-3 p-3 rounded-lg transition-colors ${
-              readOnly && selectedAnswer === optIndex
-                ? isCorrect
-                  ? 'bg-green-50 dark:bg-green-900/20 border border-green-200'
-                  : 'bg-red-50 dark:bg-red-900/20 border border-red-200'
-                : readOnly && question.correctAnswer === optIndex
-                ? 'bg-green-50 dark:bg-green-900/20 border border-green-200'
-                : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'
-            }`}
-          >
-            <RadioGroupItem
-              value={optIndex.toString()}
-              id={`q${index}-opt${optIndex}`}
-              disabled={readOnly}
-              checked={selectedAnswer === optIndex}
-              onClick={() => handleSingleSelect(optIndex.toString())}
-            />
-            <Label
-              htmlFor={`q${index}-opt${optIndex}`}
-              className="text-sm leading-relaxed cursor-pointer flex-1"
+        {question.options.map((option, optIndex) => {
+          const isSelected = selectedAnswer === optIndex;
+          const isCorrectOption = question.correctAnswer === optIndex;
+          
+          let optionStyle = 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50';
+          
+          if (readOnly) {
+            if (isSelected && isCorrectOption) {
+              optionStyle = 'border-green-300 bg-green-50 dark:bg-green-900/20 dark:border-green-700';
+            } else if (isSelected && !isCorrectOption) {
+              optionStyle = 'border-red-300 bg-red-50 dark:bg-red-900/20 dark:border-red-700';
+            } else if (!isSelected && isCorrectOption) {
+              optionStyle = 'border-green-300 bg-green-50 dark:bg-green-900/20 dark:border-green-700';
+            }
+          } else if (isSelected) {
+            optionStyle = 'border-primary-300 bg-primary-50 dark:bg-primary-900/20 dark:border-primary-700';
+          }
+
+          return (
+            <div
+              key={optIndex}
+              onClick={() => handleOptionClick(optIndex)}
+              className={cn(
+                'flex items-start space-x-3 p-3 rounded-lg border cursor-pointer transition-colors',
+                optionStyle,
+                readOnly && 'cursor-default'
+              )}
             >
-              <span className="font-medium mr-2">
-                {getOptionLetter(optIndex)}.
-              </span>
-              {option}
-            </Label>
-            {readOnly && selectedAnswer === optIndex && (
-              isCorrect ? (
+              {/* Custom Radio Circle */}
+              <div
+                className={cn(
+                  'w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 transition-colors',
+                  isSelected
+                    ? 'border-primary-600 bg-primary-600'
+                    : 'border-gray-300 dark:border-gray-600',
+                  readOnly && isSelected && isCorrectOption && 'border-green-600 bg-green-600',
+                  readOnly && isSelected && !isCorrectOption && 'border-red-600 bg-red-600',
+                  readOnly && !isSelected && isCorrectOption && 'border-green-600'
+                )}
+              >
+                {isSelected && (
+                  <div className="w-2 h-2 rounded-full bg-white" />
+                )}
+              </div>
+              
+              <Label
+                className={cn(
+                  'text-sm leading-relaxed cursor-pointer flex-1',
+                  readOnly && 'cursor-default'
+                )}
+              >
+                <span className="font-medium mr-2">
+                  {getOptionLetter(optIndex)}.
+                </span>
+                {option}
+              </Label>
+
+              {/* Indicators for readonly mode */}
+              {readOnly && isSelected && (
+                isCorrectOption ? (
+                  <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
+                ) : (
+                  <XCircle className="h-5 w-5 text-red-500 shrink-0" />
+                )
+              )}
+              {readOnly && !isSelected && isCorrectOption && (
                 <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
-              ) : (
-                <XCircle className="h-5 w-5 text-red-500 shrink-0" />
-              )
-            )}
-            {readOnly && question.correctAnswer === optIndex && selectedAnswer !== optIndex && (
-              <CheckCircle className="h-5 w-5 text-green-500 shrink-0" />
-            )}
-          </div>
-        ))}
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* Explanation */}
@@ -157,11 +174,12 @@ export function QuestionDisplay({
       {/* Correct/Incorrect Indicator */}
       {readOnly && isCorrect !== undefined && (
         <div
-          className={`mt-4 p-3 rounded-lg flex items-center gap-2 ${
+          className={cn(
+            'mt-4 p-3 rounded-lg flex items-center gap-2',
             isCorrect
               ? 'bg-green-50 dark:bg-green-900/20'
               : 'bg-red-50 dark:bg-red-900/20'
-          }`}
+          )}
         >
           {isCorrect ? (
             <>
