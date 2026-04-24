@@ -49,13 +49,16 @@ export async function GET(req: NextRequest) {
     const level = searchParams.get('level');
     const price = searchParams.get('price');
     const search = searchParams.get('search');
+    
+    // ✅ NEW: Filter to exclude completed assessments
+    const excludeCompleted = searchParams.get('excludeCompleted') === 'true';
 
     // Build query
     const query: Record<string, any> = { isActive: true };
 
     if (skill) query.skillName = skill;
     if (level) query.level = level;
-    
+
     if (price === 'free') {
       query.price = 0;
     } else if (price === 'paid') {
@@ -71,9 +74,23 @@ export async function GET(req: NextRequest) {
       ];
     }
 
+    const session = await getServerSession(authOptions);
     const skip = (page - 1) * limit;
 
-    // Fetch assessments without correct answers
+    // ✅ If user logged in and excludeCompleted=true, filter out completed
+    if (session?.user?.id && excludeCompleted) {
+      // Get IDs of assessments user has completed
+      const completedAssessmentIds = await Assessment.find({
+        'attempts.userId': session.user.id,
+        'attempts.completedAt': { $ne: null },
+      }).distinct('_id');
+
+      // Exclude completed assessments from query
+      if (completedAssessmentIds.length > 0) {
+        query._id = { $nin: completedAssessmentIds };
+      }
+    }
+
     const [assessments, total] = await Promise.all([
       Assessment.find(query)
         .select('-questions.correctAnswer -questions.explanation')
@@ -85,16 +102,14 @@ export async function GET(req: NextRequest) {
     ]);
 
     // Add user attempt info if logged in
-    const session = await getServerSession(authOptions);
-    
     let assessmentsWithAttempts = assessments;
 
     if (session?.user?.id) {
       assessmentsWithAttempts = assessments.map((assessment: any) => {
         const userAttempt = assessment.attempts?.find(
-          (a: any) => a.userId?.toString() === session.user.id
+          (a: any) => a.userId?.toString() === session.user.id && a.completedAt
         );
-        
+
         return {
           ...assessment,
           userAttempt: userAttempt

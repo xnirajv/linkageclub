@@ -8,7 +8,6 @@ import { BadgeDisplay } from '@/components/assessments/BadgeDisplay';
 import { SearchInput } from '@/components/forms/SearchInput';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Loader2 } from 'lucide-react';
 import { useAssessments } from '@/hooks/useAssessments';
 import { useProfile } from '@/hooks/useProfile';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -19,72 +18,42 @@ export default function StudentAssessmentsPage() {
   const [activeTab, setActiveTab] = useState('available');
   const debouncedSearch = useDebounce(searchQuery, 300);
 
+  // ✅ Available tab: exclude completed assessments
   const {
     assessments = [],
     pagination,
     isLoading,
     applyFilters,
     loadMore,
-    startAssessment,
   } = useAssessments({
     search: debouncedSearch,
+    excludeCompleted: activeTab === 'available', // ✅ Exclude when Available tab
   });
 
   const { badges = [], isLoading: profileLoading } = useProfile();
 
-  // Get all assessments without filters for user's assessments
-  const { assessments: allAssessments = [] } = useAssessments({});
-
-  // Filter user's attempted assessments
-  const userAssessments = useMemo(() => {
-    return allAssessments.filter(
-      (assessment: any) =>
-        assessment.attempts && assessment.attempts.length > 0
-    );
-  }, [allAssessments]);
-
-  // Format for display
-  const formattedUserAssessments = useMemo(() => {
-    return userAssessments.map((assessment: any) => {
-      const latestAttempt =
-        assessment.attempts?.[assessment.attempts.length - 1];
-      return {
-        _id: assessment._id,
-        title: assessment.title,
-        description: assessment.description,
-        skillName: assessment.skillName,
-        level: assessment.level,
-        price: assessment.price,
-        duration: assessment.duration,
-        passingScore: assessment.passingScore,
-        totalAttempts: assessment.totalAttempts,
-        passRate: assessment.passRate,
-        averageScore: assessment.averageScore,
-        userAttempt: latestAttempt
-          ? {
-              score: latestAttempt.score,
-              passed: latestAttempt.passed,
-            }
-          : undefined,
-      };
-    });
-  }, [userAssessments]);
-
-  // Filter in-progress
-  const inProgressAssessments = useMemo(() => {
-    return userAssessments.filter((assessment: any) => {
-      const latestAttempt =
-        assessment.attempts?.[assessment.attempts.length - 1];
-      return latestAttempt && !latestAttempt.completedAt;
-    });
-  }, [userAssessments]);
+  // Get completed assessments for Completed tab
+  const { assessments: allAssessments = [] } = useAssessments({
+    excludeCompleted: false,
+  });
 
   // Filter completed
   const completedAssessments = useMemo(() => {
-    return formattedUserAssessments.filter(
-      (ua: any) => ua.userAttempt !== undefined
+    return allAssessments.filter(
+      (a: any) => a.userAttempt?.completedAt
     );
-  }, [formattedUserAssessments]);
+  }, [allAssessments]);
+
+  // Filter in-progress (started but not completed)
+  const inProgressAssessments = useMemo(() => {
+    return allAssessments.filter(
+      (a: any) =>
+        a.attempts?.some(
+          (att: any) =>
+            att.userId && !att.completedAt
+        )
+    );
+  }, [allAssessments]);
 
   const handleSearch = (value: string) => {
     setSearchQuery(value);
@@ -119,7 +88,7 @@ export default function StudentAssessmentsPage() {
           <TabsTrigger value="badges">My Badges</TabsTrigger>
         </TabsList>
 
-        {/* Available Assessments */}
+        {/* Available - excludes completed */}
         <TabsContent value="available" className="space-y-6 mt-6">
           <div className="space-y-4">
             <SearchInput
@@ -134,7 +103,7 @@ export default function StudentAssessmentsPage() {
             <AssessmentGrid
               assessments={assessments}
               isLoading={isLoadingAny}
-              emptyMessage="No assessments found"
+              emptyMessage="No assessments available. You've completed all!"
               onQuickStart={handleQuickStart}
             />
 
@@ -167,7 +136,7 @@ export default function StudentAssessmentsPage() {
           <AssessmentGrid
             assessments={completedAssessments as any}
             isLoading={isLoadingAny}
-            emptyMessage="No completed assessments"
+            emptyMessage="No completed assessments yet. Start one!"
             onQuickStart={handleQuickStart}
           />
         </TabsContent>

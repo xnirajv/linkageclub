@@ -19,6 +19,7 @@ interface UseAssessmentsOptions {
   level?: string;
   price?: string;
   search?: string;
+  excludeCompleted?: boolean; // ✅ NEW
 }
 
 export function useAssessments(options: UseAssessmentsOptions = {}) {
