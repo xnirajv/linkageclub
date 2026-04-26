@@ -6,8 +6,8 @@ import connectDB from '@/lib/db/connect';
 import { z } from 'zod';
 
 const createAssessmentSchema = z.object({
-  title: z.string().min(5).max(100),
-  description: z.string().min(50).max(2000),
+  title: z.string().min(3, 'Title must be at least 3 characters').max(100),
+  description: z.string().min(10, 'Description must be at least 10 characters').max(5000),
   skillName: z.string().min(1, 'Skill name is required'),
   level: z.enum(['beginner', 'intermediate', 'advanced', 'expert']),
   price: z.number().min(0),
@@ -16,8 +16,8 @@ const createAssessmentSchema = z.object({
   questions: z
     .array(
       z.object({
-        question: z.string().min(5),
-        options: z.array(z.string()).min(2),
+        question: z.string().min(3, 'Question too short'),
+        options: z.array(z.string()).min(2, 'At least 2 options required'),
         correctAnswer: z.number().min(0),
         explanation: z.string().optional(),
         points: z.number().min(1).default(1),
@@ -28,7 +28,7 @@ const createAssessmentSchema = z.object({
     .array(
       z.object({
         name: z.string(),
-        description: z.string(),
+        description: z.string().optional(),
         image: z.string().optional(),
         requiredScore: z.number(),
       })
