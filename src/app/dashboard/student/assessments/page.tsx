@@ -8,7 +8,6 @@ import { BadgeDisplay } from '@/components/assessments/BadgeDisplay';
 import { SearchInput } from '@/components/forms/SearchInput';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Sparkles, TrendingUp } from 'lucide-react';
 import { useAssessments } from '@/hooks/useAssessments';
@@ -21,10 +20,8 @@ export default function StudentAssessmentsPage() {
   const [activeTab, setActiveTab] = useState('available');
   const debouncedSearch = useDebounce(searchQuery, 300);
 
-  // User profile for skills
   const { profile } = useProfile();
 
-  // Available tab - exclude completed
   const {
     assessments = [],
     pagination,
@@ -37,7 +34,6 @@ export default function StudentAssessmentsPage() {
     excludeCompleted: true,
   });
 
-  // All assessments for other tabs
   const {
     assessments: allAssessments = [],
     isLoading: isLoadingAll,
@@ -49,45 +45,103 @@ export default function StudentAssessmentsPage() {
 
   const { badges = [], isLoading: profileLoading } = useProfile();
 
-  // ✅ Get user's verified skills
+  // ✅ Get user's verified skills from profile
   const userSkills = useMemo(() => {
-    return profile?.skills?.filter((s: any) => s.verified).map((s: any) => s.name) || [];
+    if (!profile?.skills) return [];
+    return profile.skills
+      .filter((s: any) => s.verified)
+      .map((s: any) => s.name?.toLowerCase().trim());
   }, [profile]);
 
-  // ✅ Recommended assessments - match user skills ya popular
+  // ✅ Get user's interested skills (unverified bhi)
+  const userAllSkills = useMemo(() => {
+    if (!profile?.skills) return [];
+    return profile.skills.map((s: any) => s.name?.toLowerCase().trim());
+  }, [profile]);
+
+  // ✅ Smart Recommendations based on user profile
   const recommendedAssessments = useMemo(() => {
-    if (userSkills.length === 0) {
-      // No skills - show popular (high pass rate, high attempts)
-      return [...allAssessments]
-        .filter((a: any) => !a.userAttempt?.completedAt)
-        .sort((a: any, b: any) => (b.totalAttempts || 0) - (a.totalAttempts || 0))
+    if (!allAssessments.length) return [];
+
+    // Get assessments user hasn't completed
+    const availableAssessments = allAssessments.filter(
+      (a: any) => !a.userAttempt?.completedAt
+    );
+
+    if (userSkills.length === 0 && userAllSkills.length === 0) {
+      // ✅ No skills = show popular assessments (high attempts + high pass rate)
+      return availableAssessments
+        .sort((a: any, b: any) => {
+          const scoreA = (a.totalAttempts || 0) * 0.7 + (a.passRate || 0) * 0.3;
+          const scoreB = (b.totalAttempts || 0) * 0.7 + (b.passRate || 0) * 0.3;
+          return scoreB - scoreA;
+        })
         .slice(0, 3);
     }
 
-    // Match with user skills
-    const matched = allAssessments.filter((a: any) => 
-      userSkills.some((skill: string) => 
-        a.skillName?.toLowerCase().includes(skill.toLowerCase()) ||
-        a.tags?.some((tag: string) => tag.toLowerCase().includes(skill.toLowerCase()))
-      )
-    );
+    // ✅ Match assessments with user's skills
+    const scored = availableAssessments.map((assessment: any) => {
+      const skillName = (assessment.skillName || '').toLowerCase();
+      const tags = (assessment.tags || []).map((t: string) => t.toLowerCase());
+      const title = (assessment.title || '').toLowerCase();
+      const description = (assessment.description || '').toLowerCase();
 
-    const unmatched = allAssessments.filter((a: any) => 
-      !matched.find((m: any) => m._id === a._id)
-    );
+      let matchScore = 0;
 
-    // Matched first, then popular
-    return [
-      ...matched.filter((a: any) => !a.userAttempt?.completedAt),
-      ...unmatched
-        .filter((a: any) => !a.userAttempt?.completedAt)
-        .sort((a: any, b: any) => (b.totalAttempts || 0) - (a.totalAttempts || 0)),
-    ].slice(0, 4);
-  }, [allAssessments, userSkills]);
+      // Check verified skills match (highest priority)
+      userSkills.forEach((skill: string) => {
+        if (skillName.includes(skill) || skill.includes(skillName)) {
+          matchScore += 30;
+        }
+        tags.forEach((tag: string) => {
+          if (tag.includes(skill) || skill.includes(tag)) {
+            matchScore += 20;
+          }
+        });
+        if (title.includes(skill)) matchScore += 10;
+        if (description.includes(skill)) matchScore += 5;
+      });
 
-  // Other assessments (not recommended)
+      // Check unverified skills
+      const unverifiedSkills = userAllSkills.filter(
+        (s) => !userSkills.includes(s)
+      );
+      unverifiedSkills.forEach((skill: string) => {
+        if (skillName.includes(skill) || skill.includes(skillName)) {
+          matchScore += 10;
+        }
+      });
+
+      // Bonus for popular assessments
+      matchScore += Math.min((assessment.totalAttempts || 0) / 10, 5);
+      matchScore += Math.min((assessment.passRate || 0) / 10, 5);
+
+      return { ...assessment, _matchScore: matchScore };
+    });
+
+    // Sort by match score, then filter only relevant ones
+    const matched = scored
+      .filter((a: any) => a._matchScore > 0)
+      .sort((a: any, b: any) => b._matchScore - a._matchScore);
+
+    // If no matches found, return top popular
+    if (matched.length === 0) {
+      return availableAssessments
+        .sort(
+          (a: any, b: any) =>
+            (b.totalAttempts || 0) - (a.totalAttempts || 0)
+        )
+        .slice(0, 3);
+    }
+
+    return matched.slice(0, 3);
+  }, [allAssessments, userSkills, userAllSkills]);
+
+  // ✅ Other assessments = available minus recommended
   const otherAssessments = useMemo(() => {
-    const recommendedIds = new Set(recommendedAssessments.map((a: any) => a._id));
+    const recommendedIds = new Set(
+      recommendedAssessments.map((a: any) => a._id)
+    );
     return assessments.filter((a: any) => !recommendedIds.has(a._id));
   }, [assessments, recommendedAssessments]);
 
@@ -99,25 +153,31 @@ export default function StudentAssessmentsPage() {
   // In Progress
   const inProgressAssessments = useMemo(() => {
     return allAssessments.filter((a: any) => {
-      const hasIncomplete = a.attempts?.some((att: any) => !att.completedAt);
+      const hasIncomplete = a.attempts?.some(
+        (att: any) => !att.completedAt
+      );
       return hasIncomplete && !a.userAttempt?.completedAt;
     });
   }, [allAssessments]);
 
-  // Refresh on mount & tab change
+  // Refresh handlers
   const refreshAll = useCallback(() => {
     mutateAvailable();
     mutateAll();
   }, [mutateAvailable, mutateAll]);
 
-  useEffect(() => { refreshAll(); }, []);
+  useEffect(() => {
+    refreshAll();
+  }, []);
 
-  const handleTabChange = useCallback((value: string) => {
-    setActiveTab(value);
-    setTimeout(refreshAll, 100);
-  }, [refreshAll]);
+  const handleTabChange = useCallback(
+    (value: string) => {
+      setActiveTab(value);
+      setTimeout(refreshAll, 100);
+    },
+    [refreshAll]
+  );
 
-  // Refresh on page visibility
   useEffect(() => {
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') refreshAll();
@@ -155,7 +215,6 @@ export default function StudentAssessmentsPage() {
         </p>
       </div>
 
-      {/* ✅ SINGLE Search Box - always visible */}
       <SearchInput
         placeholder="Search assessments by skill or title..."
         value={searchQuery}
@@ -168,43 +227,40 @@ export default function StudentAssessmentsPage() {
           <TabsTrigger value="available">
             Available
             {assessments.length > 0 && (
-              <span className="ml-1 text-xs opacity-60">({assessments.length})</span>
+              <span className="ml-1 text-xs opacity-60">
+                ({assessments.length})
+              </span>
             )}
           </TabsTrigger>
           <TabsTrigger value="in-progress">
             In Progress
-            {inProgressAssessments.length > 0 && (
-              <span className="ml-1 text-xs opacity-60">({inProgressAssessments.length})</span>
-            )}
           </TabsTrigger>
           <TabsTrigger value="completed">
             Completed
-            {completedAssessments.length > 0 && (
-              <span className="ml-1 text-xs opacity-60">({completedAssessments.length})</span>
-            )}
           </TabsTrigger>
           <TabsTrigger value="badges">
             My Badges
-            {badges.length > 0 && (
-              <span className="ml-1 text-xs opacity-60">({badges.length})</span>
-            )}
           </TabsTrigger>
         </TabsList>
 
         {/* Available Tab */}
         <TabsContent value="available" className="space-y-6 mt-6">
-          {/* ✅ Recommended Section */}
-          {recommendedAssessments.length > 0 && searchQuery === '' && (
+          {/* ✅ Recommended Section - only if has recommendations AND not searching */}
+          {recommendedAssessments.length > 0 && !searchQuery && (
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-yellow-500" />
                 <h2 className="text-lg font-semibold">
-                  {userSkills.length > 0 ? 'Recommended for You' : 'Popular Assessments'}
+                  {userSkills.length > 0
+                    ? 'Recommended for You'
+                    : 'Popular Assessments'}
                 </h2>
                 {userSkills.length > 0 && (
                   <div className="flex gap-1">
                     {userSkills.slice(0, 3).map((skill: string) => (
-                      <Badge key={skill} variant="skill" size="sm">{skill}</Badge>
+                      <Badge key={skill} variant="skill" size="sm">
+                        {skill}
+                      </Badge>
                     ))}
                   </div>
                 )}
@@ -220,15 +276,16 @@ export default function StudentAssessmentsPage() {
 
           {/* ✅ All Other Assessments */}
           <div className="space-y-4">
-            {recommendedAssessments.length > 0 && otherAssessments.length > 0 && (
-              <div className="flex items-center gap-2 pt-2">
-                <TrendingUp className="h-5 w-5 text-gray-500" />
-                <h2 className="text-lg font-semibold">All Assessments</h2>
-              </div>
-            )}
-            
-            {/* Filters - only show when not searching */}
-            {searchQuery === '' && (
+            {recommendedAssessments.length > 0 &&
+              otherAssessments.length > 0 &&
+              !searchQuery && (
+                <div className="flex items-center gap-2 pt-2">
+                  <TrendingUp className="h-5 w-5 text-gray-500" />
+                  <h2 className="text-lg font-semibold">All Assessments</h2>
+                </div>
+              )}
+
+            {!searchQuery && (
               <AssessmentFilters onFilterChange={handleFilterChange} />
             )}
 
@@ -241,7 +298,11 @@ export default function StudentAssessmentsPage() {
 
             {pagination && pagination.page < pagination.pages && (
               <div className="flex justify-center mt-8">
-                <Button variant="outline" onClick={loadMore} disabled={isLoadingAny}>
+                <Button
+                  variant="outline"
+                  onClick={loadMore}
+                  disabled={isLoadingAny}
+                >
                   Load More
                 </Button>
               </div>
