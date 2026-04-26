@@ -29,22 +29,32 @@ export async function GET(
       }),
     };
 
-    // Add user attempt if logged in
+    // Add user attempt if logged in - ✅ GET LATEST
     const session = await getServerSession(authOptions);
-    
+
     if (session?.user?.id) {
-      const userAttempt = assessment.attempts?.find(
-        (a: any) => a.userId?.toString() === session.user.id
-      );
+      // ✅ FIX: Get all completed attempts, sort by latest
+      const userAttempts = (assessment.attempts || [])
+        .filter(
+          (a: any) =>
+            a.userId?.toString() === session.user.id && a.completedAt
+        )
+        .sort(
+          (a: any, b: any) =>
+            new Date(b.completedAt).getTime() -
+            new Date(a.completedAt).getTime()
+        );
+
+      const latestAttempt = userAttempts[0] || null;
 
       return NextResponse.json({
         assessment: {
           ...sanitizedAssessment,
-          userAttempt: userAttempt
+          userAttempt: latestAttempt
             ? {
-                score: userAttempt.score,
-                passed: userAttempt.passed,
-                completedAt: userAttempt.completedAt,
+                score: latestAttempt.score,
+                passed: latestAttempt.passed,
+                completedAt: latestAttempt.completedAt,
               }
             : undefined,
         },
