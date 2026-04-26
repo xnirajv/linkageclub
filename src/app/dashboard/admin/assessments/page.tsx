@@ -26,7 +26,8 @@ import { Search, Plus, MoreVertical, Eye, Edit, Copy, Trash2, Users, TrendingUp,
 import { formatCurrency, formatNumber } from '@/lib/utils/format';
 
 interface Assessment {
-  id: string;
+  _id: string;
+  id?: string;
   title: string;
   skillName: string;
   level: string;
@@ -34,7 +35,8 @@ interface Assessment {
   duration: number;
   totalAttempts: number;
   passRate: number;
-  status: string;
+  isActive: boolean;
+  status?: string;
   createdAt: string;
 }
 
@@ -54,11 +56,19 @@ export default function AdminAssessmentsPage() {
       setLoading(true);
       const response = await fetch('/api/admin/assessments');
       const data = await response.json();
-      if (data.success) {
+      
+      console.log('API Response:', data); // ✅ Debug
+      
+      // ✅ FIX: API directly returns assessments array, no success wrapper
+      if (data.assessments) {
         setAssessments(data.assessments || []);
+      } else {
+        console.error('Unexpected API response:', data);
+        setAssessments([]);
       }
     } catch (error) {
       console.error('Error fetching assessments:', error);
+      setAssessments([]);
     } finally {
       setLoading(false);
     }
@@ -76,18 +86,21 @@ export default function AdminAssessmentsPage() {
     }
   };
 
+  // ✅ Use _id for filtering (MongoDB uses _id, not id)
   const filteredAssessments = assessments.filter(assessment => {
-    const matchesSearch = assessment.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         assessment.skillName.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = 
+      assessment.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      assessment.skillName?.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesLevel = levelFilter === 'all' || assessment.level === levelFilter;
-    const matchesStatus = statusFilter === 'all' || assessment.status === statusFilter;
+    const status = assessment.isActive ? 'active' : 'draft';
+    const matchesStatus = statusFilter === 'all' || status === statusFilter;
     return matchesSearch && matchesLevel && matchesStatus;
   });
 
-  const totalRevenue = assessments.reduce((sum, a) => sum + (a.price * a.totalAttempts), 0);
-  const totalAttempts = assessments.reduce((sum, a) => sum + a.totalAttempts, 0);
+  const totalRevenue = assessments.reduce((sum, a) => sum + ((a.price || 0) * (a.totalAttempts || 0)), 0);
+  const totalAttempts = assessments.reduce((sum, a) => sum + (a.totalAttempts || 0), 0);
   const averagePassRate = assessments.length > 0 
-    ? assessments.reduce((sum, a) => sum + a.passRate, 0) / assessments.length 
+    ? assessments.reduce((sum, a) => sum + (a.passRate || 0), 0) / assessments.length 
     : 0;
 
   const getLevelColor = (level: string) => {
@@ -180,40 +193,90 @@ export default function AdminAssessmentsPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Assessment</TableHead><TableHead>Skill</TableHead><TableHead>Level</TableHead>
-              <TableHead>Price</TableHead><TableHead>Duration</TableHead><TableHead>Attempts</TableHead>
-              <TableHead>Pass Rate</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead>
+              <TableHead>Assessment</TableHead>
+              <TableHead>Skill</TableHead>
+              <TableHead>Level</TableHead>
+              <TableHead>Price</TableHead>
+              <TableHead>Duration</TableHead>
+              <TableHead>Attempts</TableHead>
+              <TableHead>Pass Rate</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredAssessments.map((assessment) => (
-              <TableRow key={assessment.id}>
-                <TableCell><div><p className="font-medium">{assessment.title}</p><p className="text-xs text-gray-500">Created {new Date(assessment.createdAt).toLocaleDateString()}</p></div></TableCell>
-                <TableCell>{assessment.skillName}</TableCell>
-                <TableCell><Badge className={getLevelColor(assessment.level)}>{assessment.level}</Badge></TableCell>
-                <TableCell>{assessment.price === 0 ? 'Free' : formatCurrency(assessment.price)}</TableCell>
-                <TableCell>{assessment.duration} min</TableCell>
-                <TableCell>{formatNumber(assessment.totalAttempts)}</TableCell>
-                <TableCell><div className="flex items-center gap-2"><div className="w-16 bg-gray-100 rounded-full h-2"><div className={`h-2 rounded-full ${assessment.passRate >= 70 ? 'bg-green-600' : assessment.passRate >= 50 ? 'bg-yellow-600' : 'bg-red-600'}`} style={{ width: `${assessment.passRate}%` }} /></div><span>{assessment.passRate}%</span></div></TableCell>
-                <TableCell><Badge variant={assessment.status === 'active' ? 'default' : 'secondary'}>{assessment.status}</Badge></TableCell>
-                <TableCell className="text-right">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                      <DropdownMenuItem asChild><Link href={`/dashboard/admin/assessments/${assessment.id}`}><Eye className="mr-2 h-4 w-4" />View Details</Link></DropdownMenuItem>
-                      <DropdownMenuItem asChild><Link href={`/dashboard/admin/assessments/${assessment.id}/edit`}><Edit className="mr-2 h-4 w-4" />Edit</Link></DropdownMenuItem>
-                      <DropdownMenuItem><Copy className="mr-2 h-4 w-4" />Duplicate</DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem className="text-red-600" onClick={() => handleDelete(assessment.id)}><Trash2 className="mr-2 h-4 w-4" />Delete</DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            ))}
+            {filteredAssessments.map((assessment) => {
+              // ✅ Use _id from MongoDB
+              const assessmentId = assessment._id || assessment.id || '';
+              const status = assessment.isActive ? 'active' : 'draft';
+              
+              return (
+                <TableRow key={assessmentId}>
+                  <TableCell>
+                    <div>
+                      <p className="font-medium">{assessment.title}</p>
+                      <p className="text-xs text-gray-500">
+                        Created {new Date(assessment.createdAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </TableCell>
+                  <TableCell>{assessment.skillName}</TableCell>
+                  <TableCell><Badge className={getLevelColor(assessment.level)}>{assessment.level}</Badge></TableCell>
+                  <TableCell>{assessment.price === 0 ? 'Free' : formatCurrency(assessment.price)}</TableCell>
+                  <TableCell>{assessment.duration} min</TableCell>
+                  <TableCell>{formatNumber(assessment.totalAttempts)}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <div className="w-16 bg-gray-100 rounded-full h-2">
+                        <div
+                          className={`h-2 rounded-full ${
+                            (assessment.passRate || 0) >= 70 ? 'bg-green-600' : 
+                            (assessment.passRate || 0) >= 50 ? 'bg-yellow-600' : 'bg-red-600'
+                          }`}
+                          style={{ width: `${assessment.passRate || 0}%` }}
+                        />
+                      </div>
+                      <span>{assessment.passRate || 0}%</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={status === 'active' ? 'default' : 'secondary'}>
+                      {status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4" /></Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                        <DropdownMenuItem asChild>
+                          <Link href={`/dashboard/admin/assessments/${assessmentId}`}>
+                            <Eye className="mr-2 h-4 w-4" />View Details
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link href={`/dashboard/admin/assessments/${assessmentId}/edit`}>
+                            <Edit className="mr-2 h-4 w-4" />Edit
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem><Copy className="mr-2 h-4 w-4" />Duplicate</DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem className="text-red-600" onClick={() => handleDelete(assessmentId)}>
+                          <Trash2 className="mr-2 h-4 w-4" />Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
-        {filteredAssessments.length === 0 && <div className="text-center py-8 text-gray-500">No assessments found</div>}
+        {filteredAssessments.length === 0 && (
+          <div className="text-center py-8 text-gray-500">No assessments found</div>
+        )}
       </Card>
     </div>
   );
