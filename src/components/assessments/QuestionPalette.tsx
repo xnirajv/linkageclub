@@ -11,7 +11,6 @@ interface QuestionPaletteProps {
   answers: (number | number[] | undefined)[];
   markedForReview: number[];
   onQuestionSelect: (index: number) => void;
-  onSubmit?: () => void;
   timeLeft?: number;
 }
 
@@ -21,7 +20,6 @@ export function QuestionPalette({
   answers,
   markedForReview,
   onQuestionSelect,
-  onSubmit,
   timeLeft,
 }: QuestionPaletteProps) {
   const getQuestionStatus = (index: number) => {
@@ -155,13 +153,6 @@ export function QuestionPalette({
           </span>
         </div>
       </div>
-
-      {/* Submit Button */}
-      {onSubmit && (
-        <Button onClick={onSubmit} className="w-full mt-4" variant="default">
-          Submit Assessment
-        </Button>
-      )}
     </Card>
   );
 }

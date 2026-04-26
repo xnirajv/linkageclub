@@ -51,17 +51,19 @@ export default function TakeAssessmentPage() {
         }
 
         const data = await response.json();
-        
+
         const startTime = Date.now();
         startedAtRef.current = startTime;
 
         setTimeLeft(data.timeLeft || data.duration * 60);
 
         const questionCount = data.questions?.length || 0;
-        const initAnswers = new Array(questionCount).fill(-1);
+        const initAnswers = data.savedAnswers?.length
+          ? data.savedAnswers
+          : new Array(questionCount).fill(-1);
+
         setAnswers(initAnswers);
         answersRef.current = initAnswers;
-
         setCurrentQuestion(0);
       } catch (error: any) {
         console.error('Failed to start assessment:', error);
@@ -73,18 +75,20 @@ export default function TakeAssessmentPage() {
     initAssessment();
   }, [assessmentId, router]);
 
-  // Sync answersRef
+  // Sync answersRef with state
   useEffect(() => {
     answersRef.current = answers;
   }, [answers]);
 
+  // Time up handler
   const handleTimeUp = useCallback(() => {
     if (isSubmittingRef.current) return;
-    isSubmittingRef.current = true;
-    setIsSubmitting(true);
 
     const now = Date.now();
     const timeSpent = Math.max(1, Math.floor((now - startedAtRef.current) / 1000));
+
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
 
     submitAssessment(answersRef.current, timeSpent).then((result) => {
       if (result.success) {
@@ -123,8 +127,10 @@ export default function TakeAssessmentPage() {
     }
   };
 
+  // Final submit handler
   const handleSubmit = async () => {
     if (isSubmittingRef.current) return;
+
     isSubmittingRef.current = true;
     setIsSubmitting(true);
     setShowSubmitDialog(false);
@@ -155,10 +161,11 @@ export default function TakeAssessmentPage() {
   const currentQ = questions[currentQuestion];
   const answeredCount = answers.filter((a) => a !== -1 && a !== undefined).length;
   const progress = questions.length > 0 ? (answeredCount / questions.length) * 100 : 0;
+  const isLastQuestion = currentQuestion === questions.length - 1;
 
   return (
     <div className="max-w-6xl mx-auto">
-      {/* Header - ✅ ONLY Submit button here */}
+      {/* Header - ✅ NO Submit button */}
       <div className="bg-white dark:bg-gray-800 border-b sticky top-0 z-10 shadow-sm">
         <div className="px-6 py-4">
           <div className="flex items-center justify-between">
@@ -173,21 +180,7 @@ export default function TakeAssessmentPage() {
                 showProgress={false}
                 className="border-0 shadow-none p-0"
               />
-              {/* ✅ Single Submit Button */}
-              <Button
-                onClick={() => setShowSubmitDialog(true)}
-                disabled={isSubmitting}
-                size="sm"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Submitting...
-                  </>
-                ) : (
-                  'Submit'
-                )}
-              </Button>
+              {/* ✅ NO Submit button in header */}
             </div>
           </div>
           <Progress value={progress} className="mt-2" />
@@ -209,7 +202,7 @@ export default function TakeAssessmentPage() {
             />
           )}
 
-          {/* Navigation - ✅ No Submit button here, just Previous/Next */}
+          {/* Navigation - ✅ Submit ONLY on last question */}
           <div className="flex items-center justify-between pt-4">
             <Button
               variant="outline"
@@ -218,13 +211,23 @@ export default function TakeAssessmentPage() {
             >
               Previous
             </Button>
-            <Button onClick={handleNext}>
-              {currentQuestion === questions.length - 1 ? 'Review' : 'Next'}
-            </Button>
+            
+            {isLastQuestion ? (
+              // ✅ Last question: Submit button
+              <Button
+                onClick={() => setShowSubmitDialog(true)}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Submitting...' : 'Submit Assessment'}
+              </Button>
+            ) : (
+              // Other questions: Next button
+              <Button onClick={handleNext}>Next</Button>
+            )}
           </div>
         </div>
 
-        {/* Question Palette - ✅ No Submit button */}
+        {/* Question Palette */}
         <div className="lg:col-span-1">
           <QuestionPalette
             totalQuestions={questions.length}
@@ -247,9 +250,7 @@ export default function TakeAssessmentPage() {
             </DialogTitle>
             <DialogDescription>
               <div className="space-y-3 mt-2">
-                <p className="text-gray-700 dark:text-gray-300">
-                  Are you sure you want to submit this assessment?
-                </p>
+                <p>Are you sure you want to submit this assessment?</p>
                 <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg text-sm space-y-1">
                   <p><strong>Total Questions:</strong> {questions.length}</p>
                   <p>
@@ -281,7 +282,7 @@ export default function TakeAssessmentPage() {
               onClick={() => setShowSubmitDialog(false)}
               className="flex-1"
             >
-              Continue
+              Go Back
             </Button>
             <Button
               onClick={handleSubmit}
@@ -294,7 +295,7 @@ export default function TakeAssessmentPage() {
                   Submitting...
                 </>
               ) : (
-                'Submit'
+                'Confirm Submit'
               )}
             </Button>
           </DialogFooter>
