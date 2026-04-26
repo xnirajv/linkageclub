@@ -8,6 +8,9 @@ import { BadgeDisplay } from '@/components/assessments/BadgeDisplay';
 import { SearchInput } from '@/components/forms/SearchInput';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Sparkles, TrendingUp } from 'lucide-react';
 import { useAssessments } from '@/hooks/useAssessments';
 import { useProfile } from '@/hooks/useProfile';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -17,6 +20,9 @@ export default function StudentAssessmentsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('available');
   const debouncedSearch = useDebounce(searchQuery, 300);
+
+  // User profile for skills
+  const { profile } = useProfile();
 
   // Available tab - exclude completed
   const {
@@ -28,79 +34,99 @@ export default function StudentAssessmentsPage() {
     mutate: mutateAvailable,
   } = useAssessments({
     search: debouncedSearch,
-    excludeCompleted: true, // Always exclude for Available
+    excludeCompleted: true,
   });
 
-  // ✅ Completed tab - include all (separate instance to avoid cache conflict)
+  // All assessments for other tabs
   const {
     assessments: allAssessments = [],
     isLoading: isLoadingAll,
     mutate: mutateAll,
   } = useAssessments({
-    excludeCompleted: false, // Show all
-    limit: 50, // Get more for filtering
+    excludeCompleted: false,
+    limit: 50,
   });
 
   const { badges = [], isLoading: profileLoading } = useProfile();
 
-  // ✅ Filter completed - only those with completedAt
+  // ✅ Get user's verified skills
+  const userSkills = useMemo(() => {
+    return profile?.skills?.filter((s: any) => s.verified).map((s: any) => s.name) || [];
+  }, [profile]);
+
+  // ✅ Recommended assessments - match user skills ya popular
+  const recommendedAssessments = useMemo(() => {
+    if (userSkills.length === 0) {
+      // No skills - show popular (high pass rate, high attempts)
+      return [...allAssessments]
+        .filter((a: any) => !a.userAttempt?.completedAt)
+        .sort((a: any, b: any) => (b.totalAttempts || 0) - (a.totalAttempts || 0))
+        .slice(0, 3);
+    }
+
+    // Match with user skills
+    const matched = allAssessments.filter((a: any) => 
+      userSkills.some((skill: string) => 
+        a.skillName?.toLowerCase().includes(skill.toLowerCase()) ||
+        a.tags?.some((tag: string) => tag.toLowerCase().includes(skill.toLowerCase()))
+      )
+    );
+
+    const unmatched = allAssessments.filter((a: any) => 
+      !matched.find((m: any) => m._id === a._id)
+    );
+
+    // Matched first, then popular
+    return [
+      ...matched.filter((a: any) => !a.userAttempt?.completedAt),
+      ...unmatched
+        .filter((a: any) => !a.userAttempt?.completedAt)
+        .sort((a: any, b: any) => (b.totalAttempts || 0) - (a.totalAttempts || 0)),
+    ].slice(0, 4);
+  }, [allAssessments, userSkills]);
+
+  // Other assessments (not recommended)
+  const otherAssessments = useMemo(() => {
+    const recommendedIds = new Set(recommendedAssessments.map((a: any) => a._id));
+    return assessments.filter((a: any) => !recommendedIds.has(a._id));
+  }, [assessments, recommendedAssessments]);
+
+  // Completed
   const completedAssessments = useMemo(() => {
+    return allAssessments.filter((a: any) => a.userAttempt?.completedAt);
+  }, [allAssessments]);
+
+  // In Progress
+  const inProgressAssessments = useMemo(() => {
     return allAssessments.filter((a: any) => {
-      // Check if user has any completed attempt
-      const hasCompletedAttempt = a.attempts?.some(
-        (att: any) => att.completedAt
-      );
-      return hasCompletedAttempt || a.userAttempt?.completedAt;
+      const hasIncomplete = a.attempts?.some((att: any) => !att.completedAt);
+      return hasIncomplete && !a.userAttempt?.completedAt;
     });
   }, [allAssessments]);
 
-  // Filter in-progress - started but not completed
-  const inProgressAssessments = useMemo(() => {
-    return allAssessments.filter((a: any) => {
-      const hasIncompleteAttempt = a.attempts?.some(
-        (att: any) => !att.completedAt
-      );
-      // Exclude if already in completed
-      const isCompleted = completedAssessments.some((c: any) => c._id === a._id);
-      return hasIncompleteAttempt && !isCompleted;
-    });
-  }, [allAssessments, completedAssessments]);
-
-  // ✅ Refresh all data when tab changes or page becomes visible
+  // Refresh on mount & tab change
   const refreshAll = useCallback(() => {
     mutateAvailable();
     mutateAll();
   }, [mutateAvailable, mutateAll]);
 
-  // Refresh on tab change
+  useEffect(() => { refreshAll(); }, []);
+
   const handleTabChange = useCallback((value: string) => {
     setActiveTab(value);
     setTimeout(refreshAll, 100);
   }, [refreshAll]);
 
-  // Refresh on mount
-  useEffect(() => {
-    refreshAll();
-  }, []);
-
-  // Refresh when page becomes visible (user returns from taking assessment)
+  // Refresh on page visibility
   useEffect(() => {
     const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        refreshAll();
-      }
+      if (document.visibilityState === 'visible') refreshAll();
     };
-
-    const handleFocus = () => {
-      refreshAll();
-    };
-
     document.addEventListener('visibilitychange', handleVisibility);
-    window.addEventListener('focus', handleFocus);
-
+    window.addEventListener('focus', refreshAll);
     return () => {
       document.removeEventListener('visibilitychange', handleVisibility);
-      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('focus', refreshAll);
     };
   }, [refreshAll]);
 
@@ -128,6 +154,14 @@ export default function StudentAssessmentsPage() {
           Get verified and earn badges to boost your profile
         </p>
       </div>
+
+      {/* ✅ SINGLE Search Box - always visible */}
+      <SearchInput
+        placeholder="Search assessments by skill or title..."
+        value={searchQuery}
+        onChange={(e) => handleSearch(e.target.value)}
+        onClear={() => handleSearch('')}
+      />
 
       <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList className="grid w-full grid-cols-4">
@@ -157,26 +191,58 @@ export default function StudentAssessmentsPage() {
           </TabsTrigger>
         </TabsList>
 
-        {/* Available */}
+        {/* Available Tab */}
         <TabsContent value="available" className="space-y-6 mt-6">
+          {/* ✅ Recommended Section */}
+          {recommendedAssessments.length > 0 && searchQuery === '' && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-yellow-500" />
+                <h2 className="text-lg font-semibold">
+                  {userSkills.length > 0 ? 'Recommended for You' : 'Popular Assessments'}
+                </h2>
+                {userSkills.length > 0 && (
+                  <div className="flex gap-1">
+                    {userSkills.slice(0, 3).map((skill: string) => (
+                      <Badge key={skill} variant="skill" size="sm">{skill}</Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <AssessmentGrid
+                assessments={recommendedAssessments}
+                isLoading={isLoadingAny}
+                emptyMessage=""
+                onQuickStart={handleQuickStart}
+              />
+            </div>
+          )}
+
+          {/* ✅ All Other Assessments */}
           <div className="space-y-4">
-            <SearchInput
-              placeholder="Search assessments by skill or title..."
-              value={searchQuery}
-              onChange={(e) => handleSearch(e.target.value)}
-              onClear={() => handleSearch('')}
-            />
-            <AssessmentFilters onFilterChange={handleFilterChange} />
+            {recommendedAssessments.length > 0 && otherAssessments.length > 0 && (
+              <div className="flex items-center gap-2 pt-2">
+                <TrendingUp className="h-5 w-5 text-gray-500" />
+                <h2 className="text-lg font-semibold">All Assessments</h2>
+              </div>
+            )}
+            
+            {/* Filters - only show when not searching */}
+            {searchQuery === '' && (
+              <AssessmentFilters onFilterChange={handleFilterChange} />
+            )}
+
             <AssessmentGrid
-              assessments={assessments}
+              assessments={searchQuery ? assessments : otherAssessments}
               isLoading={isLoadingAny}
-              emptyMessage="All assessments completed! 🎉"
+              emptyMessage="No assessments found"
               onQuickStart={handleQuickStart}
             />
+
             {pagination && pagination.page < pagination.pages && (
               <div className="flex justify-center mt-8">
                 <Button variant="outline" onClick={loadMore} disabled={isLoadingAny}>
-                  Load More Assessments
+                  Load More
                 </Button>
               </div>
             )}
@@ -198,7 +264,7 @@ export default function StudentAssessmentsPage() {
           <AssessmentGrid
             assessments={completedAssessments as any}
             isLoading={isLoadingAny}
-            emptyMessage="No completed assessments yet. Start your first assessment!"
+            emptyMessage="No completed assessments yet"
             onQuickStart={handleQuickStart}
           />
         </TabsContent>
