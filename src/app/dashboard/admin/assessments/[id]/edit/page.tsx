@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/forms/Textarea';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Plus, X, Save, Trash2 } from 'lucide-react';
+import { ArrowLeft, Plus, X, Trash2, Loader2, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 
 interface Question {
@@ -30,9 +30,10 @@ export default function EditAssessmentPage() {
   const router = useRouter();
   const params = useParams();
   const id = params?.id as string;
-  
+
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [questions, setQuestions] = useState<Question[]>([
     { id: '1', question: '', options: ['', '', '', ''], correctAnswer: 0, points: 1 },
@@ -52,10 +53,14 @@ export default function EditAssessmentPage() {
 
   const fetchAssessment = async () => {
     try {
+      setLoading(true);
+      setError(null);
       const response = await fetch(`/api/admin/assessments/${id}`);
       const data = await response.json();
-      if (data.success && data.assessment) {
-        const a = data.assessment;
+      
+      const a = data.assessment || data;
+      
+      if (a) {
         setFormData({
           title: a.title || '',
           description: a.description || '',
@@ -65,23 +70,26 @@ export default function EditAssessmentPage() {
           duration: a.duration?.toString() || '',
           passingScore: a.passingScore?.toString() || '70',
           tags: a.tags?.join(', ') || '',
-          isActive: a.isActive || false,
+          isActive: a.isActive ?? true,
         });
-        if (a.questions && a.questions.length > 0) {
+        if (a.questions?.length > 0) {
           setQuestions(a.questions.map((q: any, idx: number) => ({
             id: idx.toString(),
-            question: q.question,
-            options: q.options || ['', '', '', ''],
+            question: q.question || '',
+            options: q.options?.length ? q.options : ['', '', '', ''],
             correctAnswer: q.correctAnswer || 0,
             explanation: q.explanation || '',
             points: q.points || 1,
           })));
         }
-        if (a.badges && a.badges.length > 0) setBadges(a.badges);
-        if (a.prerequisites && a.prerequisites.length > 0) setPrerequisites(a.prerequisites);
+        if (a.badges?.length > 0) setBadges(a.badges);
+        if (a.prerequisites?.length > 0) setPrerequisites(a.prerequisites);
+      } else {
+        setError('Assessment not found');
       }
-    } catch (error) {
-      console.error('Error fetching assessment:', error);
+    } catch (err) {
+      console.error('Error fetching:', err);
+      setError('Failed to load assessment');
     } finally {
       setLoading(false);
     }
@@ -96,12 +104,12 @@ export default function EditAssessmentPage() {
     setQuestions([...questions, { id: Date.now().toString(), question: '', options: ['', '', '', ''], correctAnswer: 0, points: 1 }]);
   };
 
-  const handleRemoveQuestion = (id: string) => {
-    if (questions.length > 1) setQuestions(questions.filter(q => q.id !== id));
+  const handleRemoveQuestion = (qId: string) => {
+    if (questions.length > 1) setQuestions(questions.filter(q => q.id !== qId));
   };
 
-  const handleQuestionChange = (id: string, field: keyof Question, value: any) => {
-    setQuestions(questions.map(q => q.id === id ? { ...q, [field]: value } : q));
+  const handleQuestionChange = (qId: string, field: keyof Question, value: any) => {
+    setQuestions(questions.map(q => q.id === qId ? { ...q, [field]: value } : q));
   };
 
   const handleOptionChange = (questionId: string, optionIndex: number, value: string) => {
@@ -141,36 +149,94 @@ export default function EditAssessmentPage() {
 
   const handleUpdate = async () => {
     setIsSubmitting(true);
+    setError(null);
     try {
       const payload = {
-        title: formData.title, description: formData.description, skillName: formData.skillName,
-        level: formData.level, price: parseInt(formData.price) || 0, duration: parseInt(formData.duration) || 30,
-        passingScore: parseInt(formData.passingScore) || 70, isActive: formData.isActive,
-        questions: questions.map(q => ({ question: q.question, options: q.options.filter(opt => opt.trim() !== ''), correctAnswer: q.correctAnswer, explanation: q.explanation, points: q.points })),
+        title: formData.title,
+        description: formData.description,
+        skillName: formData.skillName,
+        level: formData.level,
+        price: parseInt(formData.price) || 0,
+        duration: parseInt(formData.duration) || 30,
+        passingScore: parseInt(formData.passingScore) || 70,
+        isActive: formData.isActive,
+        questions: questions.map(q => ({
+          question: q.question,
+          options: q.options.filter(opt => opt.trim() !== ''),
+          correctAnswer: q.correctAnswer,
+          explanation: q.explanation || '',
+          points: q.points || 1,
+        })),
         badges: badges.length > 0 ? badges : undefined,
         prerequisites: prerequisites.length > 0 ? prerequisites : undefined,
-        tags: formData.tags ? formData.tags.split(',').map(t => t.trim()) : undefined,
+        tags: formData.tags ? formData.tags.split(',').map(t => t.trim()).filter(Boolean) : undefined,
       };
-      const response = await fetch(`/api/admin/assessments/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      if (response.ok) router.push('/dashboard/admin/assessments');
-      else alert('Failed to update assessment');
-    } catch (error) { alert('Something went wrong'); } finally { setIsSubmitting(false); }
+
+      const response = await fetch(`/api/admin/assessments/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (response.ok) {
+        alert('Assessment updated successfully!');
+        router.push('/dashboard/admin/assessments');
+      } else {
+        const err = await response.json();
+        throw new Error(err.error || 'Failed to update');
+      }
+    } catch (err: any) {
+      console.error('Update error:', err);
+      setError(err.message);
+      alert(err.message || 'Failed to update assessment');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  if (loading) return <div className="flex justify-center items-center h-64">Loading...</div>;
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
+      </div>
+    );
+  }
+
+  if (error && !formData.title) {
+    return (
+      <div className="text-center py-12 space-y-4">
+        <AlertCircle className="h-12 w-12 text-red-400 mx-auto" />
+        <p className="text-lg text-gray-600">{error}</p>
+        <Button asChild variant="outline">
+          <Link href="/dashboard/admin/assessments">Back</Link>
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 p-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild><Link href="/dashboard/admin/assessments"><ArrowLeft className="h-4 w-4" /></Link></Button>
+          <Button variant="ghost" size="icon" asChild>
+            <Link href="/dashboard/admin/assessments"><ArrowLeft className="h-4 w-4" /></Link>
+          </Button>
           <div><h1 className="text-2xl font-bold">Edit Assessment</h1><p className="text-gray-500">Update assessment details</p></div>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => router.push('/dashboard/admin/assessments')}>Cancel</Button>
-          <Button onClick={handleUpdate} disabled={isSubmitting}>{isSubmitting ? 'Saving...' : 'Save Changes'}</Button>
+          <Button onClick={handleUpdate} disabled={isSubmitting}>
+            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            {isSubmitting ? 'Saving...' : 'Save Changes'}
+          </Button>
         </div>
       </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded-lg flex items-center gap-2">
+          <AlertCircle className="h-4 w-4" />{error}
+        </div>
+      )}
 
       <div className="flex items-center justify-between mb-8">
         {[1, 2, 3].map((step) => (
@@ -181,7 +247,6 @@ export default function EditAssessmentPage() {
         ))}
       </div>
 
-      {/* Step 1 */}
       {currentStep === 1 && (
         <Card className="p-6 space-y-6">
           <h2 className="text-lg font-semibold">Basic Information</h2>
@@ -204,10 +269,9 @@ export default function EditAssessmentPage() {
         </Card>
       )}
 
-      {/* Step 2 */}
       {currentStep === 2 && (
         <Card className="p-6 space-y-6">
-          <div className="flex items-center justify-between"><h2 className="text-lg font-semibold">Questions</h2><Button variant="outline" size="sm" onClick={handleAddQuestion}><Plus className="h-4 w-4 mr-2" />Add Question</Button></div>
+          <div className="flex items-center justify-between"><h2 className="text-lg font-semibold">Questions ({questions.length})</h2><Button variant="outline" size="sm" onClick={handleAddQuestion}><Plus className="h-4 w-4 mr-2" />Add Question</Button></div>
           {questions.map((question, qIndex) => (
             <Card key={question.id} className="p-4 border-2">
               <div className="flex justify-between mb-4"><h3 className="font-medium">Question {qIndex + 1}</h3><Button variant="ghost" size="icon" onClick={() => handleRemoveQuestion(question.id)} disabled={questions.length === 1}><Trash2 className="h-4 w-4 text-red-600" /></Button></div>
@@ -221,7 +285,7 @@ export default function EditAssessmentPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div><label className="block text-sm font-medium mb-1">Correct Answer</label><select value={question.correctAnswer} onChange={(e) => handleQuestionChange(question.id, 'correctAnswer', parseInt(e.target.value))} className="w-full rounded-md border p-2">{question.options.map((_, idx) => (<option key={idx} value={idx}>Option {idx + 1}</option>))}</select></div>
-                  <div><label className="block text-sm font-medium mb-1">Points</label><Input type="number" value={question.points} onChange={(e) => handleQuestionChange(question.id, 'points', parseInt(e.target.value))} min="1" max="10" /></div>
+                  <div><label className="block text-sm font-medium mb-1">Points</label><Input type="number" value={question.points} onChange={(e) => handleQuestionChange(question.id, 'points', parseInt(e.target.value) || 1)} min="1" max="10" /></div>
                 </div>
                 <Textarea value={question.explanation || ''} onChange={(e) => handleQuestionChange(question.id, 'explanation', e.target.value)} placeholder="Explanation (Optional)" rows={2} />
               </div>
@@ -231,7 +295,6 @@ export default function EditAssessmentPage() {
         </Card>
       )}
 
-      {/* Step 3 */}
       {currentStep === 3 && (
         <Card className="p-6 space-y-6">
           <h2 className="text-lg font-semibold">Badges & Prerequisites</h2>
@@ -239,11 +302,11 @@ export default function EditAssessmentPage() {
             <div className="flex items-center justify-between"><h3 className="font-medium">Earnable Badges</h3><Button variant="outline" size="sm" onClick={handleAddBadge}><Plus className="h-4 w-4 mr-2" />Add Badge</Button></div>
             {badges.map((badge, idx) => (
               <Card key={idx} className="p-4"><div className="flex justify-between mb-2"><h4 className="font-medium">Badge {idx + 1}</h4><Button variant="ghost" size="icon" onClick={() => handleRemoveBadge(idx)}><Trash2 className="h-4 w-4 text-red-600" /></Button></div>
-              <div className="space-y-3"><Input placeholder="Name" value={badge.name} onChange={(e) => handleBadgeChange(idx, 'name', e.target.value)} /><Input placeholder="Description" value={badge.description} onChange={(e) => handleBadgeChange(idx, 'description', e.target.value)} /><div className="grid grid-cols-2 gap-3"><Input placeholder="Image URL" value={badge.image} onChange={(e) => handleBadgeChange(idx, 'image', e.target.value)} /><Input type="number" placeholder="Required Score (%)" value={badge.requiredScore} onChange={(e) => handleBadgeChange(idx, 'requiredScore', parseInt(e.target.value))} min="0" max="100" /></div></div></Card>
+              <div className="space-y-3"><Input placeholder="Name" value={badge.name} onChange={(e) => handleBadgeChange(idx, 'name', e.target.value)} /><Input placeholder="Description" value={badge.description} onChange={(e) => handleBadgeChange(idx, 'description', e.target.value)} /><div className="grid grid-cols-2 gap-3"><Input placeholder="Image URL" value={badge.image} onChange={(e) => handleBadgeChange(idx, 'image', e.target.value)} /><Input type="number" placeholder="Required Score (%)" value={badge.requiredScore} onChange={(e) => handleBadgeChange(idx, 'requiredScore', parseInt(e.target.value) || 0)} min="0" max="100" /></div></div></Card>
             ))}
             {badges.length === 0 && <p className="text-gray-500 text-center py-4">No badges added yet</p>}
           </div>
-          <div className="space-y-4"><h3 className="font-medium">Prerequisites</h3><div className="flex gap-2"><Input value={newPrerequisite} onChange={(e) => setNewPrerequisite(e.target.value)} placeholder="e.g., Basic JavaScript knowledge" onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddPrerequisite())} /><Button onClick={handleAddPrerequisite}>Add</Button></div><div className="flex flex-wrap gap-2">{prerequisites.map((prereq) => (<Badge key={prereq} variant="secondary" className="flex items-center gap-1">{prereq}<X className="h-3 w-3 cursor-pointer" onClick={() => handleRemovePrerequisite(prereq)} /></Badge>))}</div></div>
+          <div className="space-y-4"><h3 className="font-medium">Prerequisites</h3><div className="flex gap-2"><Input value={newPrerequisite} onChange={(e) => setNewPrerequisite(e.target.value)} placeholder="e.g., Basic JavaScript" onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddPrerequisite())} /><Button onClick={handleAddPrerequisite}>Add</Button></div><div className="flex flex-wrap gap-2">{prerequisites.map((prereq) => (<Badge key={prereq} variant="secondary" className="flex items-center gap-1">{prereq}<X className="h-3 w-3 cursor-pointer" onClick={() => handleRemovePrerequisite(prereq)} /></Badge>))}</div></div>
           <div className="flex justify-between"><Button variant="outline" onClick={() => setCurrentStep(2)}>Back</Button><Button onClick={handleUpdate} disabled={isSubmitting}>{isSubmitting ? 'Saving...' : 'Save Changes'}</Button></div>
         </Card>
       )}
