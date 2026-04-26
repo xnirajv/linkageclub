@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -29,10 +29,12 @@ export default function TakeAssessmentPage() {
   const [answers, setAnswers] = useState<number[]>([]);
   const [markedForReview, setMarkedForReview] = useState<number[]>([]);
   const [timeLeft, setTimeLeft] = useState(0);
-  const [startedAt, setStartedAt] = useState<Date | null>(null);
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [attemptId, setAttemptId] = useState<string | null>(null);
+
+  const startedAtRef = useRef<number>(0);
+  const answersRef = useRef<number[]>([]);
+  const isSubmittingRef = useRef(false);
 
   // Initialize assessment
   useEffect(() => {
@@ -49,13 +51,17 @@ export default function TakeAssessmentPage() {
         }
 
         const data = await response.json();
-        setAttemptId(data.attemptId);
-        setTimeLeft(data.timeLeft || data.duration * 60);
-        setStartedAt(new Date(data.startedAt));
         
-        // Initialize answers array
+        const startTime = Date.now();
+        startedAtRef.current = startTime;
+
+        setTimeLeft(data.timeLeft || data.duration * 60);
+
         const questionCount = data.questions?.length || 0;
-        setAnswers(new Array(questionCount).fill(-1));
+        const initAnswers = new Array(questionCount).fill(-1);
+        setAnswers(initAnswers);
+        answersRef.current = initAnswers;
+
         setCurrentQuestion(0);
       } catch (error: any) {
         console.error('Failed to start assessment:', error);
@@ -67,13 +73,32 @@ export default function TakeAssessmentPage() {
     initAssessment();
   }, [assessmentId, router]);
 
-  const handleTimeUp = useCallback(() => {
-    handleSubmit();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Sync answersRef
+  useEffect(() => {
+    answersRef.current = answers;
   }, [answers]);
 
+  const handleTimeUp = useCallback(() => {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
+
+    const now = Date.now();
+    const timeSpent = Math.max(1, Math.floor((now - startedAtRef.current) / 1000));
+
+    submitAssessment(answersRef.current, timeSpent).then((result) => {
+      if (result.success) {
+        router.push(`/dashboard/student/assessments/${assessmentId}/results`);
+      } else {
+        alert(result.error || 'Failed to submit');
+        isSubmittingRef.current = false;
+        setIsSubmitting(false);
+      }
+    });
+  }, [assessmentId, router, submitAssessment]);
+
   const handleAnswer = (answer: number | number[]) => {
-    const newAnswers = [...answers];
+    const newAnswers = [...answersRef.current];
     newAnswers[currentQuestion] = Array.isArray(answer) ? answer[0] : answer;
     setAnswers(newAnswers);
   };
@@ -99,23 +124,21 @@ export default function TakeAssessmentPage() {
   };
 
   const handleSubmit = async () => {
-    if (isSubmitting) return;
-
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
     setShowSubmitDialog(false);
-    
-    const timeSpent = Math.floor(
-      (Date.now() - (startedAt?.getTime() || Date.now())) / 1000
-    );
 
-    const result = await submitAssessment(answers, timeSpent);
+    const now = Date.now();
+    const timeSpent = Math.max(1, Math.floor((now - startedAtRef.current) / 1000));
+
+    const result = await submitAssessment(answersRef.current, timeSpent);
 
     if (result.success) {
-      router.push(
-        `/dashboard/student/assessments/${assessmentId}/results`
-      );
+      router.push(`/dashboard/student/assessments/${assessmentId}/results`);
     } else {
       alert(result.error || 'Failed to submit assessment');
+      isSubmittingRef.current = false;
       setIsSubmitting(false);
     }
   };
@@ -135,7 +158,7 @@ export default function TakeAssessmentPage() {
 
   return (
     <div className="max-w-6xl mx-auto">
-      {/* Header */}
+      {/* Header - ✅ ONLY Submit button here */}
       <div className="bg-white dark:bg-gray-800 border-b sticky top-0 z-10 shadow-sm">
         <div className="px-6 py-4">
           <div className="flex items-center justify-between">
@@ -150,8 +173,8 @@ export default function TakeAssessmentPage() {
                 showProgress={false}
                 className="border-0 shadow-none p-0"
               />
+              {/* ✅ Single Submit Button */}
               <Button
-                variant="destructive"
                 onClick={() => setShowSubmitDialog(true)}
                 disabled={isSubmitting}
                 size="sm"
@@ -186,7 +209,7 @@ export default function TakeAssessmentPage() {
             />
           )}
 
-          {/* Navigation */}
+          {/* Navigation - ✅ No Submit button here, just Previous/Next */}
           <div className="flex items-center justify-between pt-4">
             <Button
               variant="outline"
@@ -195,22 +218,13 @@ export default function TakeAssessmentPage() {
             >
               Previous
             </Button>
-            <div className="flex gap-2">
-              {currentQuestion === questions.length - 1 ? (
-                <Button
-                  onClick={() => setShowSubmitDialog(true)}
-                  disabled={isSubmitting}
-                >
-                  Submit Assessment
-                </Button>
-              ) : (
-                <Button onClick={handleNext}>Next</Button>
-              )}
-            </div>
+            <Button onClick={handleNext}>
+              {currentQuestion === questions.length - 1 ? 'Review' : 'Next'}
+            </Button>
           </div>
         </div>
 
-        {/* Question Palette */}
+        {/* Question Palette - ✅ No Submit button */}
         <div className="lg:col-span-1">
           <QuestionPalette
             totalQuestions={questions.length}
@@ -218,13 +232,12 @@ export default function TakeAssessmentPage() {
             answers={answers}
             markedForReview={markedForReview}
             onQuestionSelect={setCurrentQuestion}
-            onSubmit={() => setShowSubmitDialog(true)}
             timeLeft={timeLeft}
           />
         </div>
       </div>
 
-      {/* Submit Confirmation Dialog - Using Dialog instead of AlertDialog */}
+      {/* Submit Confirmation Dialog */}
       <Dialog open={showSubmitDialog} onOpenChange={setShowSubmitDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -238,9 +251,7 @@ export default function TakeAssessmentPage() {
                   Are you sure you want to submit this assessment?
                 </p>
                 <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg text-sm space-y-1">
-                  <p>
-                    <strong>Total Questions:</strong> {questions.length}
-                  </p>
+                  <p><strong>Total Questions:</strong> {questions.length}</p>
                   <p>
                     <strong>Answered:</strong>{' '}
                     <span className="text-green-600 font-medium">{answeredCount}</span>
@@ -253,37 +264,29 @@ export default function TakeAssessmentPage() {
                   </p>
                   <p>
                     <strong>Marked for Review:</strong>{' '}
-                    <span className="text-yellow-600 font-medium">
-                      {markedForReview.length}
-                    </span>
+                    <span className="text-yellow-600 font-medium">{markedForReview.length}</span>
                   </p>
-                  {timeLeft > 0 && (
-                    <p>
-                      <strong>Time Left:</strong>{' '}
-                      {Math.floor(timeLeft / 60)}m {timeLeft % 60}s
-                    </p>
-                  )}
                 </div>
                 {questions.length - answeredCount > 0 && (
                   <p className="text-yellow-600 text-sm font-medium">
-                    ⚠️ Warning: You have {questions.length - answeredCount} unanswered questions!
+                    ⚠️ You have {questions.length - answeredCount} unanswered questions!
                   </p>
                 )}
               </div>
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="sm:justify-between">
+          <DialogFooter className="flex gap-2">
             <Button
               variant="outline"
               onClick={() => setShowSubmitDialog(false)}
-              className="w-full sm:w-auto"
+              className="flex-1"
             >
-              Continue Assessment
+              Continue
             </Button>
             <Button
               onClick={handleSubmit}
               disabled={isSubmitting}
-              className="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white"
+              className="flex-1 bg-red-600 hover:bg-red-700 text-white"
             >
               {isSubmitting ? (
                 <>
@@ -291,7 +294,7 @@ export default function TakeAssessmentPage() {
                   Submitting...
                 </>
               ) : (
-                'Submit Assessment'
+                'Submit'
               )}
             </Button>
           </DialogFooter>
