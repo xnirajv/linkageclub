@@ -10,8 +10,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input';
 import { useProjects } from '@/hooks/useProjects';
 import { Textarea } from '@/components/forms/Textarea';
-import { SkillInput } from '@/components/forms/SkillInput';
 import { Badge } from '@/components/ui/badge';
+import { SkillInput } from '@/components/forms/SkillInput';
 
 type Step = 1 | 2 | 3 | 4;
 type Visibility = 'public' | 'private' | 'invite';
@@ -30,7 +30,7 @@ interface FormState {
   description: string;
   summary: string;
   skills: string[];
-  _skillObjects?: Array<{ name: string; level: string; mandatory: boolean }>;
+  _skillObjects?: Array<{ name: string; level: 'beginner' | 'intermediate' | 'advanced'; mandatory: boolean }>;
   experienceLevel: string;
   requirements: string[];
   locationPreference: LocationPreference;
@@ -293,11 +293,10 @@ export default function PostProjectPage() {
       {/* Status Messages */}
       {(submitError || submitSuccess) && (
         <div
-          className={`rounded-2xl border p-4 text-sm ${
-            submitError
+          className={`rounded-2xl border p-4 text-sm ${submitError
               ? 'border-red-200 bg-red-50 text-red-700'
               : 'border-green-200 bg-green-50 text-green-700'
-          }`}
+            }`}
         >
           {submitError || submitSuccess}
         </div>
@@ -319,13 +318,12 @@ export default function PostProjectPage() {
                 <Card className="border-none bg-card/80 dark:bg-charcoal-900/72 hover:shadow-md transition-shadow">
                   <CardContent className="flex items-center gap-3 p-4">
                     <div
-                      className={`flex h-10 w-10 items-center justify-center rounded-2xl text-sm font-semibold ${
-                        done
+                      className={`flex h-10 w-10 items-center justify-center rounded-2xl text-sm font-semibold ${done
                           ? 'bg-green-600 text-white'
                           : active
-                          ? 'bg-primary-600 text-white'
-                          : 'bg-gray-100 text-gray-600'
-                      }`}
+                            ? 'bg-primary-600 text-white'
+                            : 'bg-gray-100 text-gray-600'
+                        }`}
                     >
                       {done ? <CheckCircle2 className="h-4 w-4" /> : current}
                     </div>
@@ -410,11 +408,14 @@ export default function PostProjectPage() {
                 <div className="space-y-1">
                   <label className="text-sm font-medium">Skills Required *</label>
                   <SkillInput
-                    value={(form._skillObjects || form.skills.map((name) => ({
-                      name,
-                      level: 'intermediate' as const,
-                      mandatory: true,
-                    })))}
+                    value={form._skillObjects && form._skillObjects.length > 0
+                      ? form._skillObjects
+                      : form.skills.map((name) => ({
+                        name,
+                        level: 'intermediate' as const,
+                        mandatory: true,
+                      }))
+                    }
                     onChange={(skills) => {
                       setForm((prev) => ({
                         ...prev,
@@ -439,11 +440,10 @@ export default function PostProjectPage() {
                         key={value}
                         type="button"
                         onClick={() => setField('experienceLevel', value)}
-                        className={`rounded-xl border px-4 py-3 text-sm text-left transition-colors ${
-                          form.experienceLevel === value
+                        className={`rounded-xl border px-4 py-3 text-sm text-left transition-colors ${form.experienceLevel === value
                             ? 'border-primary-600 bg-primary-50 text-primary-800'
                             : 'border-gray-200 bg-white hover:bg-gray-50'
-                        }`}
+                          }`}
                       >
                         {label}
                       </button>
@@ -459,11 +459,10 @@ export default function PostProjectPage() {
                         key={type}
                         type="button"
                         onClick={() => setField('locationPreference', type)}
-                        className={`rounded-xl border px-4 py-3 text-sm capitalize transition-colors ${
-                          form.locationPreference === type
+                        className={`rounded-xl border px-4 py-3 text-sm capitalize transition-colors ${form.locationPreference === type
                             ? 'border-primary-600 bg-primary-50 text-primary-800'
                             : 'border-gray-200 bg-white hover:bg-gray-50'
-                        }`}
+                          }`}
                       >
                         {type}
                       </button>
@@ -520,11 +519,10 @@ export default function PostProjectPage() {
                         key={value}
                         type="button"
                         onClick={() => setField('budgetType', value)}
-                        className={`rounded-xl border px-4 py-3 text-sm transition-colors ${
-                          form.budgetType === value
+                        className={`rounded-xl border px-4 py-3 text-sm transition-colors ${form.budgetType === value
                             ? 'border-primary-600 bg-primary-50 text-primary-800'
                             : 'border-gray-200 bg-white hover:bg-gray-50'
-                        }`}
+                          }`}
                       >
                         {label}
                       </button>
@@ -654,11 +652,10 @@ export default function PostProjectPage() {
                         key={value}
                         type="button"
                         onClick={() => setField('visibility', value as Visibility)}
-                        className={`w-full rounded-xl border px-4 py-3 text-left transition-colors ${
-                          form.visibility === value
+                        className={`w-full rounded-xl border px-4 py-3 text-left transition-colors ${form.visibility === value
                             ? 'border-primary-600 bg-primary-50 text-primary-800'
                             : 'border-gray-200 bg-white hover:bg-gray-50'
-                        }`}
+                          }`}
                       >
                         <p className="font-medium text-sm">{label}</p>
                         <p className="text-xs text-gray-500 mt-0.5">{desc}</p>
