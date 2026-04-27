@@ -1,31 +1,26 @@
 'use client';
 
+import React, { useState } from 'react';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Calendar, CreditCard, MessageSquare, ShieldCheck, Target } from 'lucide-react';
-import { useApplication, useApplications } from '@/hooks/useApplications';
+import {
+  ArrowLeft,
+  Clock,
+  DollarSign,
+  Calendar,
+  MapPin,
+  Briefcase,
+  ExternalLink,
+  MessageSquare,
+  Users,
+  Loader2,
+  AlertCircle,
+} from 'lucide-react';
 import { useProject } from '@/hooks/useProjects';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Textarea } from '@/components/forms/Textarea';
-
-type ApplicantRef = {
-  _id?: string;
-  name?: string;
-  trustScore?: number;
-  location?: string;
-  skills?: Array<{ name?: string; level?: string }>;
-};
-
-type ProjectApplication = {
-  _id: string;
-  status?: string;
-  proposedAmount?: number;
-  applicantId?: ApplicantRef;
-};
-
-type SelectedApplicant = string | ApplicantRef;
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('en-IN', {
@@ -35,299 +30,224 @@ function formatCurrency(value: number) {
   }).format(value);
 }
 
+function getStatusBadge(status: string) {
+  const styles: Record<string, string> = {
+    open: 'bg-green-100 text-green-700',
+    in_progress: 'bg-blue-100 text-blue-700',
+    completed: 'bg-purple-100 text-purple-700',
+    draft: 'bg-yellow-100 text-yellow-700',
+    cancelled: 'bg-red-100 text-red-700',
+  };
+  return styles[status] || 'bg-gray-100 text-gray-700';
+}
+
 export default function CompanyProjectDetailPage() {
   const params = useParams();
   const router = useRouter();
   const projectId = params.id as string;
   const { project, isLoading, errorMessage } = useProject(projectId);
-  const { applications = [], isLoading: applicationsLoading, sendMessage } = useApplications({
-    role: 'company',
-    projectId,
-    limit: 50,
-  });
-  const [activeTab, setActiveTab] = useState<'overview' | 'milestones' | 'candidate' | 'communication' | 'payments'>('overview');
-  const [messageInput, setMessageInput] = useState('');
-  const [messageError, setMessageError] = useState<string | null>(null);
-  const [messageSending, setMessageSending] = useState(false);
-  const [messages, setMessages] = useState<any[]>([]);
 
-  const typedApplications = applications as ProjectApplication[];
-  const selectedApplication = useMemo(() => {
-    if (!project?.selectedApplicant) {
-      return typedApplications.find((application) => application.status === 'accepted') || null;
-    }
-
-    const selected = project.selectedApplicant as SelectedApplicant;
-    const selectedId = typeof selected === 'string' ? selected : selected?._id;
-
+  if (isLoading) {
     return (
-      typedApplications.find(
-        (application) => application.applicantId?._id === selectedId
-      ) || null
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
+      </div>
     );
-  }, [project?.selectedApplicant, typedApplications]);
-  const selectedApplicationId = selectedApplication?._id || '';
-  const { getMessages } = useApplication(selectedApplicationId);
-
-  const completedMilestones = project?.milestones?.filter((item) => item.status === 'completed' || item.status === 'approved').length || 0;
-  const progress = Math.round((completedMilestones / Math.max(project?.milestones?.length || 1, 1)) * 100);
-  const releasedAmount =
-    project?.milestones
-      ?.filter((item) => item.status === 'approved' || item.status === 'completed')
-      .reduce((sum, item) => sum + (item.amount || 0), 0) || 0;
-  const pendingAmount = Math.max((project?.budget?.max || project?.budget?.min || 0) - releasedAmount, 0);
-
-  useEffect(() => {
-    let active = true;
-    const loadMessages = async () => {
-      if (!selectedApplicationId) {
-        setMessages([]);
-        return;
-      }
-      const data = await getMessages();
-      if (active) {
-        setMessages(data || []);
-      }
-    };
-    void loadMessages();
-    return () => {
-      active = false;
-    };
-  }, [getMessages, selectedApplicationId]);
-
-  const handleSendMessage = async () => {
-    if (!selectedApplicationId || !messageInput.trim() || messageSending) return;
-    setMessageSending(true);
-    setMessageError(null);
-    const result = await sendMessage(selectedApplicationId, messageInput.trim());
-    if (!result.success) {
-      setMessageError(result.error || 'Failed to send message.');
-    } else {
-      setMessageInput('');
-      const updated = await getMessages();
-      setMessages(updated || []);
-    }
-    setMessageSending(false);
-  };
-
-  if (isLoading || applicationsLoading) {
-    return <div className="rounded-[28px] bg-card/80 p-8 text-sm text-charcoal-500 dark:bg-charcoal-900/72 dark:text-charcoal-400">Loading project details...</div>;
   }
 
   if (!project) {
     return (
-      <div className="space-y-4">
-        <div className="rounded-[28px] border border-red-200 bg-red-50 p-6 text-sm text-red-700">
-          {errorMessage || 'Project not found.'}
-        </div>
-        <Button asChild variant="outline">
+      <div className="space-y-4 text-center py-12">
+        <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
+        <p className="text-gray-600">{errorMessage || 'Project not found'}</p>
+        <Button asChild variant="outline" className="mt-4">
           <Link href="/dashboard/company/my-projects">Back to My Projects</Link>
         </Button>
       </div>
     );
   }
 
+  const progress = project.milestones?.length
+    ? Math.round(
+        (project.milestones.filter((m: any) => m.status === 'approved').length /
+          project.milestones.length) *
+          100
+      )
+    : 0;
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div className="flex items-start gap-3">
-          <Button variant="outline" size="icon" onClick={() => router.back()}>
+    <div className="space-y-6 p-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => router.back()}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-3xl font-semibold text-charcoal-950 dark:text-white">{project.title}</h1>
-            <p className="mt-2 text-sm leading-7 text-charcoal-500 dark:text-charcoal-400">Project detail, candidate management, milestones, and payment tracking in one company workspace.</p>
+            <h1 className="text-2xl font-bold">{project.title}</h1>
+            <div className="flex items-center gap-3 mt-1">
+              <Badge className={getStatusBadge(project.status)}>
+                {project.status === 'open' ? 'Active' : project.status}
+              </Badge>
+              <span className="text-sm text-gray-500">
+                {progress}% Complete • {project.duration} days
+              </span>
+            </div>
           </div>
         </div>
-        <div className="flex flex-wrap gap-3">
+        <div className="flex gap-3">
           <Button asChild variant="outline">
-            <Link href={`/dashboard/company/my-projects/${projectId}/manage`}>Manage Project</Link>
+            <Link href={`/dashboard/company/my-projects/${projectId}/manage`}>
+              Manage Project
+            </Link>
           </Button>
           <Button asChild variant="outline">
-            <Link href="/dashboard/messages">
-              <MessageSquare className="mr-2 h-4 w-4" />
-              Message Candidate
+            <Link href={`/dashboard/company/my-projects/${projectId}/applications`}>
+              <Users className="mr-2 h-4 w-4" />
+              Applications ({project.applicationsCount || 0})
             </Link>
           </Button>
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <Metric title="Status" value={String(project.status || 'open')} />
-        <Metric title="Budget" value={`${formatCurrency(project.budget?.min || 0)} - ${formatCurrency(project.budget?.max || 0)}`} />
-        <Metric title="Duration" value={`${project.duration || 0} days`} />
-        <Metric title="Progress" value={`${progress}%`} />
+      {/* Progress Bar */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between mb-2 text-sm">
+            <span className="text-gray-500">Project Progress</span>
+            <span className="font-medium">{progress}%</span>
+          </div>
+          <Progress value={progress} className="h-2" />
+        </CardContent>
+      </Card>
+
+      {/* Quick Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatCard
+          icon={<DollarSign className="h-5 w-5 text-green-600" />}
+          label="Budget"
+          value={`${formatCurrency(project.budget?.min || 0)} - ${formatCurrency(project.budget?.max || 0)}`}
+        />
+        <StatCard
+          icon={<Clock className="h-5 w-5 text-blue-600" />}
+          label="Duration"
+          value={`${project.duration} days`}
+        />
+        <StatCard
+          icon={<Calendar className="h-5 w-5 text-purple-600" />}
+          label="Posted"
+          value={new Date(project.createdAt).toLocaleDateString()}
+        />
+        <StatCard
+          icon={<Briefcase className="h-5 w-5 text-orange-600" />}
+          label="Category"
+          value={project.category || 'General'}
+        />
       </div>
 
-      <div className="grid gap-3 md:grid-cols-5">
-        {[
-          ['overview', 'Overview'],
-          ['milestones', 'Milestones'],
-          ['candidate', 'Candidate'],
-          ['communication', 'Communication'],
-          ['payments', 'Payments'],
-        ].map(([value, label]) => (
-          <button
-            key={value}
-            type="button"
-            onClick={() => setActiveTab(value as typeof activeTab)}
-            className={`rounded-[24px] border px-4 py-3 text-left text-sm transition ${activeTab === value ? 'border-primary-700 bg-primary-50 text-primary-800' : 'border-primary-100 bg-card/80 text-charcoal-700 dark:border-white/10 dark:bg-charcoal-900/72 dark:text-charcoal-300'}`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+      {/* Details Grid */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Left: Description + Skills */}
         <div className="space-y-6">
-          {activeTab === 'overview' && (
-            <Card className="border-none bg-card/80 dark:bg-charcoal-900/72">
-              <CardHeader><CardTitle className="text-xl text-charcoal-950 dark:text-white">Overview</CardTitle></CardHeader>
-              <CardContent className="space-y-4 text-sm text-charcoal-700 dark:text-charcoal-300">
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="rounded-[24px] border border-primary-100/70 bg-silver-50/70 p-4 dark:border-white/10 dark:bg-charcoal-950/35">
-                    <div className="text-xs uppercase tracking-[0.16em] text-charcoal-500">Project Details</div>
-                    <div className="mt-3 space-y-2">
-                      <div>Title: {project.title}</div>
-                      <div>Category: {project.category || 'General'}</div>
-                      <div>Budget: {formatCurrency(project.budget?.min || 0)} - {formatCurrency(project.budget?.max || 0)}</div>
-                      <div>Duration: {project.duration || 0} days</div>
-                      <div>Status: {project.status || 'open'}</div>
-                    </div>
-                  </div>
-                  <div className="rounded-[24px] border border-primary-100/70 bg-silver-50/70 p-4 dark:border-white/10 dark:bg-charcoal-950/35">
-                    <div className="text-xs uppercase tracking-[0.16em] text-charcoal-500">Quick Actions</div>
-                    <div className="mt-3 flex flex-col gap-2">
-                      <Button asChild size="sm">
-                        <Link href="/dashboard/messages">Message Candidate</Link>
-                      </Button>
-                      <Button size="sm" variant="outline">Review Milestone</Button>
-                      <Button size="sm" variant="outline">Release Payment</Button>
-                      <Button size="sm" variant="outline">View Contract</Button>
-                      <Button size="sm" variant="outline">Report Issue</Button>
-                    </div>
-                  </div>
-                </div>
-                <div className="rounded-[24px] border border-primary-100/70 bg-silver-50/70 p-4 dark:border-white/10 dark:bg-charcoal-950/35">
-                  <div className="font-semibold text-charcoal-950 dark:text-white">Project Description</div>
-                  <div className="mt-3 leading-7">{project.description}</div>
+          <Card>
+            <CardHeader><CardTitle>Project Description</CardTitle></CardHeader>
+            <CardContent>
+              <p className="text-gray-600 whitespace-pre-wrap leading-7">{project.description}</p>
+            </CardContent>
+          </Card>
+
+          {project.skills?.length > 0 && (
+            <Card>
+              <CardHeader><CardTitle>Skills Required</CardTitle></CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-2">
+                  {project.skills.map((skill: any, i: number) => (
+                    <Badge key={i} variant="secondary" className="text-sm px-3 py-1">
+                      {skill.name || skill} {skill.level && `(${skill.level})`}
+                    </Badge>
+                  ))}
                 </div>
               </CardContent>
             </Card>
           )}
 
-          {activeTab === 'milestones' && (
-            <Card className="border-none bg-card/80 dark:bg-charcoal-900/72">
-              <CardHeader><CardTitle className="text-xl text-charcoal-950 dark:text-white">Milestones</CardTitle></CardHeader>
-              <CardContent className="space-y-3">
-                {(project.milestones || []).map((milestone, index) => (
-                  <div key={`${milestone.title}-${index}`} className="rounded-[24px] border border-primary-100/70 bg-silver-50/70 p-4 dark:border-white/10 dark:bg-charcoal-950/35">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <div className="font-semibold text-charcoal-950 dark:text-white">{milestone.title}</div>
-                        <div className="mt-1 text-sm text-charcoal-500 dark:text-charcoal-400">{formatCurrency(milestone.amount || 0)}</div>
-                      </div>
-                      <span className="rounded-full bg-primary-100 px-3 py-1 text-xs font-semibold text-primary-800">{milestone.status || 'pending'}</span>
-                    </div>
-                  </div>
-                ))}
-                {(project.milestones || []).length === 0 && (
-                  <div className="rounded-[24px] border border-dashed border-primary-200 bg-silver-50/70 p-6 text-sm text-charcoal-500">
-                    No milestones added yet.
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {activeTab === 'communication' && (
-            <Card className="border-none bg-card/80 dark:bg-charcoal-900/72">
-              <CardHeader><CardTitle className="text-xl text-charcoal-950 dark:text-white">Communication</CardTitle></CardHeader>
-              <CardContent className="space-y-4 text-sm text-charcoal-700 dark:text-charcoal-300">
-                {messages.length === 0 && (
-                  <div className="rounded-[22px] border border-dashed border-primary-200 bg-silver-50/70 p-4 text-sm text-charcoal-500">
-                    No messages yet.
-                  </div>
-                )}
-                {messages.map((message) => (
-                  <div key={message.id} className="rounded-[22px] border border-primary-100/70 bg-silver-50/70 p-4">
-                    <div className="text-xs text-charcoal-500">{message.sender?.name || 'User'}</div>
-                    <div className="text-[11px] text-charcoal-400">
-                      {message.createdAt ? new Date(message.createdAt).toLocaleString() : 'Recently'}
-                    </div>
-                    <div className="mt-2 text-sm text-charcoal-700">{message.content}</div>
-                  </div>
-                ))}
-                {messageError && (
-                  <div className="rounded-[22px] border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-                    {messageError}
-                  </div>
-                )}
-                <div className="space-y-3">
-                  <Textarea
-                    rows={3}
-                    value={messageInput}
-                    onChange={(event) => setMessageInput(event.target.value)}
-                    placeholder="Type your message..."
-                  />
-                  <Button onClick={handleSendMessage} disabled={!messageInput.trim() || messageSending}>
-                    {messageSending ? 'Sending...' : 'Send Message'}
-                  </Button>
-                </div>
+          {project.requirements?.length > 0 && (
+            <Card>
+              <CardHeader><CardTitle>Requirements</CardTitle></CardHeader>
+              <CardContent>
+                <ul className="space-y-2">
+                  {project.requirements.map((req: string, i: number) => (
+                    <li key={i} className="flex items-center gap-2 text-sm text-gray-600">
+                      <span className="h-1.5 w-1.5 bg-primary-600 rounded-full" />
+                      {req}
+                    </li>
+                  ))}
+                </ul>
               </CardContent>
             </Card>
           )}
         </div>
 
+        {/* Right: Milestones + Location */}
         <div className="space-y-6">
-          {activeTab === 'candidate' && (
-            <Card className="border-none bg-card/80 dark:bg-charcoal-900/72">
-              <CardHeader><CardTitle className="text-xl text-charcoal-950 dark:text-white">Candidate</CardTitle></CardHeader>
-              <CardContent className="space-y-3 text-sm text-charcoal-700 dark:text-charcoal-300">
-                <div className="rounded-[24px] border border-primary-100/70 bg-silver-50/70 p-4 dark:border-white/10 dark:bg-charcoal-950/35">
-                  <div className="font-semibold text-charcoal-950 dark:text-white">{selectedApplication?.applicantId?.name || 'No candidate selected yet'}</div>
-                  <div className="mt-2">Trust Score: {selectedApplication?.applicantId?.trustScore || 0}%</div>
-                  <div className="mt-1">Location: {selectedApplication?.applicantId?.location || 'Not provided'}</div>
-                  <div className="mt-1">Status: {selectedApplication?.status || 'Awaiting company decision'}</div>
-                  <div className="mt-1">Proposed amount: {formatCurrency(selectedApplication?.proposedAmount || 0)}</div>
-                  {selectedApplication?.applicantId?.skills?.length ? (
-                    <div className="mt-2 text-xs text-charcoal-600">
-                      Skills: {selectedApplication.applicantId.skills.map((skill) => skill.name).filter(Boolean).join(', ')}
+          {project.milestones?.length > 0 && (
+            <Card>
+              <CardHeader><CardTitle>Milestones</CardTitle></CardHeader>
+              <CardContent className="space-y-3">
+                {project.milestones.map((milestone: any, i: number) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between p-3 border rounded-xl"
+                  >
+                    <div>
+                      <p className="font-medium text-sm">{milestone.title}</p>
+                      <p className="text-xs text-gray-500">Day {milestone.deadline}</p>
                     </div>
-                  ) : null}
-                  <div className="mt-4 flex gap-2">
-                    <Button asChild size="sm">
-                      <Link href={`/dashboard/company/my-projects/${projectId}/applications`}>Review Applicants</Link>
-                    </Button>
-                    <Button asChild size="sm" variant="outline">
-                      <Link href="/dashboard/messages">Message</Link>
-                    </Button>
+                    <div className="text-right">
+                      <p className="font-medium text-sm">{formatCurrency(milestone.amount)}</p>
+                      <Badge className={getStatusBadge(milestone.status)}>
+                        {milestone.status}
+                      </Badge>
+                    </div>
                   </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {project.location && (
+            <Card>
+              <CardHeader><CardTitle>Location</CardTitle></CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-5 w-5 text-gray-400" />
+                  <span className="text-lg font-medium capitalize">
+                    {project.location.type}
+                    {project.location.label && ` - ${project.location.label}`}
+                  </span>
                 </div>
               </CardContent>
             </Card>
           )}
 
-          {activeTab === 'payments' && (
-            <Card className="border-none bg-card/80 dark:bg-charcoal-900/72">
-              <CardHeader><CardTitle className="text-xl text-charcoal-950 dark:text-white">Payments</CardTitle></CardHeader>
-              <CardContent className="space-y-3 text-sm text-charcoal-700 dark:text-charcoal-300">
-                <div className="rounded-[24px] border border-primary-100/70 bg-silver-50/70 p-4 dark:border-white/10 dark:bg-charcoal-950/35">
-                  <div className="flex items-center gap-2"><CreditCard className="h-4 w-4 text-secondary-700" />Released: {formatCurrency(releasedAmount)}</div>
-                  <div className="mt-2">Pending: {formatCurrency(pendingAmount)}</div>
-                  <div className="mt-2">Platform commission (10%): {formatCurrency(Math.round((project.budget?.max || project.budget?.min || 0) * 0.1))}</div>
-                </div>
-                <div className="rounded-[24px] border border-dashed border-primary-200 bg-silver-50/70 p-4 text-xs text-charcoal-500">
-                  Transaction history will appear here once payments are released.
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          <Card className="border-none bg-gradient-to-br from-primary-700 via-info-600 to-info-500 text-white">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-2 text-sm uppercase tracking-[0.16em] text-white/70"><ShieldCheck className="h-4 w-4" />Company Control</div>
-              <div className="mt-4 text-xl font-semibold">This project now reflects the real database state instead of placeholder candidate and milestone data.</div>
+          {/* Quick Actions */}
+          <Card>
+            <CardHeader><CardTitle>Quick Actions</CardTitle></CardHeader>
+            <CardContent className="space-y-2">
+              <Button asChild variant="outline" className="w-full justify-start">
+                <Link href="/dashboard/messages">
+                  <MessageSquare className="mr-2 h-4 w-4" />Message
+                </Link>
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                onClick={() =>
+                  router.push(`/dashboard/company/my-projects/${projectId}/manage`)
+                }
+              >
+                <ExternalLink className="mr-2 h-4 w-4" />Manage Project
+              </Button>
             </CardContent>
           </Card>
         </div>
@@ -336,22 +256,26 @@ export default function CompanyProjectDetailPage() {
   );
 }
 
-function Metric({ title, value }: { title: string; value: string }) {
+function StatCard({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}) {
   return (
-    <Card className="border-none bg-card/80 dark:bg-charcoal-900/72">
-      <CardContent className="p-5">
-        <div className="text-sm uppercase tracking-[0.16em] text-charcoal-500 dark:text-charcoal-400">{title}</div>
-        <div className="mt-3 text-2xl font-semibold text-charcoal-950 dark:text-white">{value}</div>
+    <Card>
+      <CardContent className="p-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-gray-100 rounded-lg">{icon}</div>
+          <div>
+            <p className="text-xs text-gray-500">{label}</p>
+            <p className="font-semibold">{value}</p>
+          </div>
+        </div>
       </CardContent>
     </Card>
-  );
-}
-
-function ActionCard({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) {
-  return (
-    <div className="rounded-[24px] border border-primary-100/70 bg-silver-50/70 p-4 dark:border-white/10 dark:bg-charcoal-950/35">
-      <div className="flex items-center gap-2 text-sm font-semibold text-charcoal-950 dark:text-white">{icon}{title}</div>
-      <div className="mt-2 text-sm text-charcoal-500 dark:text-charcoal-400">{text}</div>
-    </div>
   );
 }
