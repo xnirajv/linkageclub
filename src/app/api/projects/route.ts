@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { z } from 'zod';
 import { authOptions } from '@/lib/auth/options';
@@ -59,7 +59,7 @@ const listQuerySchema = z.object({
   minBudget: z.coerce.number().min(0).default(0),
   maxBudget: z.coerce.number().min(0).default(1000000),
   experienceLevel: z.enum(['beginner', 'intermediate', 'advanced', 'any']).optional(),
-  status: z.enum(['draft', 'open', 'in_progress', 'completed', 'cancelled']).default('open'),
+  status: z.enum(['draft', 'open', 'in_progress', 'completed', 'cancelled', 'all']).default('open'),
   search: z.string().trim().optional(),
 });
 
@@ -105,10 +105,24 @@ export async function GET(req: NextRequest) {
 
     await connectDB();
 
-    const query: Record<string, unknown> = {
-      status: queryParams.status,
-      visibility: 'public',
-    };
+    const session = await getServerSession(authOptions);
+
+    const query: Record<string, unknown> = {};
+
+    // ✅ Company user - only show their own projects
+    if (session?.user?.role === 'company') {
+      query.companyId = new mongoose.Types.ObjectId(session.user.id);
+    }
+
+    // ✅ Status filter (skip if 'all')
+    if (queryParams.status && queryParams.status !== 'all') {
+      query.status = queryParams.status;
+    }
+
+    // ✅ Public visibility only for non-company users
+    if (!session || session.user.role !== 'company') {
+      query.visibility = 'public';
+    }
 
     if (queryParams.category) {
       query.category = queryParams.category;
@@ -142,7 +156,7 @@ export async function GET(req: NextRequest) {
     }
 
     const skip = (queryParams.page - 1) * queryParams.limit;
-    const [projects, total, session] = await Promise.all([
+    const [projects, total] = await Promise.all([
       Project.find(query)
         .populate('companyId', 'name avatar companyName')
         .sort({ createdAt: -1 })
@@ -150,7 +164,6 @@ export async function GET(req: NextRequest) {
         .limit(queryParams.limit)
         .lean(),
       Project.countDocuments(query),
-      getServerSession(authOptions),
     ]);
 
     let savedIds = new Set<string>();
