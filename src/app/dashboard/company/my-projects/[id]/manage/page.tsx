@@ -4,202 +4,156 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
-  ArrowLeft,
-  Clock,
-  CheckCircle2,
-  AlertCircle,
-  Play,
-  Send,
-  Paperclip,
-  User,
-  MessageSquare,
-  DollarSign,
-  Star,
-  ExternalLink,
-  RotateCcw,
-  XCircle,
+  ArrowLeft, Save, Sparkles, Plus, Trash2, Loader2, AlertCircle,
+  CheckCircle2, Eye, Edit3, X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/forms/Textarea';
-import { Loader2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { useProject } from '@/hooks/useProjects';
 
-type TabValue = 'overview' | 'milestones' | 'candidate' | 'communication' | 'payments';
-
-interface MilestoneData {
-  _id: string;
+interface Milestone {
   title: string;
-  description?: string;
-  amount: number;
-  deadline: number;
-  status: 'pending' | 'in_progress' | 'completed' | 'approved';
-  feedback?: string;
-  deliverables?: string[];
-  completedAt?: string;
-  approvedAt?: string;
-}
-
-interface CandidateData {
-  _id: string;
-  name: string;
-  avatar?: string;
-  trustScore?: number;
-  location?: string;
-  skills?: Array<{ name: string; level: string; verified: boolean }>;
-  bio?: string;
-}
-
-interface Message {
-  id: string;
-  sender: string;
-  senderName: string;
-  message: string;
-  timestamp: string;
-  attachments?: string[];
-}
-
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function getStatusBadge(status: string) {
-  const styles: Record<string, string> = {
-    pending: 'bg-yellow-100 text-yellow-700',
-    in_progress: 'bg-blue-100 text-blue-700',
-    completed: 'bg-green-100 text-green-700',
-    approved: 'bg-purple-100 text-purple-700',
-  };
-  return styles[status] || 'bg-gray-100 text-gray-700';
-}
-
-function getStatusIcon(status: string) {
-  switch (status) {
-    case 'completed': return <CheckCircle2 className="h-4 w-4 text-green-600" />;
-    case 'in_progress': return <Play className="h-4 w-4 text-blue-600" />;
-    case 'approved': return <CheckCircle2 className="h-4 w-4 text-purple-600" />;
-    default: return <Clock className="h-4 w-4 text-yellow-600" />;
-  }
+  amount: string;
+  deadline: string;
+  deliverables?: string;
 }
 
 export default function ManageProjectPage() {
   const params = useParams();
   const router = useRouter();
   const projectId = params.id as string;
-  const [activeTab, setActiveTab] = useState<TabValue>('overview');
-  const [loading, setLoading] = useState(true);
-  const [project, setProject] = useState<any>(null);
-  const [milestones, setMilestones] = useState<MilestoneData[]>([]);
-  const [candidate, setCandidate] = useState<CandidateData | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [newMessage, setNewMessage] = useState('');
-  const [feedback, setFeedback] = useState<Record<string, string>>({});
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { project, isLoading, errorMessage, updateProject } = useProject(projectId);
+
+  // Form State
+  const [title, setTitle] = useState('');
+  const [summary, setSummary] = useState('');
+  const [description, setDescription] = useState('');
+  const [category, setCategory] = useState('');
+  const [skills, setSkills] = useState<string[]>([]);
+  const [skillInput, setSkillInput] = useState('');
+  const [budgetMin, setBudgetMin] = useState('');
+  const [budgetMax, setBudgetMax] = useState('');
+  const [duration, setDuration] = useState('');
+  const [experienceLevel, setExperienceLevel] = useState('intermediate');
+  const [locationType, setLocationType] = useState<'remote' | 'onsite' | 'hybrid'>('remote');
+  const [locationLabel, setLocationLabel] = useState('');
+  const [status, setStatus] = useState('open');
+  const [milestones, setMilestones] = useState<Milestone[]>([]);
+  const [requirements, setRequirements] = useState<string[]>([]);
+  const [reqInput, setReqInput] = useState('');
+
+  // UI State
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
 
   useEffect(() => {
-    if (projectId) fetchAllData();
-  }, [projectId]);
+    if (!project) return;
+    setTitle(project.title || '');
+    setSummary(project.summary || '');
+    setDescription(project.description || '');
+    setCategory(project.category || '');
+    setSkills((project.skills || []).map((s: any) => s.name || s));
+    setBudgetMin(String(project.budget?.min ?? ''));
+    setBudgetMax(String(project.budget?.max ?? ''));
+    setDuration(String(project.duration ?? ''));
+    setExperienceLevel(project.experienceLevel || 'intermediate');
+    setLocationType(project.location?.type || 'remote');
+    setLocationLabel(project.location?.label || '');
+    setStatus(project.status || 'open');
+    setRequirements(project.requirements || []);
+    setMilestones(
+      (project.milestones || []).map((m: any) => ({
+        title: m.title || '',
+        amount: String(m.amount ?? ''),
+        deadline: String(m.deadline ?? ''),
+        deliverables: m.description || '',
+      }))
+    );
+  }, [project]);
 
-  const fetchAllData = async () => {
-    setLoading(true);
-    setError(null);
+  const milestoneTotal = useMemo(
+    () => milestones.reduce((sum, m) => sum + (Number(m.amount) || 0), 0),
+    [milestones]
+  );
+
+  const handleSave = async () => {
+    if (isSaving) return;
+    setIsSaving(true);
+    setSaveError(null);
+    setSaveSuccess(null);
+
     try {
-      const [projectRes, milestoneRes] = await Promise.all([
-        fetch(`/api/projects/${projectId}`),
-        fetch(`/api/projects/${projectId}/milestones`),
-      ]);
+      const result = await updateProject({
+        title: title.trim(),
+        summary: summary.trim() || undefined,
+        description: description.trim(),
+        category,
+        skills: skills.filter(Boolean).map((name) => ({
+          name,
+          level: experienceLevel as any,
+          mandatory: true,
+        })),
+        budget: {
+          type: (project?.budget?.type as any) || 'fixed',
+          min: Number(budgetMin) || 0,
+          max: Number(budgetMax) || 0,
+          currency: 'INR',
+        },
+        duration: Number(duration) || 0,
+        experienceLevel: experienceLevel as any,
+        location: {
+          type: locationType,
+          label: locationType === 'remote' ? 'Remote' : locationLabel.trim() || undefined,
+        },
+        status: status as any,
+        requirements: requirements.filter(Boolean),
+        milestones: milestones
+          .filter((m) => m.title && m.amount)
+          .map((m) => ({
+            title: m.title,
+            description: m.deliverables || m.title,
+            amount: Number(m.amount),
+            deadline: Number(m.deadline),
+            status: 'pending' as const, // ✅ Add this
+          })),
+      });
 
-      const projectData = await projectRes.json();
-      const milestoneData = await milestoneRes.json();
-
-      if (projectData.success || projectData.data) {
-        const proj = projectData.data?.project || projectData.project;
-        setProject(proj);
-        if (proj?.selectedApplicant) {
-          setCandidate(proj.selectedApplicant);
-        }
-      }
-
-      if (milestoneData.milestones) {
-        setMilestones(milestoneData.milestones);
+      if (result.success) {
+        setSaveSuccess('Project updated successfully!');
+        setTimeout(() => setSaveSuccess(null), 3000);
+      } else {
+        setSaveError(result.error || 'Failed to save changes');
       }
     } catch (err) {
-      console.error('Error fetching data:', err);
-      setError('Failed to load project data');
+      setSaveError('Something went wrong');
     } finally {
-      setLoading(false);
+      setIsSaving(false);
     }
   };
 
-  const handleMilestoneAction = async (
-    milestoneId: string,
-    action: 'approve' | 'request_changes' | 'reject'
-  ) => {
-    setActionLoading(milestoneId);
+  const handleDeleteMilestone = (index: number) => {
+    setMilestones((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleDeleteProject = async () => {
+    if (!confirm('Are you sure you want to delete this project? This cannot be undone.')) return;
     try {
-      const statusMap = {
-        approve: 'approved',
-        request_changes: 'in_progress',
-        reject: 'pending',
-      };
-
-      const response = await fetch(`/api/projects/${projectId}/milestones`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          milestoneId,
-          status: statusMap[action],
-          feedback: feedback[milestoneId] || '',
-        }),
-      });
-
-      if (response.ok) {
-        fetchAllData();
-        setFeedback((prev) => ({ ...prev, [milestoneId]: '' }));
+      const res = await fetch(`/api/projects/${projectId}`, { method: 'DELETE' });
+      if (res.ok) {
+        router.push('/dashboard/company/my-projects');
       } else {
-        const err = await response.json();
-        alert(err.error || 'Action failed');
+        alert('Failed to delete project');
       }
     } catch (err) {
       alert('Something went wrong');
-    } finally {
-      setActionLoading(null);
     }
   };
 
-  const sendMessage = async () => {
-    if (!newMessage.trim()) return;
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: Date.now().toString(),
-        sender: 'You',
-        senderName: 'You',
-        message: newMessage,
-        timestamp: new Date().toISOString(),
-      },
-    ]);
-    setNewMessage('');
-  };
-
-  const milestoneStats = useMemo(() => {
-    const total = milestones.length;
-    const completed = milestones.filter((m) => m.status === 'approved').length;
-    const totalBudget = milestones.reduce((sum, m) => sum + (m.amount || 0), 0);
-    const released = milestones
-      .filter((m) => m.status === 'approved')
-      .reduce((sum, m) => sum + (m.amount || 0), 0);
-    return { total, completed, progress: total > 0 ? Math.round((completed / total) * 100) : 0, totalBudget, released };
-  }, [milestones]);
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-primary-600" />
@@ -207,333 +161,243 @@ export default function ManageProjectPage() {
     );
   }
 
-  if (error || !project) {
+  if (!project) {
     return (
       <div className="text-center py-12">
         <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
-        <p className="text-gray-600">{error || 'Project not found'}</p>
-        <Button variant="outline" className="mt-4" onClick={() => router.back()}>
-          Go Back
+        <p className="text-gray-600">{errorMessage || 'Project not found'}</p>
+        <Button asChild variant="outline" className="mt-4">
+          <Link href="/dashboard/company/my-projects">Back</Link>
         </Button>
       </div>
     );
   }
 
+  const categories = [
+    'Web Development', 'Mobile Development', 'AI / ML', 'Data Science',
+    'DevOps', 'Design', 'Content Writing', 'Marketing', 'Other',
+  ];
+
   return (
     <div className="space-y-6 p-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => router.back()}>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex items-start gap-3">
+          <Button variant="outline" size="icon" onClick={() => router.back()}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold">{project.title}</h1>
-            <div className="flex items-center gap-3 mt-1">
-              <Badge className={getStatusBadge(project.status)}>
-                {project.status === 'open' ? 'Active' : project.status}
-              </Badge>
-              <span className="text-sm text-gray-500">
-                {milestoneStats.progress}% Complete • {project.duration || 0} days duration
-              </span>
+            <div className="inline-flex items-center gap-2 rounded-full border border-primary-200 bg-card/80 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-primary-700">
+              <Sparkles className="h-3.5 w-3.5" />
+              Edit Project
             </div>
+            <h1 className="mt-4 text-3xl font-semibold">{title || 'Untitled'}</h1>
           </div>
         </div>
-        <Button variant="outline" asChild>
-          <Link href={`/dashboard/company/my-projects/${projectId}`}>
-            <ExternalLink className="mr-2 h-4 w-4" />
-            View Public Page
-          </Link>
-        </Button>
+        <div className="flex gap-3">
+          <Button asChild variant="outline">
+            <Link href={`/dashboard/company/my-projects/${projectId}`}>
+              <Eye className="mr-2 h-4 w-4" />View
+            </Link>
+          </Button>
+          <Button variant="destructive" onClick={handleDeleteProject}>
+            <Trash2 className="mr-2 h-4 w-4" />Delete
+          </Button>
+          <Button onClick={handleSave} disabled={isSaving}>
+            {isSaving ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="mr-2 h-4 w-4" />
+            )}
+            {isSaving ? 'Saving...' : 'Save Changes'}
+          </Button>
+        </div>
       </div>
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabValue)}>
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="milestones">Milestones</TabsTrigger>
-          <TabsTrigger value="candidate">Candidate</TabsTrigger>
-          <TabsTrigger value="communication">Communication</TabsTrigger>
-          <TabsTrigger value="payments">Payments</TabsTrigger>
-        </TabsList>
+      {/* Messages */}
+      {saveError && (
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 flex items-center gap-2">
+          <AlertCircle className="h-4 w-4" />{saveError}
+        </div>
+      )}
+      {saveSuccess && (
+        <div className="rounded-2xl border border-green-200 bg-green-50 p-4 text-sm text-green-700 flex items-center gap-2">
+          <CheckCircle2 className="h-4 w-4" />{saveSuccess}
+        </div>
+      )}
 
-        {/* OVERVIEW TAB */}
-        <TabsContent value="overview" className="space-y-6 mt-6">
-          <div className="grid gap-6 lg:grid-cols-2">
-            <Card>
-              <CardHeader><CardTitle>Project Details</CardTitle></CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex justify-between"><span className="text-gray-500">Title:</span><span className="font-medium">{project.title}</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">Category:</span><span>{project.category}</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">Budget:</span><span className="font-medium">{formatCurrency(project.budget?.min || 0)} - {formatCurrency(project.budget?.max || 0)}</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">Duration:</span><span>{project.duration} days</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">Posted:</span><span>{new Date(project.createdAt).toLocaleDateString()}</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">Status:</span><Badge className={getStatusBadge(project.status)}>{project.status || 'Active'}</Badge></div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader><CardTitle>Quick Actions</CardTitle></CardHeader>
-              <CardContent className="space-y-3">
-                <Button variant="outline" className="w-full justify-start" asChild>
-                  <Link href="/dashboard/messages"><MessageSquare className="mr-2 h-4 w-4" />Message Candidate</Link>
-                </Button>
-                <Button variant="outline" className="w-full justify-start" onClick={() => setActiveTab('milestones')}>
-                  <CheckCircle2 className="mr-2 h-4 w-4" />Review Milestones
-                </Button>
-                <Button variant="outline" className="w-full justify-start" onClick={() => setActiveTab('payments')}>
-                  <DollarSign className="mr-2 h-4 w-4" />Release Payment
-                </Button>
-                <Button variant="outline" className="w-full justify-start text-red-600">
-                  <AlertCircle className="mr-2 h-4 w-4" />Report Issue
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-
-          {project.skills?.length > 0 && (
-            <Card>
-              <CardHeader><CardTitle>Skills Required</CardTitle></CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-2">
-                  {project.skills.map((skill: any, i: number) => (
-                    <Badge key={i} variant="secondary" className="text-sm px-3 py-1">
-                      {skill.name || skill} {skill.level && `(${skill.level})`}
-                    </Badge>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
+      <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+        {/* LEFT: Edit Form */}
+        <div className="space-y-6">
+          {/* Basic Info */}
           <Card>
-            <CardHeader><CardTitle>Project Description</CardTitle></CardHeader>
-            <CardContent>
-              <p className="text-gray-600 whitespace-pre-wrap">{project.description}</p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* MILESTONES TAB */}
-        <TabsContent value="milestones" className="space-y-4 mt-6">
-          {milestones.length === 0 ? (
-            <Card className="p-12 text-center"><p className="text-gray-500">No milestones yet</p></Card>
-          ) : (
-            milestones.map((milestone) => (
-              <Card key={milestone._id}>
-                <CardContent className="p-5 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      {getStatusIcon(milestone.status)}
-                      <h3 className="font-semibold text-lg">{milestone.title}</h3>
-                      <Badge className={getStatusBadge(milestone.status)}>
-                        {milestone.status.replace('_', ' ')}
-                      </Badge>
-                    </div>
-                    <span className="text-sm text-gray-500">
-                      {formatCurrency(milestone.amount)} • Day {milestone.deadline}
-                    </span>
-                  </div>
-
-                  {milestone.deliverables && milestone.deliverables.length > 0 && (
-                    <div className="pl-7">
-                      <p className="text-xs font-medium text-gray-500 mb-1">Deliverables:</p>
-                      <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
-                        {milestone.deliverables.map((d, i) => (
-                          <li key={i}>{d}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {milestone.feedback && (
-                    <div className="bg-gray-50 rounded-lg p-3 pl-7">
-                      <p className="text-xs font-medium text-gray-500">Feedback:</p>
-                      <p className="text-sm text-gray-700">{milestone.feedback}</p>
-                    </div>
-                  )}
-
-                  {milestone.status === 'completed' && (
-                    <div className="space-y-2">
-                      <Textarea
-                        rows={2}
-                        placeholder="Your feedback..."
-                        value={feedback[milestone._id] || ''}
-                        onChange={(e) => setFeedback((prev) => ({ ...prev, [milestone._id]: e.target.value }))}
-                      />
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => handleMilestoneAction(milestone._id, 'approve')}
-                          disabled={actionLoading === milestone._id}
-                        >
-                          {actionLoading === milestone._id ? (
-                            <Loader2 className="h-4 w-4 animate-spin mr-12" />
-                          ) : (
-                            <CheckCircle2 className="mr-1 h-4 w-4" />
-                          )}
-                          Approve & Release Payment
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleMilestoneAction(milestone._id, 'request_changes')}
-                          disabled={actionLoading === milestone._id}
-                        >
-                          <RotateCcw className="mr-1 h-4 w-4" />
-                          Request Changes
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="text-red-600"
-                          onClick={() => handleMilestoneAction(milestone._id, 'reject')}
-                          disabled={actionLoading === milestone._id}
-                        >
-                          <XCircle className="mr-1 h-4 w-4" />
-                          Reject
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-
-                  {milestone.status === 'in_progress' && (
-                    <Button size="sm" variant="outline">
-                      Request Update
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </TabsContent>
-
-        {/* CANDIDATE TAB */}
-        <TabsContent value="candidate" className="space-y-6 mt-6">
-          {candidate ? (
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-start gap-4">
-                  <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center text-2xl font-bold text-primary-600">
-                    {candidate.name?.charAt(0) || '?'}
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-xl font-semibold">{candidate.name || 'Unknown'}</h3>
-                    <p className="text-sm text-gray-500">
-                      Trust Score: {candidate.trustScore || 0}% • {candidate.location || 'N/A'}
-                    </p>
-                    {/* ✅ Fixed: proper optional check */}
-                    {candidate.skills && candidate.skills.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mt-3">
-                        {candidate.skills.map((skill: any, i: number) => (
-                          <Badge key={i} variant="secondary" className="gap-1">
-                            {skill.name} ({skill.level})
-                            {skill.verified && <CheckCircle2 className="h-3 w-3 text-green-500" />}
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-                    {candidate.bio && (
-                      <p className="text-gray-600 mt-3">{candidate.bio}</p>
-                    )}
-                    <div className="flex gap-2 mt-4">
-                      <Button size="sm">
-                        <User className="mr-1 h-4 w-4" />View Full Profile
-                      </Button>
-                      <Button size="sm" variant="outline">
-                        <MessageSquare className="mr-1 h-4 w-4" />Message
-                      </Button>
-                      <Button size="sm" variant="outline">
-                        <Star className="mr-1 h-4 w-4" />Rate Candidate
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card className="p-12 text-center">
-              <User className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500">No candidate hired yet</p>
-            </Card>
-          )}
-        </TabsContent>
-
-        {/* COMMUNICATION TAB */}
-        <TabsContent value="communication" className="space-y-4 mt-6">
-          <Card>
-            <CardContent className="p-5 space-y-4">
-              <div className="space-y-4 max-h-80 overflow-y-auto">
-                {messages.length === 0 ? (
-                  <p className="text-center text-gray-500 py-8">No messages yet. Start the conversation!</p>
-                ) : (
-                  messages.map((msg) => (
-                    <div key={msg.id} className={`flex ${msg.sender === 'You' ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[70%] rounded-2xl p-3 ${msg.sender === 'You' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-800'}`}>
-                        <p className="text-sm">{msg.message}</p>
-                        <p className="text-xs mt-1 opacity-70">{new Date(msg.timestamp).toLocaleTimeString()}</p>
-                      </div>
-                    </div>
-                  ))
-                )}
+            <CardHeader><CardTitle>Basic Information</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <label className="text-sm font-medium mb-1 block">Title *</label>
+                <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Project title" />
               </div>
-              <div className="flex gap-2 pt-4 border-t">
-                <Textarea
-                  rows={2}
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder="Type your message..."
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      sendMessage();
-                    }
-                  }}
-                />
-                <div className="flex flex-col gap-2">
-                  <Button size="icon" variant="outline">
-                    <Paperclip className="h-4 w-4" />
-                  </Button>
-                  <Button size="icon" onClick={sendMessage} disabled={!newMessage.trim()}>
-                    <Send className="h-4 w-4" />
-                  </Button>
-                </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Category *</label>
+                <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full rounded-md border p-2">
+                  <option value="">Select category</option>
+                  {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Summary</label>
+                <Input value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="Brief summary" />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Description *</label>
+                <Textarea rows={6} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Project description" />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Status</label>
+                <select value={status} onChange={(e) => setStatus(e.target.value)} className="w-full rounded-md border p-2">
+                  <option value="open">Open</option>
+                  <option value="in_progress">In Progress</option>
+                  <option value="completed">Completed</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
 
-        {/* PAYMENTS TAB */}
-        <TabsContent value="payments" className="space-y-6 mt-6">
-          <div className="grid gap-6 md:grid-cols-2">
-            <Card>
-              <CardHeader><CardTitle>Payment Summary</CardTitle></CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex justify-between"><span className="text-gray-500">Total Budget:</span><span className="font-semibold">{formatCurrency(milestoneStats.totalBudget)}</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">Released:</span><span className="font-semibold text-green-600">{formatCurrency(milestoneStats.released)}</span></div>
-                <div className="flex justify-between"><span className="text-gray-500">Pending:</span><span className="font-semibold text-yellow-600">{formatCurrency(milestoneStats.totalBudget - milestoneStats.released)}</span></div>
-                <div className="flex justify-between text-sm"><span className="text-gray-500">Platform Commission (10%):</span><span>{formatCurrency(milestoneStats.totalBudget * 0.1)}</span></div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader><CardTitle>Milestone Payments</CardTitle></CardHeader>
-              <CardContent className="space-y-3">
-                {milestones.map((m) => (
-                  <div key={m._id} className="flex justify-between items-center p-2 border-b last:border-0">
-                    <div>
-                      <p className="font-medium text-sm">{m.title}</p>
-                      <p className="text-xs text-gray-500">{m.status.replace('_', ' ')}</p>
-                    </div>
-                    <span className={`font-medium text-sm ${m.status === 'approved' ? 'text-green-600' : 'text-gray-400'}`}>
-                      {formatCurrency(m.amount)}
-                    </span>
-                  </div>
+          {/* Skills */}
+          <Card>
+            <CardHeader><CardTitle>Skills</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex gap-2">
+                <Input value={skillInput} onChange={(e) => setSkillInput(e.target.value)} placeholder="Add skill" onKeyDown={(e) => {
+                  if (e.key === 'Enter' && skillInput.trim()) {
+                    e.preventDefault();
+                    setSkills((prev) => [...prev, skillInput.trim()]);
+                    setSkillInput('');
+                  }
+                }} />
+                <Button onClick={() => {
+                  if (!skillInput.trim()) return;
+                  setSkills((prev) => [...prev, skillInput.trim()]);
+                  setSkillInput('');
+                }}>Add</Button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {skills.map((skill) => (
+                  <Badge key={skill} variant="secondary" className="gap-1 cursor-pointer" onClick={() => setSkills((prev) => prev.filter((s) => s !== skill))}>
+                    {skill} <X className="h-3 w-3" />
+                  </Badge>
                 ))}
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-      </Tabs>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Budget & Duration */}
+          <Card>
+            <CardHeader><CardTitle>Budget & Duration</CardTitle></CardHeader>
+            <CardContent className="grid gap-4 md:grid-cols-3">
+              <div>
+                <label className="text-sm font-medium mb-1 block">Min Budget (₹)</label>
+                <Input type="number" value={budgetMin} onChange={(e) => setBudgetMin(e.target.value)} placeholder="Min" />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Max Budget (₹)</label>
+                <Input type="number" value={budgetMax} onChange={(e) => setBudgetMax(e.target.value)} placeholder="Max" />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Duration (days)</label>
+                <Input type="number" value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="Days" />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Location */}
+          <Card>
+            <CardHeader><CardTitle>Location</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex gap-3">
+                {(['remote', 'onsite', 'hybrid'] as const).map((type) => (
+                  <button key={type} onClick={() => setLocationType(type)} className={`rounded-xl border px-4 py-2 text-sm capitalize ${locationType === type ? 'border-primary-600 bg-primary-50 text-primary-800' : 'border-gray-200'}`}>
+                    {type}
+                  </button>
+                ))}
+              </div>
+              {locationType !== 'remote' && (
+                <Input value={locationLabel} onChange={(e) => setLocationLabel(e.target.value)} placeholder="Location" />
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Requirements */}
+          <Card>
+            <CardHeader><CardTitle>Requirements</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex gap-2">
+                <Input value={reqInput} onChange={(e) => setReqInput(e.target.value)} placeholder="Add requirement" onKeyDown={(e) => {
+                  if (e.key === 'Enter' && reqInput.trim()) {
+                    e.preventDefault();
+                    setRequirements((prev) => [...prev, reqInput.trim()]);
+                    setReqInput('');
+                  }
+                }} />
+                <Button onClick={() => {
+                  if (!reqInput.trim()) return;
+                  setRequirements((prev) => [...prev, reqInput.trim()]);
+                  setReqInput('');
+                }}>Add</Button>
+              </div>
+              {requirements.map((req, i) => (
+                <div key={i} className="flex items-center gap-2 text-sm">
+                  <span className="h-1.5 w-1.5 bg-primary-600 rounded-full" />
+                  {req}
+                  <button onClick={() => setRequirements((prev) => prev.filter((_, idx) => idx !== i))} className="ml-auto text-red-500">
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* RIGHT: Milestones */}
+        <div className="space-y-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Milestones</CardTitle>
+              <Button size="sm" variant="outline" onClick={() => setMilestones((prev) => [...prev, { title: '', amount: '', deadline: '', deliverables: '' }])}>
+                <Plus className="mr-2 h-4 w-4" />Add
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {milestones.map((m, index) => (
+                <div key={index} className="rounded-xl border bg-gray-50 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Milestone {index + 1}</span>
+                    <Button variant="ghost" size="icon" onClick={() => handleDeleteMilestone(index)}>
+                      <Trash2 className="h-4 w-4 text-red-500" />
+                    </Button>
+                  </div>
+                  <Input value={m.title} onChange={(e) => setMilestones((prev) => prev.map((item, i) => i === index ? { ...item, title: e.target.value } : item))} placeholder="Title" />
+                  <div className="grid grid-cols-2 gap-3">
+                    <Input type="number" value={m.amount} onChange={(e) => setMilestones((prev) => prev.map((item, i) => i === index ? { ...item, amount: e.target.value } : item))} placeholder="Amount (₹)" />
+                    <Input type="number" value={m.deadline} onChange={(e) => setMilestones((prev) => prev.map((item, i) => i === index ? { ...item, deadline: e.target.value } : item))} placeholder="Deadline day" />
+                  </div>
+                  <Input value={m.deliverables || ''} onChange={(e) => setMilestones((prev) => prev.map((item, i) => i === index ? { ...item, deliverables: e.target.value } : item))} placeholder="Deliverables" />
+                </div>
+              ))}
+              {milestones.length === 0 && (
+                <p className="text-center text-gray-500 py-4 text-sm">No milestones added yet</p>
+              )}
+              {milestones.length > 0 && (
+                <div className="flex justify-between text-sm pt-2 border-t">
+                  <span className="text-gray-500">Total:</span>
+                  <span className="font-medium">₹{milestoneTotal.toLocaleString()}</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }

@@ -26,7 +26,7 @@ export interface Milestone {
   deadline: number;
   feedback?: string;
   filesRequired?: boolean;
-  status: 'pending' | 'in_progress' | 'completed' | 'approved' | 'rejected';
+  status?: 'pending' | 'in_progress' | 'completed' | 'approved' | 'rejected';
   submissions?: Array<{
     work: string;
     attachments: string[];
