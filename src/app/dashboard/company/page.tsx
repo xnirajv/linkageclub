@@ -7,7 +7,7 @@ import { useCompanyDashboard } from '@/hooks/useCompanyDashboard';
 import { WelcomeBanner } from '@/components/dashboard/company/WelcomeBanner';
 import { StatCard } from '@/components/dashboard/company/StateCard';
 import { ActiveProjectCard } from '@/components/dashboard/company/ActiveProjectsCard';
-import { ApplicationListItem } from '@/components/dashboard/company/ApplicationLIstItem';
+import { ApplicationListItem } from '@/components/dashboard/company/ApplicationListItem';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
