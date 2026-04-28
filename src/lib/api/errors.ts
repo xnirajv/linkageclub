@@ -79,6 +79,11 @@ export function successResponse<T>(data: T, statusCode: number = 200): NextRespo
   return NextResponse.json({ success: true, data }, { status: statusCode });
 }
 
+// ✅ ADD: validationError function
+export function validationError(errors: Record<string, string>): APIError {
+  return new APIError('Validation failed', 400, 'VALIDATION_ERROR', errors);
+}
+
 export const errors = {
   unauthorized: () => new APIError('Unauthorized', 401, 'UNAUTHORIZED'),
   forbidden: () => new APIError('Forbidden', 403, 'FORBIDDEN'),
