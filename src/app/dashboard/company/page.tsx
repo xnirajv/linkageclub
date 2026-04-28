@@ -2,170 +2,173 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { ArrowRight, Briefcase, Users, Plus, Eye, Sparkles, FileText, DollarSign, Search, BarChart3 } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
-import { useUserProjects } from '@/hooks/useProjects';
-import { useApplications } from '@/hooks/useApplications';
+import { ArrowRight, Briefcase, Users, DollarSign, FileText, Target, Sparkles, Plus, Search, CreditCard, Download, UserPlus } from 'lucide-react';
+import { useCompanyDashboard } from '@/hooks/useCompanyDashboard';
+import { WelcomeBanner } from '@/components/dashboard/company/WelcomeBanner';
+import { StatCard } from '@/components/dashboard/company/StateCard';
+import { ActiveProjectCard } from '@/components/dashboard/company/ActiveProjectsCard';
+import { ApplicationListItem } from '@/components/dashboard/company/ApplicationLIstItem';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useApplications } from '@/hooks/useApplications';
 
 function formatCurrency(v: number) {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(v);
 }
 
-function timeAgo(date: string) {
-  const hours = Math.round((Date.now() - new Date(date).getTime()) / 3600000);
-  return hours < 24 ? `${hours}h ago` : `${Math.round(hours / 24)}d ago`;
-}
-
 export default function CompanyDashboardPage() {
-  const { user } = useAuth();
-  const { projects = [], isLoading: pLoading } = useUserProjects(user?.id, { role: 'company' });
-  const { applications = [], isLoading: aLoading } = useApplications({ role: 'company', limit: 10 });
-
-  const allProjects = projects as any[];
-  const activeProjects = allProjects.filter((p: any) => p.status === 'open' || p.status === 'in_progress');
-  const recentApps = (applications as any[]).slice(0, 5);
-  const isLoading = pLoading || aLoading;
-
-  const totalBudget = allProjects.reduce((s: number, p: any) => s + (p.budget?.max || p.budget?.min || 0), 0);
-  const pendingCount = (applications as any[]).filter((a: any) => a.status === 'pending').length;
+  const { dashboard, isLoading } = useCompanyDashboard();
+  const { updateStatus } = useApplications({ role: 'company', limit: 5 });
 
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <Skeleton className="h-10 w-64 rounded-lg" />
-        <div className="grid gap-4 md:grid-cols-4">{Array(4).fill(0).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)}</div>
-        <Skeleton className="h-64 rounded-xl" />
+        <Skeleton className="h-40 rounded-xl" />
+        <div className="grid gap-4 md:grid-cols-4">
+          {[...Array(4)].map((_, i) => (<Skeleton key={i} className="h-28 rounded-xl" />))}
+        </div>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Skeleton className="h-96 rounded-xl" />
+          <Skeleton className="h-96 rounded-xl" />
+        </div>
       </div>
     );
   }
 
+  const stats = dashboard?.stats || { activeProjects: 0, openPositions: 0, totalApplicants: 0, totalBudget: 0, pendingReview: 0 };
+  const activeProjects: any[] = dashboard?.activeProjects || [];
+  const recentApplications: any[] = dashboard?.recentApplications || [];
+  
+  // ✅ Fix: Type pipeline properly
+  const pipeline = (dashboard?.pipeline || {}) as {
+    new: number;
+    reviewing: number;
+    interview: number;
+    offer: number;
+    hired: number;
+  };
+
+  const handleShortlist = async (id: string) => { await updateStatus(id, 'shortlisted'); };
+  const handleReject = async (id: string) => { const reason = prompt('Reason (optional):'); await updateStatus(id, 'rejected', reason || undefined); };
+
+  const pipelineStages = [
+    { stage: 'new', label: 'New', count: pipeline.new || 0, color: 'bg-yellow-500' },
+    { stage: 'reviewing', label: 'Reviewing', count: pipeline.reviewing || 0, color: 'bg-blue-500' },
+    { stage: 'interview', label: 'Interview', count: pipeline.interview || 0, color: 'bg-purple-500' },
+    { stage: 'offer', label: 'Offer', count: pipeline.offer || 0, color: 'bg-orange-500' },
+    { stage: 'hired', label: 'Hired', count: pipeline.hired || 0, color: 'bg-green-500' },
+  ];
+
   return (
-    <div className="space-y-8 max-w-5xl mx-auto">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}, {user?.name?.split(' ')[0]}
-        </h1>
-        <p className="text-gray-500 mt-1">Here&apos;s your project overview.</p>
-      </div>
+    <div className="space-y-6">
+      <WelcomeBanner firstName={dashboard?.user?.name?.split(' ')[0] || 'there'} />
 
       <div className="grid gap-4 md:grid-cols-4">
-        {[
-          { icon: Briefcase, label: 'Active', value: activeProjects.length, color: 'text-blue-600 bg-blue-50 dark:bg-blue-900/20', href: '/dashboard/company/my-projects' },
-          { icon: Users, label: 'Applicants', value: applications.length, color: 'text-green-600 bg-green-50 dark:bg-green-900/20', href: '/dashboard/company/applications' },
-          { icon: FileText, label: 'Pending', value: pendingCount, color: 'text-orange-600 bg-orange-50 dark:bg-orange-900/20', href: '/dashboard/company/applications?status=pending' },
-          { icon: DollarSign, label: 'Budget', value: formatCurrency(totalBudget), color: 'text-purple-600 bg-purple-50 dark:bg-purple-900/20', href: '#' },
-        ].map((stat) => (
-          <Link key={stat.label} href={stat.href}>
-            <Card className="border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow-md hover:border-gray-300 dark:hover:border-gray-700 transition-all cursor-pointer">
-              <CardContent className="p-5">
-                <div className="flex items-center justify-between">
-                  <div><p className="text-sm text-gray-500">{stat.label}</p><p className="text-2xl font-bold mt-1">{stat.value}</p></div>
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${stat.color}`}><stat.icon className="h-5 w-5" /></div>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-        ))}
+        <StatCard icon={<Briefcase className="h-5 w-5" />} label="Active Projects" value={stats.activeProjects} href="/dashboard/company/my-projects" colorClass="text-blue-600 bg-blue-50 dark:bg-blue-900/20" />
+        <StatCard icon={<FileText className="h-5 w-5" />} label="Open Positions" value={stats.openPositions} href="/dashboard/company/jobs" colorClass="text-green-600 bg-green-50 dark:bg-green-900/20" />
+        <StatCard icon={<Users className="h-5 w-5" />} label="Total Applicants" value={stats.totalApplicants} href="/dashboard/company/applications" colorClass="text-purple-600 bg-purple-50 dark:bg-purple-900/20" />
+        <StatCard icon={<DollarSign className="h-5 w-5" />} label="Total Budget" value={formatCurrency(stats.totalBudget)} colorClass="text-orange-600 bg-orange-50 dark:bg-orange-900/20" />
       </div>
 
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2"><h2 className="text-lg font-semibold">Active Projects</h2><Badge variant="secondary" className="text-xs">{activeProjects.length}</Badge></div>
-          <div className="flex items-center gap-3">
-            <Link href="/dashboard/company/my-projects" className="text-sm text-gray-500 hover:text-gray-900 flex items-center gap-1"><span>View all</span><ArrowRight className="h-3 w-3" /></Link>
-            <Button size="sm" asChild><Link href="/dashboard/company/post-project"><Plus className="h-4 w-4 mr-1" />New</Link></Button>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card className="border border-gray-200 dark:border-gray-800 shadow-sm">
+          <div className="flex items-center justify-between p-5 border-b border-gray-100 dark:border-gray-800">
+            <div className="flex items-center gap-2">
+              <Briefcase className="h-5 w-5 text-blue-600" />
+              <h2 className="font-semibold">Active Projects ({activeProjects.length})</h2>
+            </div>
+            <Link href="/dashboard/company/my-projects" className="text-sm text-blue-600 hover:underline flex items-center gap-1">View All <ArrowRight className="h-3 w-3" /></Link>
           </div>
+          <CardContent className="p-5">
+            {activeProjects.length === 0 ? (
+              <div className="text-center py-12">
+                <Briefcase className="h-10 w-10 text-gray-300 mx-auto mb-3" />
+                <p className="font-medium">No active projects yet</p>
+                <p className="text-sm text-gray-500 mt-1">Post your first project to get started.</p>
+                <Button asChild className="mt-4"><Link href="/dashboard/company/post-project"><Plus className="h-4 w-4 mr-1" />Post New Project</Link></Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {activeProjects.map((project: any) => (<ActiveProjectCard key={project._id} project={project} />))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="border border-gray-200 dark:border-gray-800 shadow-sm">
+          <div className="flex items-center gap-2 p-5 border-b border-gray-100 dark:border-gray-800">
+            <Target className="h-5 w-5 text-purple-600" />
+            <h2 className="font-semibold">Hiring Pipeline</h2>
+          </div>
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between gap-2 mb-6">
+              {pipelineStages.map((stage, i) => (
+                <React.Fragment key={stage.stage}>
+                  <Link href={`/dashboard/company/applications?status=${stage.stage}`} className="flex flex-col items-center gap-2 flex-1 hover:opacity-80 transition-opacity">
+                    <span className="text-2xl font-bold">{stage.count}</span>
+                    <span className="text-xs text-gray-500 text-center">{stage.label}</span>
+                    <div className={`w-full h-1.5 rounded-full ${stage.color}`} />
+                  </Link>
+                  {i < pipelineStages.length - 1 && <ArrowRight className="h-4 w-4 text-gray-300 flex-shrink-0 mt-2" />}
+                </React.Fragment>
+              ))}
+            </div>
+            <div className="text-center text-sm text-gray-500">
+              Conversion Rate: {((pipeline.hired || 0) / Math.max(pipeline.new || 1, 1) * 100).toFixed(1)}% (Target: 20%)
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="border border-gray-200 dark:border-gray-800 shadow-sm">
+        <div className="flex items-center justify-between p-5 border-b border-gray-100 dark:border-gray-800">
+          <div className="flex items-center gap-2"><Users className="h-5 w-5 text-green-600" /><h2 className="font-semibold">Recent Applications ({stats.pendingReview} New)</h2></div>
+          <Link href="/dashboard/company/applications" className="text-sm text-blue-600 hover:underline flex items-center gap-1">View All <ArrowRight className="h-3 w-3" /></Link>
         </div>
-        {activeProjects.length === 0 ? (
-          <Card className="border-2 border-dashed border-gray-200 dark:border-gray-800 shadow-none bg-transparent">
-            <CardContent className="p-12 text-center">
-              <Briefcase className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-              <p className="text-gray-500 mb-4">No active projects yet</p>
-              <Button asChild><Link href="/dashboard/company/post-project"><Sparkles className="h-4 w-4 mr-2" />Post Your First Project</Link></Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2">
-            {activeProjects.slice(0, 4).map((p: any) => {
-              const completed = (p.milestones || []).filter((m: any) => m.status === 'completed' || m.status === 'approved').length;
-              const progress = (p.milestones || []).length > 0 ? Math.round((completed / p.milestones.length) * 100) : 0;
-              return (
-                <Card key={p._id} className="border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow-md transition-all">
-                  <CardContent className="p-5">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-semibold truncate">{p.title}</h3>
-                          <Badge variant={p.status === 'open' ? 'default' : 'secondary'} className="text-[10px] flex-shrink-0">{p.status === 'open' ? 'Open' : 'In Progress'}</Badge>
-                        </div>
-                        <p className="text-sm text-gray-500">{p.applicationsCount || 0} applicants • {formatCurrency(p.budget?.max || 0)} • {p.duration || 0}d</p>
-                      </div>
-                    </div>
-                    {(p.milestones || []).length > 0 && <Progress value={progress} className="h-1.5 mb-3" />}
-                    <div className="flex items-center gap-2 pt-2 border-t border-gray-100 dark:border-gray-800">
-                      <Button size="sm" variant="ghost" asChild className="text-xs"><Link href={`/dashboard/company/my-projects/${p._id}`}><Eye className="h-3.5 w-3.5 mr-1" />Details</Link></Button>
-                      <Button size="sm" variant="ghost" asChild className="text-xs"><Link href={`/dashboard/company/my-projects/${p._id}/applications`}><Users className="h-3.5 w-3.5 mr-1" />Applicants</Link></Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        )}
-      </div>
+        <CardContent className="p-5">
+          {recentApplications.length === 0 ? (
+            <div className="text-center py-12"><Users className="h-10 w-10 text-gray-300 mx-auto mb-3" /><p className="font-medium">No applications yet</p></div>
+          ) : (
+            <div className="space-y-3">
+              {recentApplications.map((app: any) => (<ApplicationListItem key={app._id} application={app} onShortlist={handleShortlist} onReject={handleReject} />))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold">Recent Applications</h2>
-          <Link href="/dashboard/company/applications" className="text-sm text-gray-500 hover:text-gray-900 flex items-center gap-1"><span>View all</span><ArrowRight className="h-3 w-3" /></Link>
+      <Card className="border border-gray-200 dark:border-gray-800 shadow-sm">
+        <div className="flex items-center justify-between p-5 border-b border-gray-100 dark:border-gray-800">
+          <div className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-yellow-600" /><h2 className="font-semibold">AI-Powered Talent Recommendations</h2></div>
+          <Link href="/dashboard/company/talent-search" className="text-sm text-blue-600 hover:underline flex items-center gap-1">View All <ArrowRight className="h-3 w-3" /></Link>
         </div>
-        {recentApps.length === 0 ? (
-          <Card className="border-2 border-dashed border-gray-200 dark:border-gray-800 shadow-none bg-transparent"><CardContent className="p-8 text-center"><Users className="h-8 w-8 text-gray-400 mx-auto mb-2" /><p className="text-gray-500">No applications yet</p></CardContent></Card>
-        ) : (
-          <div className="space-y-2">
-            {recentApps.map((app: any) => (
-              <Card key={app._id} className="border border-gray-200 dark:border-gray-800 shadow-sm hover:border-gray-300 dark:hover:border-gray-700 transition-all">
-                <CardContent className="p-4 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-black dark:bg-white flex items-center justify-center text-white dark:text-black text-xs font-medium">{(app.applicantId?.name || 'C')[0]}</div>
-                    <div>
-                      <p className="font-medium text-sm">{app.applicantId?.name || 'Candidate'}</p>
-                      <p className="text-xs text-gray-500">{app.projectId?.title || 'Project'} • {timeAgo(app.submittedAt || app.createdAt)}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={app.status === 'pending' ? 'warning' : app.status === 'shortlisted' ? 'info' : app.status === 'accepted' ? 'success' : 'secondary'} className="text-[10px]">{app.status}</Badge>
-                    <Button size="sm" variant="ghost" asChild className="h-8 w-8 p-0"><Link href={`/dashboard/company/applications/${app._id}`}><Eye className="h-3.5 w-3.5" /></Link></Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
+        <CardContent className="p-5"><p className="text-center text-gray-500 py-8">AI recommendations will appear after posting 2-3 projects.</p></CardContent>
+      </Card>
 
-      <div className="grid gap-3 md:grid-cols-4">
-        {[
-          { icon: Plus, title: 'Post Project', href: '/dashboard/company/post-project' },
-          { icon: Search, title: 'Find Talent', href: '/dashboard/company/talent-search' },
-          { icon: BarChart3, title: 'Analytics', href: '/dashboard/company/analytics' },
-          { icon: Users, title: 'Team', href: '/dashboard/company/team' },
-        ].map((a) => (
-          <Link key={a.title} href={a.href}>
-            <Card className="border-2 border-dashed border-gray-200 dark:border-gray-800 shadow-none bg-transparent hover:border-gray-300 dark:hover:border-gray-700 transition-all cursor-pointer">
-              <CardContent className="p-4 flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center"><a.icon className="h-4 w-4 text-gray-600 dark:text-gray-400" /></div>
-                <p className="font-medium text-sm">{a.title}</p>
-              </CardContent>
-            </Card>
-          </Link>
-        ))}
-      </div>
+      <Card className="border border-gray-200 dark:border-gray-800 shadow-sm">
+        <div className="flex items-center justify-between p-5 border-b border-gray-100 dark:border-gray-800">
+          <h2 className="font-semibold">Spending Analytics</h2>
+          <Link href="/dashboard/company/analytics" className="text-sm text-blue-600 hover:underline flex items-center gap-1">Detailed Analytics <ArrowRight className="h-3 w-3" /></Link>
+        </div>
+        <CardContent className="p-5">
+          <div className="text-center mb-6">
+            <span className="text-3xl font-bold">{formatCurrency(stats.totalBudget)}</span>
+            <p className="text-sm text-gray-500 mt-1">Total Budget</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border border-gray-200 dark:border-gray-800 shadow-sm sticky bottom-4">
+        <CardContent className="p-4">
+          <div className="flex flex-wrap justify-center gap-3">
+            <Button asChild size="sm"><Link href="/dashboard/company/post-project"><Plus className="h-4 w-4" />Post Project</Link></Button>
+            <Button variant="outline" size="sm" asChild><Link href="/dashboard/company/talent-search"><Search className="h-4 w-4" />Find Talent</Link></Button>
+            <Button variant="outline" size="sm"><UserPlus className="h-4 w-4" />Invite Member</Button>
+            <Button variant="outline" size="sm"><CreditCard className="h-4 w-4" />Add Funds</Button>
+            <Button variant="outline" size="sm"><Download className="h-4 w-4" />Report</Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
