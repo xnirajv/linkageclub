@@ -7,12 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/forms/Textarea';
-import { Badge } from '@/components/ui/badge';
 import {
   Plus, Trash2, Save, ArrowLeft, ArrowRight, Eye, Send,
-  Upload, X, Check, Sparkles,
+  Upload, Sparkles,
 } from 'lucide-react';
-import Link from 'next/link';
 import { useCreateProject } from '@/hooks/useCreateProjects';
 
 const steps = [
@@ -25,16 +23,13 @@ const steps = [
 export default function PostProjectPage() {
   const router = useRouter();
   const {
-    currentStep, formData, errors, isSubmitting,
+    currentStep, formData, projectId, errors, isSubmitting,
     setCurrentStep, updateField, addSkill, removeSkill, updateSkill,
     addMilestone, removeMilestone, updateMilestone,
-    addAttachment, removeAttachment,
-    setErrors, clearErrors, setIsSubmitting, setProjectId, setStatus, reset,
+    setErrors, setIsSubmitting, setProjectId, setStatus, reset,
   } = useCreateProject();
 
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [skillInput, setSkillInput] = useState('');
-  const [reqInput, setReqInput] = useState('');
 
   const validateStep = (step: number): boolean => {
     const newErrors: Record<string, string> = {};
@@ -77,6 +72,7 @@ export default function PostProjectPage() {
     }
   };
 
+  // ✅ SAVE DRAFT
   const handleSaveDraft = async () => {
     setIsSubmitting(true);
     try {
@@ -85,29 +81,42 @@ export default function PostProjectPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...formData, status: 'draft' }),
       });
+      
+      const data = await res.json();
+      
       if (res.ok) {
-        const data = await res.json();
-        setProjectId(data.project?._id || data.data?.project?._id);
+        const newProjectId = data.project?._id || data.data?.project?._id;
+        if (newProjectId) setProjectId(newProjectId);
         setStatus('draft');
-        router.push('/dashboard/company/my-projects?tab=draft');
+        alert('Draft saved successfully!');
+        router.push('/dashboard/company/my-projects');
+      } else {
+        alert(data.error || 'Failed to save draft');
       }
     } catch (err) {
-      console.error('Failed to save draft:', err);
+      console.error('Save draft error:', err);
+      alert('Something went wrong. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  // ✅ PREVIEW - Open modal or show summary
+  const handlePreview = () => {
+    setPreviewOpen(true);
+  };
+
+  // ✅ PUBLISH
   const handlePublish = async () => {
     if (!validateStep(4)) return;
+    
     setIsSubmitting(true);
     try {
-      // ✅ FIX: Use store's projectId, not formData.projectId
-      const projectId = useCreateProject.getState().projectId;
-      const endpoint = projectId
-        ? `/api/projects/${projectId}`
+      const currentProjectId = projectId || useCreateProject.getState().projectId;
+      const endpoint = currentProjectId
+        ? `/api/projects/${currentProjectId}`
         : '/api/projects';
-      const method = projectId ? 'PATCH' : 'POST';
+      const method = currentProjectId ? 'PATCH' : 'POST';
 
       const res = await fetch(endpoint, {
         method,
@@ -115,12 +124,18 @@ export default function PostProjectPage() {
         body: JSON.stringify({ ...formData, status: 'open' }),
       });
 
+      const data = await res.json();
+
       if (res.ok) {
+        alert('Project published successfully!');
         reset();
-        router.push('/dashboard/company/my-projects?tab=active');
+        router.push('/dashboard/company/my-projects');
+      } else {
+        alert(data.error || 'Failed to publish project');
       }
     } catch (err) {
-      console.error('Failed to publish:', err);
+      console.error('Publish error:', err);
+      alert('Something went wrong. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -139,11 +154,17 @@ export default function PostProjectPage() {
         <p className="text-gray-500 mt-1">Fill in the details to find the right talent</p>
       </div>
 
-      <ProjectFormStepper currentStep={currentStep} totalSteps={4} steps={steps} onStepClick={(s) => isCompleted(s) && setCurrentStep(s)} errors={errors} />
+      <ProjectFormStepper
+        currentStep={currentStep}
+        totalSteps={4}
+        steps={steps}
+        onStepClick={(s) => s < currentStep && setCurrentStep(s)}
+        errors={errors}
+      />
 
       <Card className="border border-gray-200 dark:border-gray-800 shadow-sm">
         <CardContent className="p-6 min-h-[400px]">
-          {/* STEP 1: BASIC INFO */}
+          {/* STEP 1 */}
           {currentStep === 1 && (
             <div className="space-y-5">
               <div>
@@ -162,7 +183,7 @@ export default function PostProjectPage() {
               </div>
               <div>
                 <label className="text-sm font-medium mb-1.5 block">Description *</label>
-                <Textarea value={formData.description} onChange={(e) => updateField('description', e.target.value)} placeholder="Describe your project in detail...&#10;• What are the goals?&#10;• What features are needed?&#10;• Any specific requirements?" rows={8} className="rounded-xl resize-none" />
+                <Textarea value={formData.description} onChange={(e) => updateField('description', e.target.value)} placeholder="Describe your project..." rows={8} className="rounded-xl resize-none" />
                 <p className="text-xs text-gray-400 mt-1">{formData.description.length}/5000 (min 50)</p>
                 {errors.description && <p className="text-xs text-red-500 mt-1">{errors.description}</p>}
               </div>
@@ -174,7 +195,7 @@ export default function PostProjectPage() {
             </div>
           )}
 
-          {/* STEP 2: SKILLS & REQUIREMENTS */}
+          {/* STEP 2 */}
           {currentStep === 2 && (
             <div className="space-y-5">
               <div>
@@ -197,67 +218,52 @@ export default function PostProjectPage() {
                 <label className="text-sm font-medium mb-2 block">Experience Level *</label>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   {['beginner', 'intermediate', 'advanced', 'any'].map((level) => (
-                    <button key={level} type="button" onClick={() => updateField('experienceLevel', level as any)}
-                      className={`p-3 rounded-xl border text-sm capitalize transition-all ${formData.experienceLevel === level ? 'border-blue-500 bg-blue-50 text-blue-700 font-medium' : 'border-gray-200 hover:border-gray-300'}`}>
-                      {level}
-                    </button>
+                    <button key={level} type="button" onClick={() => updateField('experienceLevel', level as any)} className={`p-3 rounded-xl border text-sm capitalize transition-all ${formData.experienceLevel === level ? 'border-blue-500 bg-blue-50 text-blue-700 font-medium' : 'border-gray-200 hover:border-gray-300'}`}>{level}</button>
                   ))}
                 </div>
                 {errors.experienceLevel && <p className="text-xs text-red-500 mt-1">{errors.experienceLevel}</p>}
               </div>
               <div>
-                <label className="text-sm font-medium mb-2 block">Location Preference *</label>
+                <label className="text-sm font-medium mb-2 block">Location *</label>
                 <div className="flex gap-3">
                   {['remote', 'onsite', 'hybrid'].map((type) => (
-                    <button key={type} type="button" onClick={() => updateField('locationType', type as any)}
-                      className={`flex-1 p-3 rounded-xl border text-sm capitalize transition-all ${formData.locationType === type ? 'border-blue-500 bg-blue-50 text-blue-700 font-medium' : 'border-gray-200 hover:border-gray-300'}`}>
-                      {type}
-                    </button>
+                    <button key={type} type="button" onClick={() => updateField('locationType', type as any)} className={`flex-1 p-3 rounded-xl border text-sm capitalize transition-all ${formData.locationType === type ? 'border-blue-500 bg-blue-50 text-blue-700 font-medium' : 'border-gray-200 hover:border-gray-300'}`}>{type}</button>
                   ))}
                 </div>
                 {(formData.locationType === 'onsite' || formData.locationType === 'hybrid') && (
                   <Input value={formData.location} onChange={(e) => updateField('location', e.target.value)} placeholder="City, Country" className="rounded-xl mt-3" />
                 )}
-                {errors.locationType && <p className="text-xs text-red-500 mt-1">{errors.locationType}</p>}
               </div>
             </div>
           )}
 
-          {/* STEP 3: BUDGET & TIMELINE */}
+          {/* STEP 3 */}
           {currentStep === 3 && (
             <div className="space-y-5">
               <div>
                 <label className="text-sm font-medium mb-2 block">Budget Type *</label>
                 <div className="flex gap-3">
                   {['fixed', 'hourly', 'milestone'].map((type) => (
-                    <button key={type} type="button" onClick={() => updateField('budgetType', type as any)}
-                      className={`flex-1 p-4 rounded-xl border text-sm capitalize transition-all ${formData.budgetType === type ? 'border-blue-500 bg-blue-50 text-blue-700 font-medium' : 'border-gray-200 hover:border-gray-300'}`}>
-                      {type}
-                    </button>
+                    <button key={type} type="button" onClick={() => updateField('budgetType', type as any)} className={`flex-1 p-4 rounded-xl border text-sm capitalize transition-all ${formData.budgetType === type ? 'border-blue-500 bg-blue-50 text-blue-700 font-medium' : 'border-gray-200 hover:border-gray-300'}`}>{type}</button>
                   ))}
                 </div>
-                {errors.budgetType && <p className="text-xs text-red-500 mt-1">{errors.budgetType}</p>}
               </div>
               {formData.budgetType === 'hourly' ? (
-                <div>
-                  <label className="text-sm font-medium mb-1.5 block">Hourly Rate (₹) *</label>
-                  <Input type="number" value={formData.hourlyRate} onChange={(e) => updateField('hourlyRate', e.target.value)} placeholder="1500" className="rounded-xl" />
-                </div>
+                <div><label className="text-sm font-medium mb-1.5 block">Hourly Rate (₹) *</label><Input type="number" value={formData.hourlyRate} onChange={(e) => updateField('hourlyRate', e.target.value)} placeholder="1500" className="rounded-xl" /></div>
               ) : (
                 <div className="grid gap-4 md:grid-cols-2">
-                  <div><label className="text-sm font-medium mb-1.5 block">Min Budget (₹) *</label><Input type="number" value={formData.budgetMin} onChange={(e) => updateField('budgetMin', e.target.value)} placeholder="50000" className="rounded-xl" />{errors.budgetMin && <p className="text-xs text-red-500 mt-1">{errors.budgetMin}</p>}</div>
-                  <div><label className="text-sm font-medium mb-1.5 block">Max Budget (₹) *</label><Input type="number" value={formData.budgetMax} onChange={(e) => updateField('budgetMax', e.target.value)} placeholder="70000" className="rounded-xl" />{errors.budgetMax && <p className="text-xs text-red-500 mt-1">{errors.budgetMax}</p>}</div>
+                  <div><label className="text-sm font-medium mb-1.5 block">Min Budget (₹) *</label><Input type="number" value={formData.budgetMin} onChange={(e) => updateField('budgetMin', e.target.value)} placeholder="50000" className="rounded-xl" /></div>
+                  <div><label className="text-sm font-medium mb-1.5 block">Max Budget (₹) *</label><Input type="number" value={formData.budgetMax} onChange={(e) => updateField('budgetMax', e.target.value)} placeholder="70000" className="rounded-xl" /></div>
                 </div>
               )}
               <div>
                 <label className="text-sm font-medium mb-1.5 block">Duration *</label>
                 <div className="flex gap-2">
-                  <Input type="number" value={formData.duration} onChange={(e) => updateField('duration', e.target.value)} placeholder="30" className="rounded-xl flex-1" min="1" max="365" />
+                  <Input type="number" value={formData.duration} onChange={(e) => updateField('duration', e.target.value)} placeholder="30" className="rounded-xl flex-1" min="1" />
                   <select value={formData.durationUnit} onChange={(e) => updateField('durationUnit', e.target.value as any)} className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm">
-                    <option value="days">Days</option><option value="weeks">Weeks</option><option value="months">Months</option>
+                    <option value="days">Days</option><option value="weeks">Weeks</option>
                   </select>
                 </div>
-                {errors.duration && <p className="text-xs text-red-500 mt-1">{errors.duration}</p>}
               </div>
               <div>
                 <div className="flex items-center justify-between mb-2">
@@ -276,16 +282,13 @@ export default function PostProjectPage() {
                   </div>
                 ))}
                 {formData.milestones.length > 0 && (
-                  <div className="text-sm text-gray-500 mt-2">
-                    Total: ₹{milestoneTotal.toLocaleString()} {budgetMax > 0 && milestoneTotal !== budgetMax && <span className="text-yellow-600">(Budget: ₹{budgetMax.toLocaleString()})</span>}
-                    {budgetMax > 0 && milestoneTotal === budgetMax && <span className="text-green-600">✓ Matches budget</span>}
-                  </div>
+                  <div className="text-sm text-gray-500 mt-2">Total: ₹{milestoneTotal.toLocaleString()} {budgetMax > 0 && milestoneTotal === budgetMax && <span className="text-green-600">✓ Matches budget</span>}</div>
                 )}
               </div>
             </div>
           )}
 
-          {/* STEP 4: VISIBILITY & ATTACHMENTS */}
+          {/* STEP 4 */}
           {currentStep === 4 && (
             <div className="space-y-5">
               <div>
@@ -295,54 +298,40 @@ export default function PostProjectPage() {
                   { value: 'private', label: 'Private', desc: 'Only invited candidates' },
                   { value: 'invite', label: 'Invite Only', desc: 'Specific candidates only' },
                 ].map((opt) => (
-                  <button key={opt.value} type="button" onClick={() => updateField('visibility', opt.value as any)}
-                    className={`w-full text-left p-4 rounded-xl border mb-2 transition-all ${formData.visibility === opt.value ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                  <button key={opt.value} type="button" onClick={() => updateField('visibility', opt.value as any)} className={`w-full text-left p-4 rounded-xl border mb-2 transition-all ${formData.visibility === opt.value ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}>
                     <p className="font-medium text-sm">{opt.label}</p><p className="text-xs text-gray-500">{opt.desc}</p>
                   </button>
                 ))}
               </div>
-              <div>
-                <label className="text-sm font-medium mb-2 block">Featured Listing</label>
-                <button type="button" onClick={() => updateField('isFeatured', !formData.isFeatured)}
-                  className={`w-full text-left p-4 rounded-xl border transition-all ${formData.isFeatured ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}>
-                  <p className="font-medium text-sm flex items-center gap-2"><input type="checkbox" checked={formData.isFeatured} readOnly className="rounded" />Feature this project</p>
-                  <p className="text-xs text-gray-500 mt-1">+₹500 • Get 3x more applications</p>
-                </button>
-              </div>
-              <div>
-                <label className="text-sm font-medium mb-2 block">Attachments</label>
-                <div className="border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-xl p-8 text-center">
-                  <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                  <p className="text-sm text-gray-500">Drag & drop files here, or click to browse</p>
-                  <p className="text-xs text-gray-400 mt-1">Max 10 files, 50 MB total (PDF, DOC, JPG, PNG, ZIP)</p>
-                </div>
-              </div>
-              <div>
-                <button type="button" onClick={() => updateField('termsAccepted', !formData.termsAccepted)}
-                  className={`w-full text-left p-4 rounded-xl border transition-all ${formData.termsAccepted ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}>
-                  <p className="text-sm flex items-center gap-2"><input type="checkbox" checked={formData.termsAccepted} readOnly className="rounded" />I confirm this is a genuine project and agree to InternHub's Terms of Service</p>
-                </button>
-                {errors.termsAccepted && <p className="text-xs text-red-500 mt-1">{errors.termsAccepted}</p>}
-              </div>
+              <button type="button" onClick={() => updateField('isFeatured', !formData.isFeatured)} className={`w-full text-left p-4 rounded-xl border transition-all ${formData.isFeatured ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                <p className="font-medium text-sm flex items-center gap-2"><input type="checkbox" checked={formData.isFeatured} readOnly className="rounded" />Feature this project</p>
+                <p className="text-xs text-gray-500 mt-1">+₹500 · Get 3x more applications</p>
+              </button>
+              <button type="button" onClick={() => updateField('termsAccepted', !formData.termsAccepted)} className={`w-full text-left p-4 rounded-xl border transition-all ${formData.termsAccepted ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                <p className="text-sm flex items-center gap-2"><input type="checkbox" checked={formData.termsAccepted} readOnly className="rounded" />I confirm this is a genuine project and agree to InternHub's Terms of Service</p>
+              </button>
+              {errors.termsAccepted && <p className="text-xs text-red-500 mt-1">{errors.termsAccepted}</p>}
             </div>
           )}
         </CardContent>
       </Card>
 
       {/* BOTTOM NAVIGATION */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between bg-white dark:bg-gray-900 p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm sticky bottom-4">
         <div className="flex gap-3">
           {currentStep > 1 && (
             <Button variant="outline" onClick={handleBack}><ArrowLeft className="h-4 w-4 mr-2" />Back</Button>
           )}
-          <Button variant="outline" onClick={handleSaveDraft} disabled={isSubmitting}><Save className="h-4 w-4 mr-2" />Save Draft</Button>
+          <Button variant="outline" onClick={handleSaveDraft} disabled={isSubmitting}>
+            {isSubmitting ? 'Saving...' : <><Save className="h-4 w-4 mr-2" />Save Draft</>}
+          </Button>
         </div>
         <div className="flex gap-3">
           {currentStep < 4 ? (
             <Button onClick={handleNext}>Continue <ArrowRight className="h-4 w-4 ml-2" /></Button>
           ) : (
             <>
-              <Button variant="outline" onClick={() => setPreviewOpen(true)}><Eye className="h-4 w-4 mr-2" />Preview</Button>
+              <Button variant="outline" onClick={handlePreview}><Eye className="h-4 w-4 mr-2" />Preview</Button>
               <Button onClick={handlePublish} disabled={isSubmitting}>
                 {isSubmitting ? 'Publishing...' : <><Send className="h-4 w-4 mr-2" />Publish Project</>}
               </Button>
@@ -350,10 +339,40 @@ export default function PostProjectPage() {
           )}
         </div>
       </div>
+
+      {/* ✅ PREVIEW MODAL */}
+      {previewOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold">Project Preview</h2>
+              <Button variant="ghost" size="icon" onClick={() => setPreviewOpen(false)}>✕</Button>
+            </div>
+            <div className="space-y-4">
+              <h3 className="text-xl font-bold">{formData.title || 'Untitled'}</h3>
+              <p className="text-sm text-gray-500">{formData.category} · {formData.locationType} · {formData.budgetType === 'hourly' ? `₹${formData.hourlyRate}/hr` : `₹${formData.budgetMin || 0} - ₹${formData.budgetMax || 0}`} · {formData.duration} {formData.durationUnit}</p>
+              <div className="flex flex-wrap gap-2">
+                {formData.skills.filter(s => s.name).map((s, i) => (
+                  <span key={i} className="px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded-full text-xs">{s.name} ({s.proficiency})</span>
+                ))}
+              </div>
+              <p className="text-sm whitespace-pre-wrap">{formData.description}</p>
+              {formData.milestones.length > 0 && (
+                <div>
+                  <p className="font-medium text-sm mb-2">Milestones:</p>
+                  {formData.milestones.map((m) => (
+                    <div key={m.id} className="text-sm text-gray-600">{m.title} - ₹{m.amount} (Day {m.deadlineDay})</div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <Button variant="outline" onClick={() => setPreviewOpen(false)}>Close</Button>
+              <Button onClick={handlePublish} disabled={isSubmitting}>{isSubmitting ? 'Publishing...' : 'Publish'}</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
-}
-
-function isCompleted(step: number): boolean {
-  return step < (useCreateProject.getState?.()?.currentStep || 1);
 }
