@@ -44,7 +44,7 @@ export default function DashboardLayout({
         onClose={() => setMobileMenuOpen(false)} 
       />
 
-      <div className="transition-all duration-300 lg:pl-[308px]">
+      <div className="transition-all duration-300 lg:pl-[72px]">
         <Header onMenuClick={() => setMobileMenuOpen(true)} />
 
         <div className="px-4 py-4 sm:px-6 lg:px-8">
