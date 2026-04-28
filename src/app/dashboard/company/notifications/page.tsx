@@ -1,66 +1,51 @@
 'use client';
 
+import React from 'react';
 import Link from 'next/link';
 import { Bell } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 
-export default function CompanyNotificationsPage() {
-  const { notifications, unreadCount, isLoading, markAllAsRead, markAsRead } = useNotifications();
+function timeAgo(date: string) {
+  const hours = Math.round((Date.now() - new Date(date).getTime()) / 3600000);
+  return hours < 24 ? `${hours}h ago` : `${Math.round(hours / 24)}d ago`;
+}
+
+export default function NotificationsPage() {
+  const { notifications, unreadCount, isLoading, markAsRead, markAllAsRead } = useNotifications();
+
+  if (isLoading) return <Skeleton className="h-64 rounded-xl" />;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <h1 className="text-3xl font-semibold">Notifications</h1>
-          <p className="mt-2 text-sm text-gray-500">Track new applications, updates, interviews, and platform alerts.</p>
-        </div>
-        <Button variant="outline" onClick={() => void markAllAsRead()} disabled={unreadCount === 0}>
-          Mark All Read
-        </Button>
+    <div className="space-y-6 max-w-2xl mx-auto">
+      <div className="flex items-center justify-between">
+        <div><h1 className="text-2xl font-bold">Notifications</h1><p className="text-gray-500">{unreadCount} unread</p></div>
+        {unreadCount > 0 && <Button variant="outline" size="sm" onClick={() => markAllAsRead()}>Mark all read</Button>}
       </div>
 
-      <Card className="border-none bg-card/80 shadow-lg">
-        <CardHeader><CardTitle>Recent Notifications ({unreadCount} unread)</CardTitle></CardHeader>
-        <CardContent className="space-y-4">
-          {isLoading && <div className="rounded-2xl bg-gray-50 p-4 text-sm">Loading notifications...</div>}
-          {!isLoading && notifications.length === 0 && (
-            <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-gray-500">No notifications yet.</div>
-          )}
-          {!isLoading && notifications.map((notification) => (
-            <div key={notification._id} className="rounded-2xl border bg-gray-50 p-4">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex gap-3">
-                  <div className={`mt-1 h-3 w-3 rounded-full ${notification.read ? 'bg-gray-300' : 'bg-blue-600'}`} />
-                  <div>
-                    <div className="font-semibold">{notification.title}</div>
-                    <div className="mt-1 text-sm text-gray-600">{notification.message}</div>
-                    <div className="mt-2 text-xs uppercase tracking-wider text-gray-500">
-                      {notification.createdAt ? new Date(notification.createdAt).toLocaleString() : 'Recently'}
-                    </div>
-                  </div>
+      {notifications.length === 0 ? (
+        <Card className="border border-dashed border-gray-200 dark:border-gray-800 shadow-none"><CardContent className="p-12 text-center"><Bell className="h-8 w-8 text-gray-400 mx-auto mb-2" /><p className="text-gray-500">No notifications</p></CardContent></Card>
+      ) : (
+        <div className="space-y-2">
+          {notifications.map((n: any) => (
+            <Card key={n._id} className={`border shadow-sm transition-all ${n.read ? 'border-gray-200 dark:border-gray-800' : 'border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-900/10'}`}>
+              <CardContent className="p-4 flex items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2"><p className="font-medium text-sm">{n.title}</p>{!n.read && <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0" />}</div>
+                  <p className="text-sm text-gray-500 mt-1">{n.message}</p>
+                  <p className="text-xs text-gray-400 mt-2">{timeAgo(n.createdAt)}</p>
                 </div>
-                <div className="flex gap-2">
-                  {!notification.read && (
-                    <Button size="sm" variant="outline" onClick={() => void markAsRead(notification._id)}>Mark Read</Button>
-                  )}
-                  {notification.link && (
-                    <Button asChild size="sm"><Link href={notification.link}>Open</Link></Button>
-                  )}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {!n.read && <Button size="sm" variant="ghost" onClick={() => markAsRead(n._id)}>Mark read</Button>}
+                  {n.link && <Button size="sm" variant="ghost" asChild><Link href={n.link}>View</Link></Button>}
                 </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           ))}
-        </CardContent>
-      </Card>
-
-      <Card className="border-none bg-gradient-to-br from-primary-700 to-info-500 text-white">
-        <CardContent className="flex items-center gap-3 p-6">
-          <Bell className="h-5 w-5" />
-          <div className="text-sm text-white/85">Notification center available from the company dashboard and mobile menu.</div>
-        </CardContent>
-      </Card>
+        </div>
+      )}
     </div>
   );
 }

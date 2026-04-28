@@ -1,9 +1,11 @@
 'use client';
 
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import Link from 'next/link';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Eye, Briefcase, ArrowRight, Users, Clock, Calendar, TrendingUp, Plus, Rocket } from 'lucide-react';
+import { Eye, Briefcase, ArrowRight, Users, Clock, Calendar, Plus, Rocket } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface Project {
   _id: string;
@@ -20,26 +22,12 @@ interface ActiveProjectsProps {
   onProjectClick?: (id: string) => void;
 }
 
-export function ActiveProjects({ 
-  projects, 
-  isLoading, 
-  onViewAll,
-  onProjectClick 
-}: ActiveProjectsProps) {
+export function ActiveProjects({ projects, isLoading, onViewAll, onProjectClick }: ActiveProjectsProps) {
   if (isLoading) {
     return (
-      <Card className="border-0 shadow-lg overflow-hidden">
-        <CardHeader className="border-b border-charcoal-100 dark:border-charcoal-800 bg-charcoal-100/60 dark:bg-charcoal-800/30">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Briefcase className="h-5 w-5 text-primary-600" />
-            Active Projects
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-5">
-          <div className="animate-pulse space-y-4">
-            <div className="h-20 bg-charcoal-100 dark:bg-charcoal-700 rounded-xl"></div>
-            <div className="h-20 bg-charcoal-100 dark:bg-charcoal-700 rounded-xl"></div>
-          </div>
+      <Card className="border border-gray-200 dark:border-gray-800 shadow-sm">
+        <CardContent className="p-5 space-y-4">
+          {[1, 2].map((i) => <Skeleton key={i} className="h-20 rounded-xl" />)}
         </CardContent>
       </Card>
     );
@@ -48,102 +36,51 @@ export function ActiveProjects({
   const totalApplications = projects.reduce((sum, p) => sum + (p.applicationsCount || 0), 0);
 
   return (
-    <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden">
-      <CardHeader className="border-b border-charcoal-100 dark:border-charcoal-800 bg-charcoal-100/60 dark:bg-charcoal-800/30">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <div className="p-1.5 rounded-lg bg-primary-100 dark:bg-primary-900/50">
-              <Rocket className="h-4 w-4 text-primary-600" />
-            </div>
-            Active Projects
-            {projects.length > 0 && (
-              <span className="text-sm font-normal text-muted-foreground">
-                ({projects.length})
-              </span>
-            )}
-          </CardTitle>
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1">
-              <Users className="h-3 w-3" />
-              {totalApplications} total applicants
-            </span>
+    <Card className="border border-gray-200 dark:border-gray-800 shadow-sm">
+      <div className="p-5 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center">
+            <Rocket className="h-4 w-4 text-blue-600" />
           </div>
+          <h3 className="font-semibold text-sm">Active Projects ({projects.length})</h3>
         </div>
-      </CardHeader>
+        <span className="text-xs text-gray-500">{totalApplications} applicants</span>
+      </div>
       <CardContent className="p-5">
         {projects.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-charcoal-100 dark:bg-charcoal-800 flex items-center justify-center">
-              <Briefcase className="h-10 w-10 text-charcoal-400" />
-            </div>
-            <p className="text-muted-foreground font-medium">No active projects</p>
-            <p className="text-xs text-muted-foreground mt-1">Post a project to get started</p>
-            <Button variant="outline" size="sm" className="mt-4 gap-2" asChild>
-              <a href="/dashboard/company/post-project">
-                <Plus className="h-3 w-3" />
-                Post New Project
-              </a>
+          <div className="text-center py-8">
+            <Briefcase className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+            <p className="text-gray-500 text-sm">No active projects</p>
+            <Button size="sm" variant="outline" className="mt-3" asChild>
+              <Link href="/dashboard/company/post-project"><Plus className="h-3 w-3 mr-1" />Post Project</Link>
             </Button>
           </div>
         ) : (
           <div className="space-y-3">
             {projects.map((project) => (
-              <div
+              <button
                 key={project._id}
-                className="group p-4 rounded-xl border border-charcoal-100 dark:border-charcoal-800 bg-card dark:bg-charcoal-900 hover:shadow-md transition-all duration-200 cursor-pointer"
+                className="w-full text-left p-3 rounded-xl border border-gray-100 dark:border-gray-800 hover:border-gray-200 dark:hover:border-gray-700 hover:shadow-sm transition-all"
                 onClick={() => onProjectClick?.(project._id)}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h4 className="font-semibold text-charcoal-950 dark:text-white group-hover:text-primary-600 transition-colors truncate">
-                        {project.title}
-                      </h4>
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-                        <Clock className="h-2.5 w-2.5" />
-                        Active
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-4 mt-2 text-xs text-charcoal-500">
-                      <span className="flex items-center gap-1">
-                        <Users className="h-3 w-3" />
-                        {project.applicationsCount || 0} applications
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        Posted {new Date(project.createdAt).toLocaleDateString()}
-                      </span>
+                    <h4 className="font-medium text-sm truncate">{project.title}</h4>
+                    <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                      <span className="flex items-center gap-1"><Users className="h-3 w-3" />{project.applicationsCount || 0}</span>
+                      <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{new Date(project.createdAt).toLocaleDateString()}</span>
                     </div>
                   </div>
-                  <Button 
-                    size="sm" 
-                    variant="ghost" 
-                    className="opacity-0 group-hover:opacity-100 transition-opacity rounded-full h-8 w-8"
-                  >
-                    <Eye className="h-4 w-4" />
-                  </Button>
+                  <Eye className="h-4 w-4 text-gray-400 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
-                {project.applicationsCount && project.applicationsCount > 0 && (
-                  <div className="mt-3 pt-3 border-t border-charcoal-100 dark:border-charcoal-800">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-charcoal-500">Response rate</span>
-                      <span className="text-green-600 flex items-center gap-1">
-                        <TrendingUp className="h-3 w-3" />
-                        85%
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
+              </button>
             ))}
           </div>
         )}
-        
         {projects.length > 0 && onViewAll && (
-          <div className="mt-4 pt-3 border-t border-charcoal-100 dark:border-charcoal-800 text-center">
-            <Button variant="ghost" size="sm" onClick={onViewAll} className="gap-1 text-primary-600 hover:text-primary-700">
-              View All Projects
-              <ArrowRight className="h-3 w-3" />
+          <div className="mt-4 text-center">
+            <Button variant="ghost" size="sm" onClick={onViewAll} className="text-xs">
+              View all <ArrowRight className="h-3 w-3 ml-1" />
             </Button>
           </div>
         )}

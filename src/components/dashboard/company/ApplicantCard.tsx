@@ -1,135 +1,66 @@
 'use client';
 
 import React from 'react';
-import { Card, CardContent, CardFooter } from '@/components/ui/card';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Star, Download, Eye, CheckCircle, XCircle, Clock, Mail, Sparkles } from 'lucide-react';
 import Link from 'next/link';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Star, Clock, Download, Eye, CheckCircle, XCircle } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 interface ApplicantCardProps {
   applicant: {
     _id: string;
-    userId: { _id: string; name: string; avatar?: string; trustScore: number; email?: string };
-    resume: string;
-    coverLetter?: string;
+    userId: { _id: string; name: string; avatar?: string; trustScore: number };
     status: string;
     appliedAt: Date;
     matchScore?: number;
   };
-  onStatusChange?: (applicantId: string, status: string) => void;
+  onStatusChange?: (id: string, status: string) => void;
 }
 
-const STATUS_VARIANTS: Record<string, { variant: any; label: string; color: string }> = {
-  pending: { variant: 'pending', label: 'Pending', color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' },
-  reviewed: { variant: 'warning', label: 'Reviewed', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
-  shortlisted: { variant: 'success', label: 'Shortlisted', color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
-  rejected: { variant: 'error', label: 'Rejected', color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
-  hired: { variant: 'verified', label: 'Hired', color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' },
+const statusConfig: Record<string, { variant: any; label: string }> = {
+  pending: { variant: 'warning', label: 'Pending' },
+  reviewed: { variant: 'info', label: 'Reviewed' },
+  shortlisted: { variant: 'success', label: 'Shortlisted' },
+  rejected: { variant: 'error', label: 'Rejected' },
+  hired: { variant: 'default', label: 'Hired' },
 };
 
 export function ApplicantCard({ applicant, onStatusChange }: ApplicantCardProps) {
   const user = applicant.userId;
-  const statusConfig = STATUS_VARIANTS[applicant.status] || STATUS_VARIANTS.pending;
-
-  const getInitials = (name: string) => {
-    return name.split(' ').map(word => word[0]).join('').toUpperCase().slice(0, 2);
-  };
+  const config = statusConfig[applicant.status] || statusConfig.pending;
 
   return (
-    <Card className="group border-0 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden">
+    <Card className="border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow-md transition-all">
       <CardContent className="p-5">
         <div className="flex items-start gap-4">
-          <Avatar className="h-14 w-14 ring-2 ring-white dark:ring-gray-800">
-            <AvatarImage src={user.avatar} />
-            <AvatarFallback className="bg-gradient-to-br from-primary-100 to-primary-200 text-primary-700 font-semibold text-lg">
-              {getInitials(user.name)}
-            </AvatarFallback>
-          </Avatar>
-          
-          <div className="flex-1">
-            <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="w-12 h-12 rounded-full bg-black dark:bg-white flex items-center justify-center text-white dark:text-black font-semibold flex-shrink-0">
+            {user.name.charAt(0)}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between gap-2">
               <div>
-                <h3 className="text-lg font-semibold text-charcoal-950 dark:text-white group-hover:text-primary-600 transition-colors">
-                  {user.name}
-                </h3>
-                {user.email && (
-                  <p className="text-sm text-charcoal-500 dark:text-charcoal-400 flex items-center gap-1 mt-0.5">
-                    <Mail className="h-3.5 w-3.5" />
-                    {user.email}
-                  </p>
-                )}
+                <h3 className="font-semibold text-sm">{user.name}</h3>
+                <div className="flex items-center gap-2 mt-1">
+                  <div className="flex items-center gap-1 text-xs"><Star className="h-3 w-3 text-yellow-500 fill-current" />{user.trustScore}%</div>
+                  <span className="text-xs text-gray-500 flex items-center gap-1"><Clock className="h-3 w-3" />{formatDistanceToNow(new Date(applicant.appliedAt), { addSuffix: true })}</span>
+                </div>
               </div>
-              <Badge className={`${statusConfig.color} border-0 gap-1`}>
-                {statusConfig.label}
-              </Badge>
+              <Badge variant={config.variant} className="text-[10px]">{config.label}</Badge>
             </div>
-
-            <div className="flex flex-wrap items-center gap-3 mt-2 text-xs">
-              <div className="flex items-center gap-1 bg-yellow-50 dark:bg-yellow-900/30 px-2 py-0.5 rounded-full">
-                <Star className="h-3 w-3 text-yellow-500 fill-current" />
-                <span className="font-medium text-yellow-700 dark:text-yellow-400">
-                  Trust: {user.trustScore}
-                </span>
-              </div>
-              <div className="flex items-center gap-1 text-charcoal-500">
-                <Clock className="h-3 w-3" />
-                Applied {formatDistanceToNow(new Date(applicant.appliedAt), { addSuffix: true })}
-              </div>
-              {applicant.matchScore && (
-                <Badge variant="skill" size="sm" className="bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400 gap-1">
-                  <Sparkles className="h-3 w-3" />
-                  {applicant.matchScore}% match
-                </Badge>
-              )}
-            </div>
-
-            {applicant.coverLetter && (
-              <p className="text-sm text-charcoal-600 dark:text-charcoal-400 mt-3 line-clamp-2">
-                {applicant.coverLetter}
-              </p>
-            )}
           </div>
         </div>
+        <div className="flex items-center gap-2 mt-4 pt-3 border-t border-gray-100 dark:border-gray-800">
+          <Button size="sm" variant="ghost" asChild className="text-xs"><Link href={`/dashboard/company/applications/${applicant._id}`}><Eye className="h-3 w-3 mr-1" />Review</Link></Button>
+          {applicant.status === 'pending' && onStatusChange && (
+            <>
+              <Button size="sm" variant="ghost" className="text-xs text-green-600" onClick={() => onStatusChange(applicant._id, 'shortlisted')}><CheckCircle className="h-3 w-3 mr-1" />Shortlist</Button>
+              <Button size="sm" variant="ghost" className="text-xs text-red-600" onClick={() => onStatusChange(applicant._id, 'rejected')}><XCircle className="h-3 w-3 mr-1" />Reject</Button>
+            </>
+          )}
+        </div>
       </CardContent>
-
-      <CardFooter className="px-5 py-3 border-t border-charcoal-100 dark:border-charcoal-800 flex flex-wrap gap-2">
-        <Button variant="outline" size="sm" asChild className="gap-1">
-          <a href={applicant.resume} target="_blank" rel="noopener noreferrer">
-            <Download className="h-3.5 w-3.5" />
-            Resume
-          </a>
-        </Button>
-        <Button variant="outline" size="sm" asChild className="gap-1">
-          <Link href={`/dashboard/company/applications/${applicant._id}`}>
-            <Eye className="h-3.5 w-3.5" />
-            Review
-          </Link>
-        </Button>
-        {applicant.status === 'pending' && onStatusChange && (
-          <>
-            <Button 
-              size="sm" 
-              className="gap-1 bg-green-600 hover:bg-green-700 text-white"
-              onClick={() => onStatusChange(applicant._id, 'shortlisted')}
-            >
-              <CheckCircle className="h-3.5 w-3.5" />
-              Shortlist
-            </Button>
-            <Button 
-              size="sm" 
-              variant="outline" 
-              className="gap-1 text-red-600 border-red-200 hover:bg-red-50"
-              onClick={() => onStatusChange(applicant._id, 'rejected')}
-            >
-              <XCircle className="h-3.5 w-3.5" />
-              Reject
-            </Button>
-          </>
-        )}
-      </CardFooter>
     </Card>
   );
 }

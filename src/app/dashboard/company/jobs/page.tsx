@@ -2,221 +2,100 @@
 
 import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { AlertTriangle, Briefcase, Calendar, Eye, Filter, PenSquare, Search, Users } from 'lucide-react';
+import { Plus, Search, Eye, Users, Briefcase, Clock } from 'lucide-react';
 import { useJobs } from '@/hooks/useJobs';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 
-type JobItem = {
-  _id?: string;
-  title?: string;
-  location?: string;
-  type?: string;
-  status?: string;
-  applicationsCount?: number;
-  postedAt?: string | Date;
-  deadline?: string | Date;
-  salary?: { min?: number; max?: number; period?: string };
-};
-
-function formatSalary(job: JobItem) {
-  if (!job.salary?.min || !job.salary?.max) return 'Salary not specified';
-  const min = Math.round(job.salary.min / 100000);
-  const max = Math.round(job.salary.max / 100000);
-  return `Rs${min}-${max} LPA`;
+function formatSalary(job: any) {
+  if (!job?.salary?.min) return 'Not specified';
+  return `₹${Math.round(job.salary.min / 100000)}L - ₹${Math.round(job.salary.max / 100000)}L`;
 }
 
-function formatRelative(value?: string | Date) {
-  if (!value) return 'Recently';
-  const hours = Math.max(1, Math.round((Date.now() - new Date(value).getTime()) / (1000 * 60 * 60)));
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.round(hours / 24)}d ago`;
+function timeAgo(date: string) {
+  const hours = Math.round((Date.now() - new Date(date).getTime()) / 3600000);
+  return hours < 24 ? `${hours}h ago` : `${Math.round(hours / 24)}d ago`;
 }
 
 export default function CompanyJobsPage() {
   const { jobs = [], isLoading } = useJobs({});
   const [query, setQuery] = useState('');
-  const [tab, setTab] = useState<'published' | 'draft' | 'filled' | 'closed'>('published');
+  const [tab, setTab] = useState<'all' | 'published' | 'draft' | 'filled'>('all');
 
-  const sourceJobs = jobs as JobItem[];
-
-  const filteredJobs = useMemo(() => {
-    return sourceJobs.filter((job) => {
-      const searchMatch = (job.title || '').toLowerCase().includes(query.toLowerCase());
-      const statusMatch = (job.status || 'published') === tab;
-      return searchMatch && statusMatch;
-    });
-  }, [query, sourceJobs, tab]);
+  const allJobs = jobs as any[];
+  const filtered = useMemo(() => allJobs.filter((j: any) => {
+    const match = (j.title || '').toLowerCase().includes(query.toLowerCase());
+    const statusMatch = tab === 'all' || (j.status || 'published') === tab;
+    return match && statusMatch;
+  }), [query, tab, allJobs]);
 
   const counts = {
-    published: sourceJobs.filter((job) => (job.status || 'published') === 'published').length,
-    draft: sourceJobs.filter((job) => job.status === 'draft').length,
-    filled: sourceJobs.filter((job) => job.status === 'filled').length,
-    closed: sourceJobs.filter((job) => job.status === 'closed').length,
+    all: allJobs.length,
+    published: allJobs.filter((j: any) => (j.status || 'published') === 'published').length,
+    draft: allJobs.filter((j: any) => j.status === 'draft').length,
+    filled: allJobs.filter((j: any) => j.status === 'filled').length,
   };
 
-  const totalApplications = sourceJobs.reduce((sum, job) => sum + (job.applicationsCount || 0), 0);
-  const expiringSoon = sourceJobs.filter((job) => {
-    if (!job.deadline) return false;
-    const diff = new Date(job.deadline).getTime() - Date.now();
-    const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
-    return days >= 0 && days <= 3;
-  });
+  if (isLoading) return <Skeleton className="h-64 rounded-xl" />;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <h1 className="text-3xl font-semibold text-charcoal-950 dark:text-white">Jobs</h1>
-          <p className="mt-2 text-sm leading-7 text-charcoal-500 dark:text-charcoal-400">Manage active roles, expiring listings, and future hiring demand with the same premium company control surface.</p>
-        </div>
-        <Button asChild>
-          <Link href="/dashboard/company/jobs/post">
-            <PenSquare className="mr-2 h-4 w-4" />
-            Post New Job
-          </Link>
-        </Button>
+    <div className="space-y-6 max-w-4xl mx-auto">
+      <div className="flex items-center justify-between">
+        <div><h1 className="text-2xl font-bold">Jobs</h1><p className="text-gray-500">{counts.all} positions</p></div>
+        <Button size="sm" asChild><Link href="/dashboard/company/jobs/post"><Plus className="h-4 w-4 mr-1" />Post Job</Link></Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
-        {[
-          { label: 'Active Jobs', value: counts.published, tone: 'text-primary-700' },
-          { label: 'Total Applications', value: totalApplications, tone: 'text-info-700' },
-          { label: 'Draft Jobs', value: counts.draft, tone: 'text-charcoal-700' },
-          { label: 'Filled Roles', value: counts.filled, tone: 'text-secondary-700' },
-        ].map((item) => (
-          <Card key={item.label} className="border-none bg-card/80 dark:bg-charcoal-900/72">
-            <CardContent className="p-5">
-              <div className="text-sm uppercase tracking-[0.16em] text-charcoal-500 dark:text-charcoal-400">{item.label}</div>
-              <div className={`mt-3 text-3xl font-semibold ${item.tone}`}>{item.value}</div>
-            </CardContent>
-          </Card>
-        ))}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search jobs..." className="pl-9 rounded-xl" />
       </div>
 
-      <Card className="border-none bg-card/80 dark:bg-charcoal-900/72">
-        <CardContent className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-charcoal-400" />
-            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search jobs by title..." className="pl-9" />
-          </div>
-          <Button variant="outline" disabled>
-            <Filter className="mr-2 h-4 w-4" />
-            Filter
-          </Button>
-        </CardContent>
-      </Card>
-
-      <div className="grid gap-3 md:grid-cols-4">
-        {[
-          ['published', `Active (${counts.published})`],
-          ['draft', `Drafts (${counts.draft})`],
-          ['filled', `Filled (${counts.filled})`],
-          ['closed', `Closed (${counts.closed})`],
-        ].map(([value, label]) => (
+      <div className="flex gap-2">
+        {Object.entries({ all: 'All', published: 'Active', draft: 'Drafts', filled: 'Filled' }).map(([key, label]) => (
           <button
-            key={value}
-            type="button"
-            onClick={() => setTab(value as typeof tab)}
-            className={`rounded-[24px] border px-4 py-4 text-left transition ${tab === value ? 'border-primary-700 bg-primary-50 text-primary-800' : 'border-primary-100 bg-card/80 text-charcoal-700 dark:border-white/10 dark:bg-charcoal-900/72 dark:text-charcoal-300'}`}
+            key={key}
+            onClick={() => setTab(key as any)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              tab === key ? 'bg-black text-white dark:bg-white dark:text-black' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+            }`}
           >
-            <div className="font-semibold">{label}</div>
+            {label} ({counts[key as keyof typeof counts]})
           </button>
         ))}
       </div>
 
-      <Card className="border-none bg-card/80 shadow-[0_18px_45px_rgba(52,74,134,0.10)] dark:bg-charcoal-900/72">
-        <CardHeader>
-          <CardTitle className="text-xl text-charcoal-950 dark:text-white">Job Listings</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {isLoading && <div className="rounded-[24px] bg-silver-50/70 p-6 text-sm text-charcoal-500">Loading jobs...</div>}
-          {!isLoading && filteredJobs.length === 0 && (
-            <div className="rounded-[24px] border border-dashed border-primary-200 bg-silver-50/70 p-8 text-center text-sm text-charcoal-500 dark:border-white/10 dark:bg-charcoal-950/35 dark:text-charcoal-400">
-              No jobs found in this view yet.
-            </div>
-          )}
-          {!isLoading && filteredJobs.map((job) => (
-            <div key={job._id || job.title} className="rounded-[28px] border border-primary-100/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(225,221,214,0.55))] p-5 dark:border-white/10 dark:bg-charcoal-950/40">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div className="space-y-3">
-                  <div>
-                    <h3 className="text-lg font-semibold text-charcoal-950 dark:text-white">{job.title || 'Untitled role'}</h3>
-                    <p className="mt-1 text-sm text-charcoal-500 dark:text-charcoal-400">
-                      {job.location || 'Remote'} • {(job.type || 'full-time').replace('-', ' ')} • Posted {formatRelative(job.postedAt)}
+      {filtered.length === 0 ? (
+        <Card className="border border-dashed border-gray-200 dark:border-gray-800 shadow-none">
+          <CardContent className="p-12 text-center"><Briefcase className="h-8 w-8 text-gray-400 mx-auto mb-2" /><p className="text-gray-500">No jobs found</p></CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map((job: any) => (
+            <Card key={job._id} className="border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow-md transition-all">
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-semibold truncate">{job.title}</h3>
+                      <Badge variant="secondary" className="text-[10px] capitalize">{(job.status || 'published').replace('_', ' ')}</Badge>
+                    </div>
+                    <p className="text-sm text-gray-500">
+                      {job.location || 'Remote'} • {job.type || 'Full-time'} • {formatSalary(job)} • {job.applicationsCount || 0} applicants
                     </p>
                   </div>
-                  <div className="grid gap-2 text-sm text-charcoal-600 dark:text-charcoal-300 md:grid-cols-2">
-                    <div>Salary: {formatSalary(job)}</div>
-                    <div>Applications: {job.applicationsCount || 0}</div>
-                    <div>Status: {job.status || 'published'}</div>
-                    <div>{job.deadline ? `Deadline: ${new Date(job.deadline).toLocaleDateString()}` : 'Deadline not set'}</div>
+                  <div className="flex items-center gap-2">
+                    <Button size="sm" variant="ghost" asChild><Link href={`/dashboard/company/jobs/${job._id}`}><Eye className="h-4 w-4" /></Link></Button>
+                    <Button size="sm" variant="ghost" asChild><Link href={`/dashboard/company/jobs/${job._id}/applications`}><Users className="h-4 w-4" /></Link></Button>
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-2 lg:w-[240px] lg:flex-col">
-                  <Button asChild size="sm">
-                    <Link href={job._id ? `/dashboard/company/jobs/${job._id}` : '/dashboard/company/jobs'}>
-                      <Eye className="mr-2 h-4 w-4" />
-                      View Details
-                    </Link>
-                  </Button>
-                  <Button asChild size="sm" variant="outline">
-                    <Link href={job._id ? `/dashboard/company/jobs/${job._id}/applications` : '/dashboard/company/applications'}>
-                      <Users className="mr-2 h-4 w-4" />
-                      View Applications
-                    </Link>
-                  </Button>
-                  <Button size="sm" variant="outline">Edit</Button>
-                </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           ))}
-        </CardContent>
-      </Card>
-
-      <div className="grid gap-6 xl:grid-cols-2">
-        <Card className="border-none bg-card/80 dark:bg-charcoal-900/72">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-xl text-charcoal-950 dark:text-white">Expiring Soon</CardTitle>
-            <AlertTriangle className="h-5 w-5 text-secondary-700" />
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {expiringSoon.length === 0 && (
-              <div className="rounded-[22px] border border-dashed border-primary-200 bg-silver-50/70 p-4 text-sm text-charcoal-500">
-                No jobs are expiring in the next 3 days.
-              </div>
-            )}
-            {expiringSoon.map((job) => {
-              const daysLeft = Math.max(0, Math.ceil((new Date(job.deadline as string | Date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
-              return (
-                <div key={job._id || job.title} className="rounded-[22px] border border-secondary-200 bg-secondary-50/80 p-4">
-                  <div className="font-semibold text-charcoal-950">{job.title || 'Untitled role'}</div>
-                  <div className="mt-2 text-sm text-charcoal-500">Applications: {job.applicationsCount || 0} • Expires in {daysLeft} day{daysLeft === 1 ? '' : 's'}</div>
-                  <div className="mt-3 flex gap-2">
-                    <Button size="sm" variant="outline">Review</Button>
-                  </div>
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
-
-        <Card className="border-none bg-card/80 dark:bg-charcoal-900/72">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-xl text-charcoal-950 dark:text-white">Hiring Activity</CardTitle>
-            <Briefcase className="h-5 w-5 text-primary-700" />
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="rounded-[22px] border border-primary-100/70 bg-silver-50/70 p-4 text-sm text-charcoal-700">
-              <div className="flex items-center gap-2"><Calendar className="h-4 w-4 text-info-700" />Active roles currently live: {counts.published}</div>
-            </div>
-            <div className="rounded-[22px] border border-primary-100/70 bg-silver-50/70 p-4 text-sm text-charcoal-700">
-              <div className="flex items-center gap-2"><Users className="h-4 w-4 text-primary-700" />Candidate demand is being measured from real job application counts.</div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+        </div>
+      )}
     </div>
   );
 }

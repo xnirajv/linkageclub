@@ -1,165 +1,115 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
-import { Bookmark, Briefcase, Clock, DollarSign, MapPin, MessageCircle, Search, Sparkles, Star, Trophy } from 'lucide-react';
+import { Search, Star, MapPin, Briefcase, Bookmark, MessageCircle, Sparkles } from 'lucide-react';
 import apiClient from '@/lib/api/client';
 import { useApplications } from '@/hooks/useApplications';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 
-type SearchUser = {
-  _id: string; name?: string; role?: string; location?: string;
-  trustScore?: number; skills?: Array<{ name?: string }>; experience?: Array<{ title?: string }>;
-};
-
-type CompanyApplication = {
-  _id?: string; proposedAmount?: number; proposedDuration?: number;
-  applicantId?: { _id?: string; name?: string; trustScore?: number; location?: string; skills?: Array<{ name?: string }>; experience?: Array<{ title?: string }> };
-  projectId?: { title?: string }; jobId?: { title?: string };
-};
-
-type TalentCard = {
-  id: string; name: string; role: string; location: string; trustScore: number;
-  experience: number; rateLabel: string; rateValue: number | null; availability: string;
-  skills: string[]; completedProjects?: number; avgRating?: number;
-  recentProjects?: Array<{ title: string; rating?: number }>;
-};
-
-const filterSkills = ['React', 'Node.js', 'Python', 'MongoDB', 'AWS', 'TypeScript', 'Next.js', 'Express'];
-
-function dedupeById(items: TalentCard[]) {
-  const seen = new Map<string, TalentCard>();
-  items.forEach((item) => { if (!seen.has(item.id)) seen.set(item.id, item); });
-  return Array.from(seen.values());
-}
-
-function toCandidateFromApplication(app: CompanyApplication): TalentCard | null {
-  const applicant = app.applicantId;
-  if (!applicant?._id || !applicant.name) return null;
-  const rateValue = app.proposedAmount && app.proposedDuration ? Math.round(app.proposedAmount / Math.max(app.proposedDuration, 1)) : null;
-  const title = app.projectId?.title || app.jobId?.title;
-  return {
-    id: applicant._id, name: applicant.name, role: app.jobId ? 'Job Applicant' : 'Project Applicant',
-    location: applicant.location || 'Remote', trustScore: applicant.trustScore || 0,
-    experience: applicant.experience?.length || 0,
-    rateLabel: rateValue ? `₹${rateValue}/day` : 'Rate not listed', rateValue,
-    availability: 'Available', skills: (applicant.skills || []).map((s) => s.name || '').filter(Boolean),
-    completedProjects: applicant.experience?.length || 0,
-    recentProjects: title ? [{ title }] : [],
-  };
-}
-
-function toCandidateFromSearchUser(user: SearchUser): TalentCard {
-  return {
-    id: user._id, name: user.name || 'Candidate', role: user.role === 'student' ? 'Student' : 'Candidate',
-    location: user.location || 'Remote', trustScore: user.trustScore || 0,
-    experience: user.experience?.length || 0, rateLabel: 'Rate not listed', rateValue: null,
-    availability: 'Not listed', skills: (user.skills || []).map((s) => s.name || '').filter(Boolean),
-    completedProjects: user.experience?.length || 0,
-  };
-}
+const skillFilters = ['React', 'Node.js', 'Python', 'MongoDB', 'AWS', 'TypeScript', 'Next.js', 'Express'];
 
 export default function TalentSearchPage() {
   const { applications = [] } = useApplications({ role: 'company', limit: 100 });
-  const typedApplications = applications as CompanyApplication[];
   const [query, setQuery] = useState('');
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
-  const [minTrustScore, setMinTrustScore] = useState(80);
-  const [maxRate, setMaxRate] = useState(2000);
-  const [sortBy, setSortBy] = useState('match');
-  const [savedCandidates, setSavedCandidates] = useState<string[]>([]);
-  const [searchedUsers, setSearchedUsers] = useState<SearchUser[]>([]);
-  const [searchLoading, setSearchLoading] = useState(false);
+  const [minTrust, setMinTrust] = useState(80);
+  const [searchedUsers, setSearchedUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    let active = true;
-    const runSearch = async () => {
-      if (query.trim().length < 2) { setSearchedUsers([]); return; }
-      setSearchLoading(true);
+    if (query.trim().length < 2) { setSearchedUsers([]); return; }
+    const run = async () => {
+      setLoading(true);
       try {
-        const params = new URLSearchParams({ q: query.trim(), role: 'student', minTrustScore: String(minTrustScore) });
-        const response = await apiClient.get<{ users?: SearchUser[] }>(`/api/search/users?${params.toString()}`);
-        if (active) setSearchedUsers(response.users || []);
-      } catch { if (active) setSearchedUsers([]); }
-      finally { if (active) setSearchLoading(false); }
+        const res = await apiClient.get<{ users?: any[] }>(`/api/search/users?q=${query}&role=student&minTrustScore=${minTrust}`);
+        setSearchedUsers(res.users || []);
+      } catch { setSearchedUsers([]); }
+      finally { setLoading(false); }
     };
-    void runSearch();
-    return () => { active = false; };
-  }, [query, minTrustScore]);
-
-  const applicantsPool = useMemo(() => dedupeById(typedApplications.map(toCandidateFromApplication).filter(Boolean) as TalentCard[]), [typedApplications]);
-  const searchPool = useMemo(() => dedupeById(searchedUsers.map(toCandidateFromSearchUser)), [searchedUsers]);
-  const basePool = query.trim().length >= 2 ? searchPool : applicantsPool;
+    void run();
+  }, [query, minTrust]);
 
   const candidates = useMemo(() => {
-    let result = basePool.filter((t) => {
-      const sMatch = !query.trim() || query.trim().length < 2 || t.name.toLowerCase().includes(query.toLowerCase()) || t.skills.some((s) => s.toLowerCase().includes(query.toLowerCase()));
-      const trustMatch = t.trustScore >= minTrustScore;
-      const rateMatch = t.rateValue === null || t.rateValue <= maxRate;
-      const skillsMatch = selectedSkills.length === 0 || selectedSkills.some((s) => t.skills.includes(s));
-      return sMatch && trustMatch && rateMatch && skillsMatch;
+    const pool = query.length >= 2 ? searchedUsers : (applications as any[]).map((a: any) => ({
+      _id: a.applicantId?._id, name: a.applicantId?.name, trustScore: a.applicantId?.trustScore,
+      location: a.applicantId?.location, skills: a.applicantId?.skills || [],
+      role: 'Applicant', experience: a.applicantId?.experience?.length || 0,
+    }));
+    return pool.filter((c: any) => {
+      if (selectedSkills.length > 0 && !selectedSkills.some(s => (c.skills || []).some((sk: any) => (sk.name || sk).toLowerCase().includes(s.toLowerCase())))) return false;
+      return (c.trustScore || 0) >= minTrust;
     });
-    if (sortBy === 'trust') result = [...result].sort((a, b) => b.trustScore - a.trustScore);
-    else if (sortBy === 'rate') result = [...result].sort((a, b) => (a.rateValue ?? Number.MAX_SAFE_INTEGER) - (b.rateValue ?? Number.MAX_SAFE_INTEGER));
-    else result = [...result].sort((a, b) => b.trustScore - a.trustScore);
-    return result;
-  }, [basePool, maxRate, minTrustScore, query, selectedSkills, sortBy]);
+  }, [searchedUsers, applications, query, selectedSkills, minTrust]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-5xl mx-auto">
       <div>
-        <div className="inline-flex items-center gap-2 rounded-full border border-primary-200 bg-card/80 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-primary-700"><Sparkles className="h-3.5 w-3.5" />Talent Search</div>
-        <h1 className="mt-4 text-3xl font-semibold">Find pre-verified candidates</h1>
-        <p className="mt-2 text-sm text-gray-500">Browse real applicants from your company funnel, or search the wider platform.</p>
+        <div className="inline-flex items-center gap-2 rounded-full border border-gray-200 dark:border-gray-800 px-3 py-1 text-xs font-medium text-gray-500 mb-3">
+          <Sparkles className="h-3 w-3" />Talent Search
+        </div>
+        <h1 className="text-2xl font-bold">Find Talent</h1>
+        <p className="text-gray-500 mt-1">Search for skilled candidates</p>
       </div>
 
-      <Card className="border-none bg-card/80 shadow-lg">
-        <CardContent className="space-y-5 p-5">
-          <div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" /><Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by skills, name, or location..." className="pl-9" /></div>
-          <div className="grid gap-5 lg:grid-cols-5">
-            <div className="lg:col-span-2"><div className="mb-2 text-sm font-medium">Skills</div><div className="flex flex-wrap gap-2">{filterSkills.map((skill) => { const selected = selectedSkills.includes(skill); return (<button key={skill} type="button" onClick={() => setSelectedSkills((prev) => selected ? prev.filter((s) => s !== skill) : [...prev, skill])} className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${selected ? 'bg-primary-700 text-white' : 'bg-gray-100 text-gray-700'}`}>{skill}</button>); })}</div></div>
-            <div><div className="mb-2 text-sm font-medium">Trust Score</div><input type="range" min="70" max="100" step="5" value={minTrustScore} onChange={(e) => setMinTrustScore(parseInt(e.target.value, 10))} className="w-full" /><div className="mt-2 text-xs text-gray-500">{minTrustScore}%+</div></div>
-            <div><div className="mb-2 text-sm font-medium">Max Rate</div><input type="range" min="500" max="5000" step="100" value={maxRate} onChange={(e) => setMaxRate(parseInt(e.target.value, 10))} className="w-full" /><div className="mt-2 text-xs text-gray-500">₹{maxRate}/day</div></div>
-            <div><div className="mb-2 text-sm font-medium">Sort</div><select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="w-full rounded-lg border p-1.5 text-xs"><option value="match">Best Match</option><option value="trust">Trust Score</option><option value="rate">Rate (Low)</option></select></div>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by name or skill (min 2 chars)..." className="pl-9 rounded-xl" />
+      </div>
 
-      <Card className="border-none bg-card/80 shadow-lg">
-        <CardHeader><CardTitle>Candidates ({candidates.length})</CardTitle></CardHeader>
-        <CardContent className="space-y-4">
-          {searchLoading && <div className="rounded-2xl bg-gray-50 p-4 text-sm">Searching...</div>}
-          {!searchLoading && candidates.length === 0 && <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-gray-500">No candidates found.</div>}
-          {!searchLoading && candidates.map((talent) => (
-            <div key={talent.id} className="rounded-2xl border bg-gradient-to-b from-white to-gray-50 p-5 transition hover:shadow-lg">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div className="flex-1 space-y-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-500 to-info-500 text-lg font-semibold text-white">{talent.name.split(' ').map((p) => p[0]).join('').slice(0, 2)}</div>
-                    <div><h3 className="text-lg font-semibold">{talent.name}</h3><p className="text-sm text-gray-500">{talent.role}</p></div>
+      <div className="flex flex-wrap gap-2">
+        {skillFilters.map((skill) => {
+          const selected = selectedSkills.includes(skill);
+          return (
+            <button key={skill} onClick={() => setSelectedSkills(prev => selected ? prev.filter(s => s !== skill) : [...prev, skill])}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${selected ? 'bg-black text-white dark:bg-white dark:text-black' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'}`}>
+              {skill}
+            </button>
+          );
+        })}
+      </div>
+
+      {loading && <Skeleton className="h-32 rounded-xl" />}
+
+      {!loading && candidates.length === 0 && (
+        <Card className="border border-dashed border-gray-200 dark:border-gray-800 shadow-none"><CardContent className="p-12 text-center"><Search className="h-8 w-8 text-gray-400 mx-auto mb-2" /><p className="text-gray-500">{query.length < 2 ? 'Start typing to search' : 'No candidates found'}</p></CardContent></Card>
+      )}
+
+      <div className="space-y-3">
+        {candidates.map((c: any, i: number) => (
+          <Card key={c._id || i} className="border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow-md transition-all">
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-3 flex-1">
+                  <div className="w-12 h-12 rounded-full bg-black dark:bg-white flex items-center justify-center text-white dark:text-black font-semibold flex-shrink-0">
+                    {(c.name || 'C')[0]}
                   </div>
-                  <div className="grid gap-2 text-sm text-gray-600">
-                    <div className="flex items-center gap-3"><Trophy className="h-4 w-4 text-primary-700" /><span>Trust: <span className="font-semibold">{talent.trustScore}%</span></span></div>
-                    <div className="flex flex-wrap gap-4">
-                      <div className="flex items-center gap-1"><MapPin className="h-4 w-4" />{talent.location}</div>
-                      <div className="flex items-center gap-1"><Briefcase className="h-4 w-4" />{talent.experience} yrs</div>
-                      <div className="flex items-center gap-1"><DollarSign className="h-4 w-4" />{talent.rateLabel}</div>
+                  <div>
+                    <h3 className="font-semibold">{c.name}</h3>
+                    <div className="flex items-center gap-3 text-sm text-gray-500 mt-1">
+                      {c.location && <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{c.location}</span>}
+                      <span className="flex items-center gap-1"><Star className="h-3 w-3 text-yellow-500 fill-current" />{c.trustScore || 0}%</span>
                     </div>
+                    {(c.skills || []).length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {(c.skills || []).slice(0, 5).map((s: any) => <Badge key={s.name || s} variant="secondary" className="text-[10px]">{s.name || s}</Badge>)}
+                      </div>
+                    )}
                   </div>
-                  <div className="flex flex-wrap gap-2">{talent.skills.map((skill) => (<span key={`${talent.id}-${skill}`} className="rounded-full bg-primary-100 px-3 py-1 text-xs font-medium text-primary-800">{skill}</span>))}</div>
                 </div>
-                <div className="flex flex-wrap gap-2 lg:w-[200px] lg:flex-col">
-                  <Button asChild size="sm"><Link href="/dashboard/company/post-project">Hire Now</Link></Button>
-                  <Button size="sm" variant="outline" onClick={() => setSavedCandidates((prev) => prev.includes(talent.id) ? prev.filter((id) => id !== talent.id) : [...prev, talent.id])} className={savedCandidates.includes(talent.id) ? 'bg-primary-50 text-primary-700' : ''}><Bookmark className="mr-2 h-4 w-4" />{savedCandidates.includes(talent.id) ? 'Saved' : 'Save'}</Button>
-                  <Button asChild size="sm" variant="outline"><Link href="/dashboard/messages"><MessageCircle className="mr-2 h-4 w-4" />Message</Link></Button>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <Button size="sm" variant="ghost"><Bookmark className="h-4 w-4" /></Button>
+                  <Button size="sm" asChild><Link href="/dashboard/messages"><MessageCircle className="h-4 w-4" /></Link></Button>
                 </div>
               </div>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 }

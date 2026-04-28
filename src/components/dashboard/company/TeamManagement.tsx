@@ -1,18 +1,14 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
-import { UserPlus, Trash2, Shield, Mail, Crown, MoreVertical, Users, UserCheck } from 'lucide-react';
+import { UserPlus, Trash2, Shield, Mail, Crown, MoreVertical, Users } from 'lucide-react';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
 interface TeamMember {
@@ -20,7 +16,6 @@ interface TeamMember {
   name: string;
   email: string;
   role: 'owner' | 'admin' | 'member';
-  avatar?: string;
   joinedAt: Date;
 }
 
@@ -31,10 +26,10 @@ interface TeamManagementProps {
   onChangeRole?: (memberId: string, role: string) => void;
 }
 
-const ROLE_BADGES: Record<string, { variant: any; label: string; icon: React.ElementType; color: string }> = {
-  owner: { variant: 'default', label: 'Owner', icon: Crown, color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' },
-  admin: { variant: 'warning', label: 'Admin', icon: Shield, color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
-  member: { variant: 'outline', label: 'Member', icon: Users, color: 'bg-charcoal-100 text-charcoal-700 dark:bg-charcoal-800 dark:text-charcoal-400' },
+const roleConfig: Record<string, { variant: any; icon: React.ElementType; color: string }> = {
+  owner: { variant: 'default', icon: Crown, color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' },
+  admin: { variant: 'warning', icon: Shield, color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
+  member: { variant: 'outline', icon: Users, color: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400' },
 };
 
 export function TeamManagement({ members = [], onInvite, onRemove, onChangeRole }: TeamManagementProps) {
@@ -45,151 +40,77 @@ export function TeamManagement({ members = [], onInvite, onRemove, onChangeRole 
   const handleInvite = async () => {
     if (!inviteEmail) return;
     setIsInviting(true);
-    try {
-      await onInvite?.(inviteEmail, inviteRole);
-      setInviteEmail('');
-    } finally {
-      setIsInviting(false);
-    }
-  };
-
-  const getInitials = (name: string) => {
-    return name.split(' ').map(word => word[0]).join('').toUpperCase().slice(0, 2);
+    await onInvite?.(inviteEmail, inviteRole);
+    setInviteEmail('');
+    setIsInviting(false);
   };
 
   return (
-    <div className="space-y-6">
-      {/* Invite Section */}
-      <Card className="border-0 shadow-lg">
-        <CardHeader className="border-b border-charcoal-100 dark:border-charcoal-800 bg-charcoal-100/60">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <div className="p-1.5 rounded-lg bg-primary-100 dark:bg-primary-900/50">
-              <UserPlus className="h-4 w-4 text-primary-600" />
+    <div className="space-y-4">
+      <Card className="border border-gray-200 dark:border-gray-800 shadow-sm">
+        <div className="p-5 border-b border-gray-100 dark:border-gray-800">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center">
+              <UserPlus className="h-4 w-4 text-blue-600" />
             </div>
-            Invite Team Member
-          </CardTitle>
-        </CardHeader>
+            <h3 className="font-semibold text-sm">Invite Team Member</h3>
+          </div>
+        </div>
         <CardContent className="p-5">
           <div className="flex flex-col sm:flex-row gap-3">
-            <div className="flex-1">
-              <Input
-                type="email"
-                placeholder="Enter email address"
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-                className="rounded-xl"
-              />
-            </div>
-            <select
-              className="rounded-xl border border-charcoal-200 dark:border-charcoal-700 bg-card dark:bg-charcoal-800 px-4 py-2 text-sm"
-              value={inviteRole}
-              onChange={(e) => setInviteRole(e.target.value)}
-            >
+            <Input type="email" placeholder="colleague@company.com" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} className="rounded-xl flex-1" />
+            <select value={inviteRole} onChange={(e) => setInviteRole(e.target.value)} className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm">
               <option value="admin">Admin</option>
               <option value="member">Member</option>
             </select>
-            <Button onClick={handleInvite} disabled={isInviting} className="gap-2">
-              {isInviting ? (
-                <>
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                  Sending...
-                </>
-              ) : (
-                <>
-                  <Mail className="h-4 w-4" />
-                  Send Invite
-                </>
-              )}
+            <Button onClick={handleInvite} disabled={isInviting} size="sm">
+              {isInviting ? 'Sending...' : <><Mail className="h-4 w-4 mr-1" />Invite</>}
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground mt-2">
-            Invited members will receive an email with instructions to join your team
-          </p>
         </CardContent>
       </Card>
 
-      {/* Team Members List */}
-      <Card className="border-0 shadow-lg">
-        <CardHeader className="border-b border-charcoal-100 dark:border-charcoal-800 bg-charcoal-100/60">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <div className="p-1.5 rounded-lg bg-primary-100 dark:bg-primary-900/50">
-              <UserCheck className="h-4 w-4 text-primary-600" />
-            </div>
-            Team Members
-            <span className="text-sm font-normal text-muted-foreground">({members.length})</span>
-          </CardTitle>
-        </CardHeader>
+      <Card className="border border-gray-200 dark:border-gray-800 shadow-sm">
+        <div className="p-5 border-b border-gray-100 dark:border-gray-800">
+          <h3 className="font-semibold text-sm">Members ({members.length})</h3>
+        </div>
         <CardContent className="p-5">
-          {!members.length ? (
-            <div className="text-center py-12">
-              <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-charcoal-100 dark:bg-charcoal-800 flex items-center justify-center">
-                <Users className="h-10 w-10 text-charcoal-400" />
-              </div>
-              <p className="text-muted-foreground">No team members yet</p>
-              <p className="text-xs text-muted-foreground mt-1">Invite members to collaborate</p>
+          {members.length === 0 ? (
+            <div className="text-center py-8">
+              <Users className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+              <p className="text-gray-500 text-sm">No members yet</p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {members.map((member) => {
-                const roleConfig = ROLE_BADGES[member.role];
-                const RoleIcon = roleConfig.icon;
-                
+                const config = roleConfig[member.role] || roleConfig.member;
+                const Icon = config.icon;
                 return (
-                  <div
-                    key={member._id}
-                    className="group p-4 rounded-xl border border-charcoal-100 dark:border-charcoal-800 bg-card dark:bg-charcoal-900 hover:shadow-md transition-all duration-200"
-                  >
-                    <div className="flex items-center gap-4">
-                      <Avatar className="h-12 w-12 ring-2 ring-white dark:ring-gray-800">
-                        <AvatarImage src={member.avatar} />
-                        <AvatarFallback className="bg-gradient-to-br from-primary-100 to-primary-200 text-primary-700 font-semibold">
-                          {getInitials(member.name)}
-                        </AvatarFallback>
-                      </Avatar>
-                      
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-semibold text-charcoal-950 dark:text-white">
-                            {member.name}
-                          </p>
-                          <Badge className={`${roleConfig.color} border-0 gap-1`}>
-                            <RoleIcon className="h-3 w-3" />
-                            {roleConfig.label}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-charcoal-500 dark:text-charcoal-400 mt-0.5">
-                          {member.email}
-                        </p>
-                        <p className="text-xs text-charcoal-400 mt-1">
-                          Joined {new Date(member.joinedAt).toLocaleDateString()}
-                        </p>
-                      </div>
-
-                      {member.role !== 'owner' && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => onChangeRole?.(member._id, 'admin')}>
-                              <Shield className="h-4 w-4" />
-                              Make Admin
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => onChangeRole?.(member._id, 'member')}>
-                              <Users className="h-4 w-4" />
-                              Make Member
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem className="gap-2 cursor-pointer text-red-600" onClick={() => onRemove?.(member._id)}>
-                              <Trash2 className="h-4 w-4" />
-                              Remove
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
+                  <div key={member._id} className="flex items-center gap-3 p-3 rounded-xl border border-gray-100 dark:border-gray-800">
+                    <div className="w-8 h-8 rounded-full bg-black dark:bg-white flex items-center justify-center text-white dark:text-black text-xs font-medium">
+                      {member.name.charAt(0)}
                     </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-sm truncate">{member.name}</p>
+                        <Badge className={`${config.color} text-[10px] border-0 gap-1`}>
+                          <Icon className="h-3 w-3" />{member.role}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-gray-500">{member.email}</p>
+                    </div>
+                    {member.role !== 'owner' && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="h-4 w-4" /></Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => onChangeRole?.(member._id, 'admin')}><Shield className="h-4 w-4 mr-2" />Make Admin</DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem className="text-red-600" onClick={() => onRemove?.(member._id)}><Trash2 className="h-4 w-4 mr-2" />Remove</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                   </div>
                 );
               })}

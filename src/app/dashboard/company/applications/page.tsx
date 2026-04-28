@@ -2,114 +2,120 @@
 
 import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { CheckCircle2, Filter, MessageSquare, Search, Sparkles, UserRoundX } from 'lucide-react';
+import { Search, Eye, Users, MessageSquare, CheckCircle2, XCircle, Sparkles } from 'lucide-react';
 import { useApplications } from '@/hooks/useApplications';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/forms/Textarea';
+import { Skeleton } from '@/components/ui/skeleton';
 
-type CompanyApplication = {
-  _id: string; status?: string; proposedAmount?: number; proposedDuration?: number;
-  submittedAt?: string; createdAt?: string; coverLetter?: string; attachments?: string[];
-  applicantId?: { name?: string; trustScore?: number; location?: string; skills?: Array<{ name?: string }>; experience?: Array<{ title?: string }> };
-  projectId?: { _id?: string; title?: string }; jobId?: { title?: string };
-};
+function timeAgo(date: string) {
+  const hours = Math.round((Date.now() - new Date(date).getTime()) / 3600000);
+  return hours < 24 ? `${hours}h ago` : `${Math.round(hours / 24)}d ago`;
+}
 
-const statusTabs = ['all', 'pending', 'shortlisted', 'interview', 'rejected'] as const;
-type StatusTab = typeof statusTabs[number];
-
-function formatCurrency(value?: number) { if (!value) return 'Negotiable'; return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(value); }
-function relativeLabel(value?: string) { if (!value) return 'Recently'; const hours = Math.max(1, Math.round((Date.now() - new Date(value).getTime()) / (1000 * 60 * 60))); if (hours < 24) return `${hours}h ago`; return `${Math.round(hours / 24)}d ago`; }
-
-export default function CompanyApplicationsPage() {
-  const { applications = [], isLoading, errorMessage, updateStatus, sendMessage } = useApplications({ role: 'company', limit: 100 });
-  const typedApplications = applications as CompanyApplication[];
+export default function ApplicationsPage() {
+  const { applications = [], isLoading, updateStatus } = useApplications({ role: 'company', limit: 50 });
   const [query, setQuery] = useState('');
-  const [tab, setTab] = useState<StatusTab>('all');
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [bulkMessageOpen, setBulkMessageOpen] = useState(false);
-  const [bulkMessage, setBulkMessage] = useState('');
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [tab, setTab] = useState('all');
 
-  const displayApplications = useMemo(() => typedApplications.filter((app) => {
-    const searchMatch = (app.applicantId?.name || '').toLowerCase().includes(query.toLowerCase()) || (app.projectId?.title || '').toLowerCase().includes(query.toLowerCase());
-    const statusMatch = tab === 'all' || (tab === 'interview' ? (app.status || '').startsWith('interview') : (app.status || '') === tab);
-    return searchMatch && statusMatch;
-  }), [query, tab, typedApplications]);
+  const apps = applications as any[];
 
-  const stats = { all: typedApplications.length, pending: typedApplications.filter((a) => a.status === 'pending').length, shortlisted: typedApplications.filter((a) => a.status === 'shortlisted').length, rejected: typedApplications.filter((a) => a.status === 'rejected').length };
+  const filtered = useMemo(() => apps.filter((a: any) => {
+    const name = (a.applicantId?.name || '').toLowerCase();
+    const title = (a.projectId?.title || a.jobId?.title || '').toLowerCase();
+    const match = name.includes(query.toLowerCase()) || title.includes(query.toLowerCase());
+    const tabMatch = tab === 'all' || a.status === tab;
+    return match && tabMatch;
+  }), [query, tab, apps]);
 
-  const handleStatusChange = async (id: string, status: string) => {
-    if (updatingId) return; setUpdatingId(id); setActionError(null);
-    const result = await updateStatus(id, status);
-    if (!result.success) setActionError(result.error || 'Failed');
-    setUpdatingId(null);
+  const counts = {
+    all: apps.length,
+    pending: apps.filter((a: any) => a.status === 'pending').length,
+    shortlisted: apps.filter((a: any) => a.status === 'shortlisted').length,
+    accepted: apps.filter((a: any) => a.status === 'accepted').length,
+    rejected: apps.filter((a: any) => a.status === 'rejected').length,
   };
 
-  const toggleSelect = (id: string) => { setSelectedIds((prev) => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; }); };
-  const toggleSelectAll = () => { setSelectedIds((prev) => prev.size === displayApplications.length ? new Set() : new Set(displayApplications.map((a) => a._id))); };
-
-  const handleBulkMessage = async () => {
-    if (!bulkMessage.trim() || selectedIds.size === 0) return;
-    const ids = Array.from(selectedIds);
-    for (const id of ids) await sendMessage(id, bulkMessage.trim());
-    setBulkMessage(''); setBulkMessageOpen(false); setSelectedIds(new Set());
+  const handleStatus = async (id: string, status: string) => {
+    await updateStatus(id, status);
   };
+
+  if (isLoading) return <Skeleton className="h-64 rounded-xl" />;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-5xl mx-auto">
       <div>
-        <div className="inline-flex items-center gap-2 rounded-full border border-primary-200 bg-card/80 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-primary-700"><Sparkles className="h-3.5 w-3.5" />Applications Management</div>
-        <h1 className="mt-4 text-3xl font-semibold">Applications</h1>
-        <p className="mt-2 text-sm text-gray-500">Review new candidates, shortlist strong profiles, and move the hiring pipeline forward.</p>
+        <div className="inline-flex items-center gap-2 rounded-full border border-gray-200 dark:border-gray-800 px-3 py-1 text-xs font-medium text-gray-500 mb-3">
+          <Sparkles className="h-3 w-3" />Applications
+        </div>
+        <h1 className="text-2xl font-bold">Applications</h1>
+        <p className="text-gray-500 mt-1">Review and manage candidate applications</p>
       </div>
 
-      {(actionError || errorMessage) && <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{actionError || errorMessage}</div>}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by name or project..." className="pl-9 rounded-xl" />
+      </div>
 
-      <Card className="border-none bg-card/80"><CardContent className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center"><div className="relative flex-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" /><Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by applicant or project..." className="pl-9" /></div><Button variant="outline"><Filter className="mr-2 h-4 w-4" />Filters</Button></CardContent></Card>
+      <div className="flex gap-2 overflow-x-auto pb-2">
+        {Object.entries({ all: 'All', pending: 'New', shortlisted: 'Shortlisted', accepted: 'Hired', rejected: 'Rejected' }).map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => setTab(key)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${
+              tab === key ? 'bg-black text-white dark:bg-white dark:text-black' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+            }`}
+          >
+            {label} ({counts[key as keyof typeof counts]})
+          </button>
+        ))}
+      </div>
 
-      <div className="grid gap-3 md:grid-cols-5">{statusTabs.map((value) => (<button key={value} type="button" onClick={() => setTab(value)} className={`rounded-2xl border px-4 py-4 text-left transition ${tab === value ? 'border-primary-700 bg-primary-50 text-primary-800' : 'border-primary-100 bg-card/80'}`}><div className="font-semibold capitalize">{value === 'all' ? 'All' : value}</div><div className="mt-1 text-sm">{stats[value]}</div></button>))}</div>
-
-      <Card className="border-none bg-card/80"><CardContent className="flex flex-col gap-3 p-5 md:flex-row md:items-center md:justify-between"><div className="flex items-center gap-3 text-sm"><input type="checkbox" checked={displayApplications.length > 0 && selectedIds.size === displayApplications.length} onChange={toggleSelectAll} /><span>{selectedIds.size} selected</span></div><div className="flex gap-2"><Button variant="outline" onClick={() => setBulkMessageOpen(true)} disabled={selectedIds.size === 0}>Message All</Button></div></CardContent></Card>
-
-      <Card className="border-none bg-card/80 shadow-lg"><CardHeader><CardTitle>Applications List ({displayApplications.length})</CardTitle></CardHeader><CardContent className="space-y-4">
-        {isLoading && <div className="rounded-2xl bg-gray-50 p-6 text-sm">Loading...</div>}
-        {!isLoading && displayApplications.length === 0 && <div className="rounded-2xl border border-dashed p-8 text-center text-sm text-gray-500">No applications match this view.</div>}
-        {!isLoading && displayApplications.map((app) => {
-          const name = app.applicantId?.name || 'Candidate';
-          const title = app.projectId?.title || 'Opportunity';
-          const initials = name.split(' ').map((p) => p[0]).join('').slice(0, 2);
-          return (
-            <div key={app._id} className="rounded-3xl border bg-gradient-to-b from-white to-gray-50 p-5">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <input type="checkbox" checked={selectedIds.has(app._id)} onChange={() => toggleSelect(app._id)} />
-                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-100 text-sm font-semibold text-primary-800">{initials}</div>
-                    <div><h3 className="text-lg font-semibold">{name}</h3><p className="text-sm text-gray-500">Applied for: {title}</p></div>
+      {filtered.length === 0 ? (
+        <Card className="border border-dashed border-gray-200 dark:border-gray-800 shadow-none">
+          <CardContent className="p-12 text-center"><Users className="h-8 w-8 text-gray-400 mx-auto mb-2" /><p className="text-gray-500">No applications found</p></CardContent>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map((app: any) => (
+            <Card key={app._id} className="border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow-md transition-all">
+              <CardContent className="p-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                    <div className="w-10 h-10 rounded-full bg-black dark:bg-white flex items-center justify-center text-white dark:text-black text-sm font-medium flex-shrink-0">
+                      {(app.applicantId?.name || 'C')[0]}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-semibold text-sm truncate">{app.applicantId?.name || 'Candidate'}</h3>
+                        <Badge variant={
+                          app.status === 'pending' ? 'warning' : app.status === 'shortlisted' ? 'info' :
+                          app.status === 'accepted' ? 'success' : app.status === 'rejected' ? 'error' : 'secondary'
+                        } className="text-[10px]">{app.status}</Badge>
+                      </div>
+                      <p className="text-sm text-gray-500">
+                        {app.projectId?.title || app.jobId?.title || 'Position'} • Trust: {app.applicantId?.trustScore || 0}% • {timeAgo(app.submittedAt || app.createdAt)}
+                      </p>
+                      {app.coverLetter && <p className="text-xs text-gray-400 mt-2 line-clamp-2">{app.coverLetter}</p>}
+                    </div>
                   </div>
-                  <div className="grid gap-2 text-sm text-gray-600 md:grid-cols-2"><div>Trust: {app.applicantId?.trustScore || 0}%</div><div>Status: {app.status || 'pending'}</div><div>Proposed: {formatCurrency(app.proposedAmount)}</div><div>{relativeLabel(app.submittedAt || app.createdAt)}</div></div>
-                  {app.coverLetter && <div className="text-sm text-gray-700">{app.coverLetter.slice(0, 140)}{app.coverLetter.length > 140 ? '...' : ''}</div>}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <Button size="sm" variant="ghost" asChild><Link href={`/dashboard/company/applications/${app._id}`}><Eye className="h-4 w-4" /></Link></Button>
+                    {app.status === 'pending' && (
+                      <>
+                        <Button size="sm" variant="ghost" className="text-green-600" onClick={() => handleStatus(app._id, 'shortlisted')}><CheckCircle2 className="h-4 w-4" /></Button>
+                        <Button size="sm" variant="ghost" className="text-red-600" onClick={() => handleStatus(app._id, 'rejected')}><XCircle className="h-4 w-4" /></Button>
+                      </>
+                    )}
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-2 lg:w-[240px] lg:flex-col">
-                  <Button asChild size="sm"><Link href={`/dashboard/company/applications/${app._id}`}>View Full Application</Link></Button>
-                  <Button size="sm" variant="outline" onClick={() => handleStatusChange(app._id, 'shortlisted')} disabled={updatingId === app._id}>Shortlist</Button>
-                  <Button size="sm" variant="outline" onClick={() => handleStatusChange(app._id, 'accepted')} disabled={updatingId === app._id}><CheckCircle2 className="mr-2 h-4 w-4" />Accept</Button>
-                  <Button size="sm" variant="outline" onClick={() => handleStatusChange(app._id, 'rejected')} disabled={updatingId === app._id}><UserRoundX className="mr-2 h-4 w-4" />Reject</Button>
-                  <Button asChild size="sm" variant="outline"><Link href="/dashboard/messages"><MessageSquare className="mr-2 h-4 w-4" />Message</Link></Button>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </CardContent></Card>
-
-      <Dialog open={bulkMessageOpen} onOpenChange={setBulkMessageOpen}>
-        <DialogContent className="max-w-lg"><DialogHeader><DialogTitle>Message Selected Candidates</DialogTitle></DialogHeader><Textarea rows={5} value={bulkMessage} onChange={(e) => setBulkMessage(e.target.value)} placeholder="Write a message..." /><DialogFooter><Button variant="outline" onClick={() => setBulkMessageOpen(false)}>Cancel</Button><Button onClick={handleBulkMessage} disabled={!bulkMessage.trim()}>Send</Button></DialogFooter></DialogContent>
-      </Dialog>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

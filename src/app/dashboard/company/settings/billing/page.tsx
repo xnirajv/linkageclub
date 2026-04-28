@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
 
-export default function CompanySettingsBillingRedirectPage() {
+export default function SettingsBillingRedirect() {
   redirect('/dashboard/company/billing');
 }

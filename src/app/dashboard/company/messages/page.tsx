@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
 
-export default function CompanyMessagesRedirectPage() {
+export default function MessagesRedirect() {
   redirect('/dashboard/messages');
 }

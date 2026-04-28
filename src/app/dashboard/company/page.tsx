@@ -37,7 +37,7 @@ export default function CompanyDashboardPage() {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <Skeleton className="h-10 w-64" />
+        <Skeleton className="h-10 w-64 rounded-lg" />
         <div className="grid gap-4 md:grid-cols-4">{Array(4).fill(0).map((_, i) => <Skeleton key={i} className="h-28 rounded-xl" />)}</div>
         <Skeleton className="h-64 rounded-xl" />
       </div>
@@ -46,7 +46,6 @@ export default function CompanyDashboardPage() {
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto">
-      {/* Welcome */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
           Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}, {user?.name?.split(' ')[0]}
@@ -54,13 +53,12 @@ export default function CompanyDashboardPage() {
         <p className="text-gray-500 mt-1">Here&apos;s your project overview.</p>
       </div>
 
-      {/* Stats */}
       <div className="grid gap-4 md:grid-cols-4">
         {[
-          { icon: Briefcase, label: 'Active Projects', value: activeProjects.length, color: 'text-blue-600 bg-blue-50 dark:bg-blue-900/20', href: '/dashboard/company/my-projects' },
-          { icon: Users, label: 'Total Applicants', value: applications.length, color: 'text-green-600 bg-green-50 dark:bg-green-900/20', href: '/dashboard/company/applications' },
-          { icon: FileText, label: 'Pending Review', value: pendingCount, color: 'text-orange-600 bg-orange-50 dark:bg-orange-900/20', href: '/dashboard/company/applications?status=pending' },
-          { icon: DollarSign, label: 'Total Budget', value: formatCurrency(totalBudget), color: 'text-purple-600 bg-purple-50 dark:bg-purple-900/20', href: '#' },
+          { icon: Briefcase, label: 'Active', value: activeProjects.length, color: 'text-blue-600 bg-blue-50 dark:bg-blue-900/20', href: '/dashboard/company/my-projects' },
+          { icon: Users, label: 'Applicants', value: applications.length, color: 'text-green-600 bg-green-50 dark:bg-green-900/20', href: '/dashboard/company/applications' },
+          { icon: FileText, label: 'Pending', value: pendingCount, color: 'text-orange-600 bg-orange-50 dark:bg-orange-900/20', href: '/dashboard/company/applications?status=pending' },
+          { icon: DollarSign, label: 'Budget', value: formatCurrency(totalBudget), color: 'text-purple-600 bg-purple-50 dark:bg-purple-900/20', href: '#' },
         ].map((stat) => (
           <Link key={stat.label} href={stat.href}>
             <Card className="border border-gray-200 dark:border-gray-800 shadow-sm hover:shadow-md hover:border-gray-300 dark:hover:border-gray-700 transition-all cursor-pointer">
@@ -75,7 +73,6 @@ export default function CompanyDashboardPage() {
         ))}
       </div>
 
-      {/* Active Projects */}
       <div>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2"><h2 className="text-lg font-semibold">Active Projects</h2><Badge variant="secondary" className="text-xs">{activeProjects.length}</Badge></div>
@@ -122,7 +119,6 @@ export default function CompanyDashboardPage() {
         )}
       </div>
 
-      {/* Recent Applications */}
       <div>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold">Recent Applications</h2>
@@ -153,7 +149,6 @@ export default function CompanyDashboardPage() {
         )}
       </div>
 
-      {/* Quick Actions */}
       <div className="grid gap-3 md:grid-cols-4">
         {[
           { icon: Plus, title: 'Post Project', href: '/dashboard/company/post-project' },

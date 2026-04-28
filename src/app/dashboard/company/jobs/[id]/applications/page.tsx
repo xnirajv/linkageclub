@@ -1,113 +1,71 @@
 'use client';
 
+import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Calendar, Search, Users } from 'lucide-react';
+import { ArrowLeft, Search, Eye, Users } from 'lucide-react';
 import { useApplications } from '@/hooks/useApplications';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-
-type AppRecord = {
-  _id?: string;
-  status?: string;
-  submittedAt?: string;
-  jobId?: { _id?: { toString(): string } | string; title?: string };
-  applicantId?: { name?: string; email?: string; trustScore?: number };
-};
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function JobApplicationsPage() {
   const params = useParams();
   const router = useRouter();
-  const { applications = [], isLoading } = useApplications({});
+  const { applications = [], isLoading } = useApplications({ role: 'company', limit: 50 });
   const [query, setQuery] = useState('');
 
-  const records = (applications as AppRecord[]).filter((item) => {
-    const jobId = typeof item.jobId?._id === 'string' ? item.jobId?._id : item.jobId?._id?.toString();
+  const apps = (applications as any[]).filter((a: any) => {
+    const jobId = typeof a.jobId?._id === 'string' ? a.jobId._id : a.jobId?._id?.toString();
     return jobId === params.id;
   });
 
-  const filtered = useMemo(() => {
-    return records.filter((item) => {
-      const name = item.applicantId?.name || '';
-      return name.toLowerCase().includes(query.toLowerCase());
-    });
-  }, [query, records]);
+  const filtered = useMemo(() => apps.filter((a: any) => {
+    const name = a.applicantId?.name || '';
+    return name.toLowerCase().includes(query.toLowerCase());
+  }), [query, apps]);
+
+  if (isLoading) return <Skeleton className="h-64 rounded-xl" />;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start gap-3">
-        <Button variant="outline" size="icon" onClick={() => router.back()}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div>
-          <h1 className="text-3xl font-semibold text-charcoal-950 dark:text-white">Job Applications</h1>
-          <p className="mt-2 text-sm leading-7 text-charcoal-500 dark:text-charcoal-400">Review the candidate pipeline for this role with a cleaner shortlist and interview action flow.</p>
-        </div>
+    <div className="space-y-6 max-w-3xl mx-auto">
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="icon" onClick={() => router.back()}><ArrowLeft className="h-4 w-4" /></Button>
+        <div><h1 className="text-2xl font-bold">Applications</h1><p className="text-gray-500">{apps.length} candidates</p></div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        {[
-          ['Total', `${filtered.length}`],
-          ['Shortlisted', `${filtered.filter((item) => item.status === 'shortlisted').length}`],
-          ['Interview', `${filtered.filter((item) => item.status === 'interview').length}`],
-        ].map(([title, value]) => (
-          <Card key={title} className="border-none bg-card/80 dark:bg-charcoal-900/72">
-            <CardContent className="p-5">
-              <div className="text-sm uppercase tracking-[0.16em] text-charcoal-500 dark:text-charcoal-400">{title}</div>
-              <div className="mt-3 text-2xl font-semibold text-charcoal-950 dark:text-white">{value}</div>
-            </CardContent>
-          </Card>
-        ))}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search applicants..." className="pl-9 rounded-xl" />
       </div>
 
-      <Card className="border-none bg-card/80 dark:bg-charcoal-900/72">
-        <CardContent className="p-5">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-charcoal-400" />
-            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search applicants by name..." className="pl-9" />
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="border-none bg-card/80 dark:bg-charcoal-900/72">
-        <CardHeader><CardTitle className="text-xl text-charcoal-950 dark:text-white">Applications ({filtered.length})</CardTitle></CardHeader>
-        <CardContent className="space-y-4">
-          {isLoading && <div className="rounded-[24px] bg-silver-50/70 p-6 text-sm text-charcoal-500">Loading applications...</div>}
-          {!isLoading && filtered.length === 0 && (
-            <div className="rounded-[24px] border border-dashed border-primary-200 bg-silver-50/70 p-8 text-center text-sm text-charcoal-500 dark:border-white/10 dark:bg-charcoal-950/35 dark:text-charcoal-400">
-              No job applications found for this role yet.
-            </div>
-          )}
-          {!isLoading && filtered.map((app) => (
-            <div key={app._id || app.applicantId?.email} className="rounded-[24px] border border-primary-100/70 bg-silver-50/70 p-4 dark:border-white/10 dark:bg-charcoal-950/35">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <div className="font-semibold text-charcoal-950 dark:text-white">{app.applicantId?.name || 'Candidate'}</div>
-                  <div className="mt-1 text-sm text-charcoal-500 dark:text-charcoal-400">{app.applicantId?.email}</div>
-                  <div className="mt-2 text-sm text-charcoal-700 dark:text-charcoal-300">
-                    Trust Score: {app.applicantId?.trustScore || 0}% • Status: {app.status || 'pending'}
+      {filtered.length === 0 ? (
+        <Card className="border border-dashed border-gray-200 dark:border-gray-800 shadow-none"><CardContent className="p-12 text-center"><Users className="h-8 w-8 text-gray-400 mx-auto mb-2" /><p className="text-gray-500">No applications yet</p></CardContent></Card>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map((app: any) => (
+            <Card key={app._id} className="border border-gray-200 dark:border-gray-800 shadow-sm">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-black dark:bg-white flex items-center justify-center text-white dark:text-black text-xs font-medium">
+                    {(app.applicantId?.name || 'C')[0]}
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm">{app.applicantId?.name}</p>
+                    <p className="text-xs text-gray-500">{app.applicantId?.email} • Trust: {app.applicantId?.trustScore || 0}%</p>
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button asChild size="sm">
-                    <Link href={app._id ? `/dashboard/company/applications/${app._id}` : '/dashboard/company/applications'}>Open Application</Link>
-                  </Button>
-                  <Button size="sm" variant="outline">
-                    <Users className="mr-2 h-4 w-4" />
-                    Shortlist
-                  </Button>
-                  <Button size="sm" variant="outline">
-                    <Calendar className="mr-2 h-4 w-4" />
-                    Interview
-                  </Button>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="text-[10px]">{app.status || 'pending'}</Badge>
+                  <Button size="sm" variant="ghost" asChild><Link href={`/dashboard/company/applications/${app._id}`}><Eye className="h-4 w-4" /></Link></Button>
                 </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
           ))}
-        </CardContent>
-      </Card>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,24 +1,17 @@
 'use client';
 
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Eye, Users, ArrowRight, Clock, Mail, CheckCircle2, XCircle, Activity } from 'lucide-react';
+import { Eye, Users, ArrowRight, Clock, Activity } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 import { formatDistanceToNow } from 'date-fns';
 
 interface Application {
   _id: string;
-  applicantId: {
-    _id: string;
-    name: string;
-    avatar?: string;
-  };
-  projectId?: {
-    _id: string;
-    title: string;
-  };
+  applicantId: { _id: string; name: string; avatar?: string };
+  projectId?: { _id: string; title: string };
   status: string;
   submittedAt: string;
 }
@@ -30,154 +23,68 @@ interface RecentApplicationsProps {
   onApplicationClick?: (id: string) => void;
 }
 
-const STATUS_CONFIG: Record<string, { label: string; icon: React.ElementType; color: string; bgColor: string }> = {
-  pending: { 
-    label: 'Pending', 
-    icon: Clock, 
-    color: 'text-yellow-700', 
-    bgColor: 'bg-yellow-100 dark:bg-yellow-900/30' 
-  },
-  reviewed: { 
-    label: 'Reviewed', 
-    icon: CheckCircle2, 
-    color: 'text-blue-700', 
-    bgColor: 'bg-blue-100 dark:bg-blue-900/30' 
-  },
-  shortlisted: { 
-    label: 'Shortlisted', 
-    icon: CheckCircle2, 
-    color: 'text-green-700', 
-    bgColor: 'bg-green-100 dark:bg-green-900/30' 
-  },
-  accepted: { 
-    label: 'Hired', 
-    icon: CheckCircle2, 
-    color: 'text-purple-700', 
-    bgColor: 'bg-purple-100 dark:bg-purple-900/30' 
-  },
-  rejected: { 
-    label: 'Rejected', 
-    icon: XCircle, 
-    color: 'text-red-700', 
-    bgColor: 'bg-red-100 dark:bg-red-900/30' 
-  },
+const statusConfig: Record<string, { label: string; variant: any }> = {
+  pending: { label: 'Pending', variant: 'warning' },
+  reviewed: { label: 'Reviewed', variant: 'info' },
+  shortlisted: { label: 'Shortlisted', variant: 'info' },
+  accepted: { label: 'Hired', variant: 'success' },
+  rejected: { label: 'Rejected', variant: 'error' },
 };
 
-export function RecentApplications({ 
-  applications, 
-  isLoading,
-  onViewAll,
-  onApplicationClick 
-}: RecentApplicationsProps) {
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(word => word[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
-  };
-
+export function RecentApplications({ applications, isLoading, onViewAll, onApplicationClick }: RecentApplicationsProps) {
   if (isLoading) {
     return (
-      <Card className="border-0 shadow-lg">
-        <CardHeader className="border-b border-charcoal-100 dark:border-charcoal-800 bg-charcoal-100/60">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Users className="h-5 w-5 text-primary-600" />
-            Recent Applications
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-5">
-          <div className="animate-pulse space-y-4">
-            <div className="h-20 bg-charcoal-100 dark:bg-charcoal-700 rounded-xl"></div>
-            <div className="h-20 bg-charcoal-100 dark:bg-charcoal-700 rounded-xl"></div>
-          </div>
+      <Card className="border border-gray-200 dark:border-gray-800 shadow-sm">
+        <CardContent className="p-5 space-y-4">
+          {[1, 2].map((i) => <Skeleton key={i} className="h-16 rounded-xl" />)}
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden">
-      <CardHeader className="border-b border-charcoal-100 dark:border-charcoal-800 bg-charcoal-100/60 dark:bg-charcoal-800/30">
-        <div className="flex items-center justify-between flex-wrap gap-2">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <div className="p-1.5 rounded-lg bg-primary-100 dark:bg-primary-900/50">
-              <Activity className="h-4 w-4 text-primary-600" />
-            </div>
-            Recent Applications
-            {applications.length > 0 && (
-              <span className="text-sm font-normal text-muted-foreground">
-                ({applications.length})
-              </span>
-            )}
-          </CardTitle>
-          {onViewAll && applications.length > 0 && (
-            <Button variant="ghost" size="sm" onClick={onViewAll} className="gap-1">
-              View All
-              <ArrowRight className="h-3 w-3" />
-            </Button>
-          )}
+    <Card className="border border-gray-200 dark:border-gray-800 shadow-sm">
+      <div className="p-5 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-green-50 dark:bg-green-900/20 flex items-center justify-center">
+            <Activity className="h-4 w-4 text-green-600" />
+          </div>
+          <h3 className="font-semibold text-sm">Recent Applications ({applications.length})</h3>
         </div>
-      </CardHeader>
+        {onViewAll && <Button variant="ghost" size="sm" onClick={onViewAll} className="text-xs">View all <ArrowRight className="h-3 w-3 ml-1" /></Button>}
+      </div>
       <CardContent className="p-5">
         {applications.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-charcoal-100 dark:bg-charcoal-800 flex items-center justify-center">
-              <Users className="h-10 w-10 text-charcoal-400" />
-            </div>
-            <p className="text-muted-foreground font-medium">No recent applications</p>
-            <p className="text-xs text-muted-foreground mt-1">Applications will appear here when candidates apply</p>
+          <div className="text-center py-8">
+            <Users className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+            <p className="text-gray-500 text-sm">No applications yet</p>
           </div>
         ) : (
           <div className="space-y-3">
             {applications.map((app) => {
-              const status = STATUS_CONFIG[app.status] || STATUS_CONFIG.pending;
-              const StatusIcon = status.icon;
-              
+              const config = statusConfig[app.status] || statusConfig.pending;
               return (
-                <div
+                <button
                   key={app._id}
-                  className="group p-4 rounded-xl border border-charcoal-100 dark:border-charcoal-800 bg-card dark:bg-charcoal-900 hover:shadow-md transition-all duration-200 cursor-pointer"
+                  className="w-full text-left p-3 rounded-xl border border-gray-100 dark:border-gray-800 hover:border-gray-200 dark:hover:border-gray-700 hover:shadow-sm transition-all"
                   onClick={() => onApplicationClick?.(app._id)}
                 >
-                  <div className="flex items-start gap-3">
-                    <Avatar className="h-11 w-11 ring-2 ring-white dark:ring-gray-800">
-                      <AvatarImage src={app.applicantId?.avatar} />
-                      <AvatarFallback className="bg-gradient-to-br from-primary-100 to-primary-200 text-primary-700 font-medium">
-                        {getInitials(app.applicantId?.name || 'U')}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2 flex-wrap">
-                        <div>
-                          <p className="font-semibold text-charcoal-950 dark:text-white group-hover:text-primary-600 transition-colors">
-                            {app.applicantId?.name}
-                          </p>
-                          <p className="text-xs text-charcoal-500 mt-0.5 flex items-center gap-1">
-                            <Mail className="h-3 w-3" />
-                            Applied for: {app.projectId?.title || 'Unknown position'}
-                          </p>
-                        </div>
-                        <Badge className={`${status.bgColor} ${status.color} border-0 gap-1`}>
-                          <StatusIcon className="h-3 w-3" />
-                          {status.label}
-                        </Badge>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-black dark:bg-white flex items-center justify-center text-white dark:text-black text-xs font-medium">
+                        {(app.applicantId?.name || 'C')[0]}
                       </div>
-                      <div className="flex items-center gap-2 mt-2 text-xs text-charcoal-400">
-                        <Clock className="h-3 w-3" />
-                        {formatDistanceToNow(new Date(app.submittedAt), { addSuffix: true })}
+                      <div>
+                        <p className="font-medium text-sm">{app.applicantId?.name}</p>
+                        <p className="text-xs text-gray-500">{app.projectId?.title || 'Project'} • {formatDistanceToNow(new Date(app.submittedAt), { addSuffix: true })}</p>
                       </div>
                     </div>
-                    <Button 
-                      size="sm" 
-                      variant="ghost" 
-                      className="opacity-0 group-hover:opacity-100 transition-opacity rounded-full h-8 w-8 flex-shrink-0"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={config.variant} className="text-[10px]">{config.label}</Badge>
+                      <Eye className="h-4 w-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>
