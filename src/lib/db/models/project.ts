@@ -86,6 +86,7 @@ const projectSchema = new Schema<IProject>(
       type: Schema.Types.ObjectId,
       ref: 'User',
       required: true,
+      index: true,
     },
     category: {
       type: String,
@@ -101,6 +102,7 @@ const projectSchema = new Schema<IProject>(
         'Marketing',
         'Other',
       ],
+      index: true,
     },
     skills: [
       {
@@ -114,35 +116,22 @@ const projectSchema = new Schema<IProject>(
       },
     ],
     budget: {
-      type: {
-        type: String,
-        enum: ['fixed', 'hourly', 'milestone'],
-        required: true,
-      },
+      type: { type: String, enum: ['fixed', 'hourly', 'milestone'], required: true },
       min: { type: Number, required: true, min: 0 },
       max: { type: Number, required: true, min: 0 },
       currency: { type: String, default: 'INR' },
     },
-    duration: {
-      type: Number,
-      required: true,
-      min: 1,
-      max: 365,
-    },
+    duration: { type: Number, required: true, min: 1, max: 365 },
     location: {
-      type: {
-        type: String,
-        enum: ['remote', 'onsite', 'hybrid'],
-        default: 'remote',
-      },
+      type: { type: String, enum: ['remote', 'onsite', 'hybrid'], default: 'remote' },
       label: String,
     },
     milestones: [
       {
         title: { type: String, required: true },
         description: String,
-        amount: { type: Number, required: true },
-        deadline: { type: Number, required: true },
+        amount: { type: Number, required: true, min: 0 },
+        deadline: { type: Number, required: true, min: 1 },
         status: {
           type: String,
           enum: ['pending', 'in_progress', 'completed', 'approved'],
@@ -159,7 +148,8 @@ const projectSchema = new Schema<IProject>(
     status: {
       type: String,
       enum: ['draft', 'open', 'in_progress', 'completed', 'cancelled'],
-      default: 'draft',
+      default: 'open',
+      index: true,
     },
     visibility: {
       type: String,
@@ -167,15 +157,12 @@ const projectSchema = new Schema<IProject>(
       default: 'public',
     },
     attachments: [String],
-    isFeatured: {
-      type: Boolean,
-      default: false,
-    },
+    isFeatured: { type: Boolean, default: false },
     applications: [
       {
         userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-        proposedAmount: { type: Number, required: true },
-        proposedDuration: { type: Number, required: true },
+        proposedAmount: { type: Number, required: true, min: 0 },
+        proposedDuration: { type: Number, required: true, min: 1 },
         coverLetter: { type: String, required: true },
         attachments: [String],
         status: {
@@ -188,10 +175,7 @@ const projectSchema = new Schema<IProject>(
         reviewNotes: String,
       },
     ],
-    selectedApplicant: {
-      type: Schema.Types.ObjectId,
-      ref: 'User',
-    },
+    selectedApplicant: { type: Schema.Types.ObjectId, ref: 'User' },
     startDate: Date,
     endDate: Date,
     reviews: [
@@ -206,26 +190,22 @@ const projectSchema = new Schema<IProject>(
     views: { type: Number, default: 0 },
     applicationsCount: { type: Number, default: 0 },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
-// Indexes
-projectSchema.index({ companyId: 1 });
-projectSchema.index({ status: 1 });
-projectSchema.index({ category: 1 });
 projectSchema.index({ 'skills.name': 1 });
 projectSchema.index({ budget: 1 });
 projectSchema.index({ createdAt: -1 });
 projectSchema.index({ 'applications.userId': 1 });
 
-// Update applications count
 projectSchema.pre('save', function (next) {
-  this.applicationsCount = this.applications.length;
+  if (this.isModified('applications')) {
+    this.applicationsCount = this.applications.length;
+  }
   next();
 });
 
-const Project: Model<IProject> = mongoose.models.Project || mongoose.model<IProject>('Project', projectSchema);
+const Project: Model<IProject> =
+  mongoose.models.Project || mongoose.model<IProject>('Project', projectSchema);
 
 export default Project;

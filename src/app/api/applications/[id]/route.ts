@@ -5,16 +5,10 @@ import Application from '@/lib/db/models/application';
 import connectDB from '@/lib/db/connect';
 import { errors, handleAPIError, successResponse } from '@/lib/api/errors';
 
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const session = await getServerSession(authOptions);
-    
-    if (!session) {
-      throw errors.unauthorized();
-    }
+    if (!session) throw errors.unauthorized();
 
     await connectDB();
 
@@ -22,26 +16,19 @@ export async function GET(
       .populate('applicantId', 'name avatar email phone trustScore skills')
       .populate('companyId', 'name avatar companyName')
       .populate('projectId')
-      .populate('jobId');
+      .populate('jobId')
+      .lean();
 
-    if (!application) {
-      throw errors.notFound('Application');
-    }
+    if (!application) throw errors.notFound('Application');
 
-    // Check if user is authorized to view this application
-    const isApplicant = application.applicantId._id.toString() === session.user.id;
-    const isCompany = application.companyId._id.toString() === session.user.id;
+    const isApplicant = (application.applicantId as any)?._id?.toString() === session.user.id;
+    const isCompany = (application.companyId as any)?._id?.toString() === session.user.id;
     const isAdmin = session.user.role === 'admin';
 
-    if (!isApplicant && !isCompany && !isAdmin) {
-      throw errors.unauthorized();
-    }
+    if (!isApplicant && !isCompany && !isAdmin) throw errors.unauthorized();
 
     return successResponse({
-      application: {
-        ...application,
-        _id: application._id.toString(),
-      },
+      application: { ...application, _id: application._id.toString() },
     });
   } catch (error) {
     return handleAPIError(error);

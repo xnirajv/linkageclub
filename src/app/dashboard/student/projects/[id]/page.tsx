@@ -24,7 +24,7 @@ export default function ProjectDetailPage() {
     return (
       <div className="text-center py-12">
         <h2 className="text-2xl font-semibold">Project not found</h2>
-        <p className="text-muted-foreground mt-2">The project you're looking for doesn't exist.</p>
+        <p className="text-muted-foreground mt-2">The project you&apos;re looking for doesn&apos;t exist.</p>
       </div>
     );
   }

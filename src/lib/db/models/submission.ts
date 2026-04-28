@@ -19,20 +19,9 @@ export interface ISubmission extends Document {
 
 const submissionSchema = new Schema<ISubmission>(
   {
-    projectId: {
-      type: Schema.Types.ObjectId,
-      ref: 'Project',
-      required: true,
-    },
-    milestoneId: {
-      type: Schema.Types.ObjectId,
-      ref: 'Milestone',
-      required: true,
-    },
-    work: {
-      type: String,
-      required: true,
-    },
+    projectId: { type: Schema.Types.ObjectId, ref: 'Project', required: true, index: true },
+    milestoneId: { type: Schema.Types.ObjectId, ref: 'Milestone', required: true, index: true },
+    work: { type: String, required: true },
     attachments: [String],
     hoursSpent: Number,
     notes: String,
@@ -41,33 +30,17 @@ const submissionSchema = new Schema<ISubmission>(
       type: String,
       enum: ['pending', 'approved', 'rejected'],
       default: 'pending',
+      index: true,
     },
-    submittedBy: {
-      type: Schema.Types.ObjectId,
-      ref: 'User',
-      required: true,
-    },
-    reviewedBy: {
-      type: Schema.Types.ObjectId,
-      ref: 'User',
-    },
+    submittedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    reviewedBy: { type: Schema.Types.ObjectId, ref: 'User' },
     reviewedAt: Date,
-    submittedAt: {
-      type: Date,
-      default: Date.now,
-    },
+    submittedAt: { type: Date, default: Date.now },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
-// Indexes
-submissionSchema.index({ projectId: 1 });
-submissionSchema.index({ milestoneId: 1 });
-submissionSchema.index({ status: 1 });
-submissionSchema.index({ submittedBy: 1 });
-
-const Submission: Model<ISubmission> = mongoose.models.Submission || mongoose.model<ISubmission>('Submission', submissionSchema);
+const Submission: Model<ISubmission> =
+  mongoose.models.Submission || mongoose.model<ISubmission>('Submission', submissionSchema);
 
 export default Submission;

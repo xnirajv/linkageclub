@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import { Project } from '@/types/project';
+import type { Project } from '@/types/project';
 
 interface ProjectState {
   projects: Project[];
@@ -25,25 +25,23 @@ interface ProjectState {
 const initialState: ProjectState = {
   projects: [],
   currentProject: null,
-  filters: {
-    skills: [],
-  },
-  pagination: {
-    page: 1,
-    limit: 20,
-    total: 0,
-    pages: 0,
-  },
+  filters: { skills: [] },
+  pagination: { page: 1, limit: 20, total: 0, pages: 0 },
   isLoading: false,
   error: null,
 };
 
 export const fetchProjects = createAsyncThunk(
   'projects/fetchAll',
-  async (params: any, { rejectWithValue }) => {
+  async (params: Record<string, unknown>, { rejectWithValue }) => {
     try {
-      const queryParams = new URLSearchParams(params).toString();
-      const response = await fetch(`/api/projects?${queryParams}`);
+      const queryParams = new URLSearchParams();
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          queryParams.append(key, String(value));
+        }
+      });
+      const response = await fetch(`/api/projects?${queryParams.toString()}`);
       if (!response.ok) throw new Error('Failed to fetch projects');
       return await response.json();
     } catch (error: any) {
@@ -67,7 +65,7 @@ export const fetchProjectById = createAsyncThunk(
 
 export const createProject = createAsyncThunk(
   'projects/create',
-  async (projectData: any, { rejectWithValue }) => {
+  async (projectData: Record<string, unknown>, { rejectWithValue }) => {
     try {
       const response = await fetch('/api/projects', {
         method: 'POST',
@@ -84,7 +82,7 @@ export const createProject = createAsyncThunk(
 
 export const updateProject = createAsyncThunk(
   'projects/update',
-  async ({ id, data }: { id: string; data: any }, { rejectWithValue }) => {
+  async ({ id, data }: { id: string; data: Record<string, unknown> }, { rejectWithValue }) => {
     try {
       const response = await fetch(`/api/projects/${id}`, {
         method: 'PATCH',
@@ -117,62 +115,51 @@ const projectSlice = createSlice({
     clearCurrentProject: (state) => {
       state.currentProject = null;
     },
+    clearError: (state) => {
+      state.error = null;
+    },
   },
   extraReducers: (builder) => {
     builder
-      // Fetch projects
       .addCase(fetchProjects.pending, (state) => {
         state.isLoading = true;
         state.error = null;
       })
       .addCase(fetchProjects.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.projects = action.payload.projects;
-        state.pagination = action.payload.pagination;
+        state.projects = action.payload.data?.projects || action.payload.projects || [];
+        state.pagination = action.payload.data?.pagination || action.payload.pagination || initialState.pagination;
       })
       .addCase(fetchProjects.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
       })
-      // Fetch project by id
       .addCase(fetchProjectById.pending, (state) => {
         state.isLoading = true;
         state.error = null;
       })
       .addCase(fetchProjectById.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.currentProject = action.payload.project;
+        state.currentProject = action.payload.data?.project || action.payload.project || null;
       })
       .addCase(fetchProjectById.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
       })
-      // Create project
-      .addCase(createProject.pending, (state) => {
-        state.isLoading = true;
-        state.error = null;
-      })
       .addCase(createProject.fulfilled, (state, action) => {
-        state.isLoading = false;
-        state.projects.unshift(action.payload.project);
+        const project = action.payload.data?.project || action.payload.project;
+        if (project) state.projects.unshift(project);
       })
-      .addCase(createProject.rejected, (state, action) => {
-        state.isLoading = false;
-        state.error = action.payload as string;
-      })
-      // Update project
       .addCase(updateProject.fulfilled, (state, action) => {
-        const index = state.projects.findIndex(p => p._id === action.payload.project._id);
-        if (index !== -1) {
-          state.projects[index] = action.payload.project;
-        }
-        if (state.currentProject?._id === action.payload.project._id) {
-          state.currentProject = action.payload.project;
+        const project = action.payload.data?.project || action.payload.project;
+        if (project) {
+          const index = state.projects.findIndex((p) => p._id === project._id);
+          if (index !== -1) state.projects[index] = project;
+          if (state.currentProject?._id === project._id) state.currentProject = project;
         }
       });
   },
 });
 
-export const { setFilters, clearFilters, setPage, clearCurrentProject } = projectSlice.actions;
-
+export const { setFilters, clearFilters, setPage, clearCurrentProject, clearError } = projectSlice.actions;
 export default projectSlice.reducer;

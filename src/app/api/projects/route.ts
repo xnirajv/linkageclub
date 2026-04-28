@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { z } from 'zod';
 import { authOptions } from '@/lib/auth/options';
@@ -10,7 +10,7 @@ import Application from '@/lib/db/models/application';
 import SavedProject from '@/lib/db/models/savedProject';
 import { errors, handleAPIError, successResponse } from '@/lib/api/errors';
 
-const projectSchema = z.object({
+const createProjectSchema = z.object({
   title: z.string().min(5).max(100),
   summary: z.string().max(200).optional(),
   description: z.string().min(50).max(5000),
@@ -22,28 +22,31 @@ const projectSchema = z.object({
       mandatory: z.boolean().default(true),
     })
   ),
-  budget: z.object({
-    type: z.enum(['fixed', 'hourly', 'milestone']),
-    min: z.number().min(0),
-    max: z.number().min(0),
-    currency: z.string().default('INR'),
-  }).refine((budget) => budget.max >= budget.min, {
-    message: 'Budget max must be greater than or equal to min',
-    path: ['max'],
-  }),
-  duration: z.number().min(1).max(365),
-  location: z.object({
-    type: z.enum(['remote', 'onsite', 'hybrid']),
-    label: z.string().max(120).optional(),
-  }).optional(),
-  milestones: z.array(
-    z.object({
-      title: z.string(),
-      description: z.string().optional(),
-      amount: z.number().min(0),
-      deadline: z.number().min(1),
+  budget: z
+    .object({
+      type: z.enum(['fixed', 'hourly', 'milestone']),
+      min: z.number().min(0),
+      max: z.number().min(0),
+      currency: z.string().default('INR'),
     })
-  ).optional(),
+    .refine((b) => b.max >= b.min, { message: 'Max budget must be >= min budget', path: ['max'] }),
+  duration: z.number().min(1).max(365),
+  location: z
+    .object({
+      type: z.enum(['remote', 'onsite', 'hybrid']),
+      label: z.string().max(120).optional(),
+    })
+    .optional(),
+  milestones: z
+    .array(
+      z.object({
+        title: z.string(),
+        description: z.string().optional(),
+        amount: z.number().min(0),
+        deadline: z.number().min(1),
+      })
+    )
+    .optional(),
   requirements: z.array(z.string()),
   experienceLevel: z.enum(['beginner', 'intermediate', 'advanced', 'any']),
   visibility: z.enum(['public', 'private', 'invite']).default('public'),
@@ -63,25 +66,17 @@ const listQuerySchema = z.object({
   search: z.string().trim().optional(),
 });
 
-function escapeRegex(value: string) {
+function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function getSkillNames(skills: unknown): string[] {
-  if (!Array.isArray(skills)) {
-    return [];
-  }
-
+  if (!Array.isArray(skills)) return [];
   return skills
     .map((skill) => {
-      if (typeof skill === 'string') {
-        return skill;
-      }
-
-      if (skill && typeof skill === 'object' && 'name' in skill) {
+      if (typeof skill === 'string') return skill;
+      if (skill && typeof skill === 'object' && 'name' in skill)
         return String((skill as { name?: unknown }).name || '');
-      }
-
       return '';
     })
     .filter(Boolean);
@@ -102,60 +97,48 @@ export async function GET(req: NextRequest) {
     };
 
     const queryParams = listQuerySchema.parse(raw);
-
     await connectDB();
 
     const session = await getServerSession(authOptions);
-
     const query: Record<string, unknown> = {};
 
-    // ✅ Company user - only show their own projects
     if (session?.user?.role === 'company') {
       query.companyId = new mongoose.Types.ObjectId(session.user.id);
     }
 
-    // ✅ Status filter (skip if 'all')
     if (queryParams.status && queryParams.status !== 'all') {
       query.status = queryParams.status;
     }
 
-    // ✅ Public visibility only for non-company users
     if (!session || session.user.role !== 'company') {
       query.visibility = 'public';
     }
 
-    if (queryParams.category) {
-      query.category = queryParams.category;
-    }
-
-    if (queryParams.skills.length > 0) {
-      query['skills.name'] = { $in: queryParams.skills };
-    }
+    if (queryParams.category) query.category = queryParams.category;
+    if (queryParams.skills.length > 0) query['skills.name'] = { $in: queryParams.skills };
 
     query['budget.min'] = { $lte: queryParams.maxBudget };
     query['budget.max'] = { $gte: queryParams.minBudget };
 
-    if (queryParams.experienceLevel) {
-      query.experienceLevel = queryParams.experienceLevel;
-    }
+    if (queryParams.experienceLevel) query.experienceLevel = queryParams.experienceLevel;
 
     if (queryParams.search) {
       const pattern = new RegExp(escapeRegex(queryParams.search), 'i');
       const matchingCompanies = await User.find({
-        $or: [
-          { name: pattern },
-          { companyName: pattern },
-        ],
-      }).select('_id').lean();
+        $or: [{ name: pattern }, { companyName: pattern }],
+      })
+        .select('_id')
+        .lean();
 
       query.$or = [
         { title: pattern },
         { description: pattern },
-        { companyId: { $in: matchingCompanies.map((company) => company._id) } },
+        { companyId: { $in: matchingCompanies.map((c) => c._id) } },
       ];
     }
 
     const skip = (queryParams.page - 1) * queryParams.limit;
+
     const [projects, total] = await Promise.all([
       Project.find(query)
         .populate('companyId', 'name avatar companyName')
@@ -176,27 +159,33 @@ export async function GET(req: NextRequest) {
         Application.find({
           applicantId: session.user.id,
           type: 'project',
-          projectId: { $in: projects.map((project) => project._id) },
-        }).select('projectId').lean(),
+          projectId: { $in: projects.map((p) => p._id) },
+        })
+          .select('projectId')
+          .lean(),
         User.findById(session.user.id).select('skills').lean(),
       ]);
 
       savedIds = new Set(savedProjects.map((item) => item.projectId.toString()));
-      appliedIds = new Set(appliedProjects.map((item) => item.projectId?.toString()).filter(Boolean) as string[]);
+      appliedIds = new Set(
+        appliedProjects.map((item) => item.projectId?.toString()).filter(Boolean) as string[]
+      );
       userSkills = getSkillNames(user?.skills);
     }
 
     const serializedProjects = projects.map((project) => {
       const projectSkills = getSkillNames(project.skills);
       const matchingSkills = projectSkills.filter((skill) => userSkills.includes(skill));
-      const matchScore = projectSkills.length > 0 ? Math.round((matchingSkills.length / projectSkills.length) * 100) : 0;
-      const projectId = project._id.toString();
+      const matchScore =
+        projectSkills.length > 0
+          ? Math.round((matchingSkills.length / projectSkills.length) * 100)
+          : 0;
 
       return {
         ...project,
-        _id: projectId,
-        isSaved: savedIds.has(projectId),
-        hasApplied: appliedIds.has(projectId),
+        _id: project._id.toString(),
+        isSaved: savedIds.has(project._id.toString()),
+        hasApplied: appliedIds.has(project._id.toString()),
         matchScore,
       };
     });
@@ -223,7 +212,8 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const validation = projectSchema.safeParse(body);
+    const validation = createProjectSchema.safeParse(body);
+
     if (!validation.success) {
       throw errors.badRequest(validation.error.errors[0]?.message || 'Validation failed');
     }
@@ -240,12 +230,7 @@ export async function POST(req: NextRequest) {
       views: 0,
     });
 
-    return successResponse(
-      {
-        project,
-      },
-      201
-    );
+    return successResponse({ project }, 201);
   } catch (error) {
     return handleAPIError(error);
   }

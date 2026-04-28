@@ -1,8 +1,10 @@
+'use client';
+
 import useSWR from 'swr';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSWRConfig } from 'swr';
 import apiClient, { fetcher } from '@/lib/api/client';
-import { Project } from '@/types/project';
+import type { Project } from '@/types/project';
 
 interface ApiEnvelope<T> {
   success: boolean;
@@ -39,33 +41,16 @@ interface CreateProjectData {
   summary?: string;
   description: string;
   category: string;
-  skills: Array<{
-    name: string;
-    level: string;
-    mandatory: boolean;
-  }>;
-  budget: {
-    type: string;
-    min: number;
-    max: number;
-    currency: string;
-  };
+  skills: Array<{ name: string; level: string; mandatory: boolean }>;
+  budget: { type: string; min: number; max: number; currency: string };
   duration: number;
-  location?: {
-    type: 'remote' | 'onsite' | 'hybrid';
-    label?: string;
-  };
+  location?: { type: 'remote' | 'onsite' | 'hybrid'; label?: string };
   requirements: string[];
   experienceLevel: string;
   visibility: 'public' | 'private' | 'invite';
   attachments?: string[];
   isFeatured?: boolean;
-  milestones?: Array<{
-    title: string;
-    description?: string;
-    amount: number;
-    deadline: number;
-  }>;
+  milestones?: Array<{ title: string; description?: string; amount: number; deadline: number }>;
 }
 
 interface ApplyPayload {
@@ -122,15 +107,9 @@ export function useProjectActions() {
           application
         );
         await revalidateProjectKeys(mutate, projectId);
-        return {
-          success: true,
-          data: response.data,
-        };
+        return { success: true, data: response.data };
       } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Failed to apply',
-        };
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to apply' };
       }
     },
     [mutate]
@@ -143,15 +122,9 @@ export function useProjectActions() {
           `/api/projects/${projectId}/save`
         );
         await revalidateProjectKeys(mutate, projectId);
-        return {
-          success: true,
-          data: response.data,
-        };
+        return { success: true, data: response.data };
       } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Failed to save project',
-        };
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to save project' };
       }
     },
     [mutate]
@@ -160,27 +133,20 @@ export function useProjectActions() {
   const createProject = useCallback(
     async (projectData: CreateProjectData): Promise<ActionResult<{ project: Project }>> => {
       try {
-        const response = await apiClient.post<ApiEnvelope<{ project: Project }>>('/api/projects', projectData);
+        const response = await apiClient.post<ApiEnvelope<{ project: Project }>>(
+          '/api/projects',
+          projectData
+        );
         await revalidateProjectKeys(mutate);
-        return {
-          success: true,
-          data: response.data,
-        };
+        return { success: true, data: response.data };
       } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Failed to create project',
-        };
+        return { success: false, error: error instanceof Error ? error.message : 'Failed to create project' };
       }
     },
     [mutate]
   );
 
-  return {
-    applyToProject,
-    saveProject,
-    createProject,
-  };
+  return { applyToProject, saveProject, createProject };
 }
 
 export function useProjects(options: UseProjectsOptions = {}) {
@@ -190,68 +156,54 @@ export function useProjects(options: UseProjectsOptions = {}) {
 
   useEffect(() => {
     const previousOptions = previousOptionsRef.current;
-    const keys = Array.from(new Set([...Object.keys(previousOptions), ...Object.keys(options)])) as Array<keyof UseProjectsOptions>;
+    const keys = Array.from(
+      new Set([...Object.keys(previousOptions), ...Object.keys(options)])
+    ) as Array<keyof UseProjectsOptions>;
+
     const hasChanged = keys.some((key) => {
-      const previousValue = previousOptions[key];
-      const nextValue = options[key];
-
-      if (Array.isArray(previousValue) || Array.isArray(nextValue)) {
-        return JSON.stringify(previousValue ?? []) !== JSON.stringify(nextValue ?? []);
+      const prev = previousOptions[key];
+      const next = options[key];
+      if (Array.isArray(prev) || Array.isArray(next)) {
+        return JSON.stringify(prev ?? []) !== JSON.stringify(next ?? []);
       }
-
-      return previousValue !== nextValue;
+      return prev !== next;
     });
 
-    if (!hasChanged) {
-      return;
-    }
+    if (!hasChanged) return;
 
     previousOptionsRef.current = options;
-    setFilters({
-      ...options,
-      page: options.page ?? 1,
-    });
+    setFilters({ ...options, page: options.page ?? 1 });
   }, [options]);
 
   const queryParams = new URLSearchParams();
   Object.entries(filters).forEach(([key, value]) => {
-    if (value === undefined || value === null || value === '') {
-      return;
-    }
-
+    if (value === undefined || value === null || value === '') return;
     if (Array.isArray(value)) {
       value.forEach((item) => queryParams.append(key, item));
       return;
     }
-
     queryParams.append(key, value.toString());
   });
 
   const { data, error, mutate } = useSWR<ApiEnvelope<ProjectsPayload>>(
     `/api/projects?${queryParams.toString()}`,
-    fetcher
+    fetcher,
+    { revalidateOnFocus: false, dedupingInterval: 3000 }
   );
 
   const applyFilters = useCallback((newFilters: Partial<UseProjectsOptions>) => {
-    setFilters((current) => ({
-      ...current,
-      ...newFilters,
-      page: 1,
-    }));
+    setFilters((current) => ({ ...current, ...newFilters, page: 1 }));
   }, []);
 
   const loadMore = useCallback(() => {
-    setFilters((current) => ({
-      ...current,
-      page: (current.page || 1) + 1,
-    }));
+    setFilters((current) => ({ ...current, page: (current.page || 1) + 1 }));
   }, []);
 
   return {
     projects: data?.data?.projects || [],
     pagination: data?.data?.pagination,
     isLoading: !error && !data,
-    isError: error,
+    isError: !!error,
     errorMessage: error instanceof Error ? error.message : data?.error,
     filters,
     applyFilters,
@@ -265,24 +217,26 @@ export function useProjects(options: UseProjectsOptions = {}) {
 
 export function useProject(id: string) {
   const { mutate: globalMutate } = useSWRConfig();
+
   const { data, error, mutate } = useSWR<ApiEnvelope<ProjectPayload>>(
     id ? `/api/projects/${id}` : null,
-    fetcher
+    fetcher,
+    { revalidateOnFocus: false }
   );
 
   const updateProject = useCallback(
     async (updates: Partial<Project>): Promise<ActionResult<{ project: Project }>> => {
       try {
-        const response = await apiClient.patch<ApiEnvelope<{ project: Project }>>(`/api/projects/${id}`, updates);
+        const response = await apiClient.patch<ApiEnvelope<{ project: Project }>>(
+          `/api/projects/${id}`,
+          updates
+        );
         await revalidateProjectKeys(globalMutate, id);
-        return {
-          success: true,
-          data: response.data,
-        };
-      } catch (actionError) {
+        return { success: true, data: response.data };
+      } catch (error) {
         return {
           success: false,
-          error: actionError instanceof Error ? actionError.message : 'Failed to update project',
+          error: error instanceof Error ? error.message : 'Failed to update project',
         };
       }
     },
@@ -292,7 +246,7 @@ export function useProject(id: string) {
   return {
     project: data?.data?.project,
     isLoading: !error && !data,
-    isError: error,
+    isError: !!error,
     errorMessage: error instanceof Error ? error.message : data?.error,
     updateProject,
     mutate,
@@ -304,21 +258,23 @@ export function useUserProjects(userId?: string, options: UseUserProjectsOptions
   const queryParams = new URLSearchParams();
 
   Object.entries(options).forEach(([key, value]) => {
-    if (value) {
-      queryParams.append(key, value);
-    }
+    if (value) queryParams.append(key, value);
   });
 
   const key = userId
     ? `/api/projects/user/${userId}${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
     : null;
 
-  const { data, error, mutate } = useSWR<ApiEnvelope<UserProjectsPayload>>(key, fetcher);
+  const { data, error, mutate } = useSWR<ApiEnvelope<UserProjectsPayload>>(
+    key,
+    fetcher,
+    { revalidateOnFocus: false }
+  );
 
   return {
     projects: data?.data?.projects || [],
     isLoading: !error && !data,
-    isError: error,
+    isError: !!error,
     errorMessage: error instanceof Error ? error.message : data?.error,
     applyToProject: actions.applyToProject,
     saveProject: actions.saveProject,

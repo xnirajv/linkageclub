@@ -7,12 +7,9 @@ import connectDB from '@/lib/db/connect';
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session || session.user.role !== 'admin') {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     await connectDB();
@@ -23,9 +20,9 @@ export async function GET(req: NextRequest) {
     const status = searchParams.get('status');
     const search = searchParams.get('search');
 
-    const query: any = {};
+    const query: Record<string, unknown> = {};
 
-    if (status) {
+    if (status && status !== 'all') {
       query.status = status;
     }
 
@@ -38,29 +35,23 @@ export async function GET(req: NextRequest) {
 
     const skip = (page - 1) * limit;
 
-    const projects = await Project.find(query)
-      .populate('companyId', 'name email')
-      .populate('selectedApplicant', 'name email')
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit);
-
-    const total = await Project.countDocuments(query);
+    const [projects, total] = await Promise.all([
+      Project.find(query)
+        .populate('companyId', 'name email')
+        .populate('selectedApplicant', 'name email')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Project.countDocuments(query),
+    ]);
 
     return NextResponse.json({
-      projects,
-      pagination: {
-        page,
-        limit,
-        total,
-        pages: Math.ceil(total / limit),
-      },
+      projects: projects.map((p) => ({ ...p, _id: p._id.toString() })),
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
     });
   } catch (error) {
-    console.error('Error fetching projects:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    console.error('Error fetching admin projects:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

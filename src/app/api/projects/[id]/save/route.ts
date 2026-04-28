@@ -7,26 +7,16 @@ import Project from '@/lib/db/models/project';
 import SavedProject from '@/lib/db/models/savedProject';
 import { errors, handleAPIError, successResponse } from '@/lib/api/errors';
 
-export async function POST(
-  _req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session) {
-      throw errors.unauthorized();
-    }
-
-    if (!mongoose.Types.ObjectId.isValid(params.id)) {
-      throw errors.invalidInput('project id');
-    }
+    if (!session) throw errors.unauthorized();
+    if (!mongoose.Types.ObjectId.isValid(params.id)) throw errors.invalidInput('project id');
 
     await connectDB();
 
     const project = await Project.findById(params.id).select('_id status');
-    if (!project) {
-      throw errors.notFound('Project');
-    }
+    if (!project) throw errors.notFound('Project');
 
     const userId = new mongoose.Types.ObjectId(session.user.id);
     const projectId = new mongoose.Types.ObjectId(params.id);
@@ -35,52 +25,28 @@ export async function POST(
 
     if (existing) {
       await SavedProject.deleteOne({ _id: existing._id });
-      return successResponse({
-        saved: false,
-        projectId: params.id,
-      });
+      return successResponse({ saved: false, projectId: params.id });
     }
 
-    await SavedProject.create({
-      userId,
-      projectId,
-      savedAt: new Date(),
-    });
+    await SavedProject.create({ userId, projectId, savedAt: new Date() });
 
-    return successResponse({
-      saved: true,
-      projectId: params.id,
-    });
+    return successResponse({ saved: true, projectId: params.id });
   } catch (error) {
     return handleAPIError(error);
   }
 }
 
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session) {
-      throw errors.unauthorized();
-    }
-
-    if (!mongoose.Types.ObjectId.isValid(params.id)) {
-      throw errors.invalidInput('project id');
-    }
+    if (!session) throw errors.unauthorized();
+    if (!mongoose.Types.ObjectId.isValid(params.id)) throw errors.invalidInput('project id');
 
     await connectDB();
 
-    const saved = await SavedProject.exists({
-      userId: session.user.id,
-      projectId: params.id,
-    });
+    const saved = await SavedProject.exists({ userId: session.user.id, projectId: params.id });
 
-    return successResponse({
-      saved: Boolean(saved),
-      projectId: params.id,
-    });
+    return successResponse({ saved: Boolean(saved), projectId: params.id });
   } catch (error) {
     return handleAPIError(error);
   }

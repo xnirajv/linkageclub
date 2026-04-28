@@ -61,99 +61,43 @@ export interface IApplication extends Document {
 
 const applicationSchema = new Schema<IApplication>(
   {
-    type: {
-      type: String,
-      enum: ['project', 'job'],
-      required: true,
-    },
-    projectId: {
-      type: Schema.Types.ObjectId,
-      ref: 'Project',
-    },
-    jobId: {
-      type: Schema.Types.ObjectId,
-      ref: 'Job',
-    },
-    applicantId: {
-      type: Schema.Types.ObjectId,
-      ref: 'User',
-      required: true,
-    },
-    companyId: {
-      type: Schema.Types.ObjectId,
-      ref: 'User',
-      required: true,
-    },
-    proposedAmount: {
-      type: Number,
-      min: 0,
-    },
-    proposedDuration: {
-      type: Number,
-      min: 1,
-    },
-    coverLetter: {
-      type: String,
-      required: true,
-    },
-    attachments: {
-      type: [String],
-      default: [],
-    },
+    type: { type: String, enum: ['project', 'job'], required: true },
+    projectId: { type: Schema.Types.ObjectId, ref: 'Project', index: true },
+    jobId: { type: Schema.Types.ObjectId, ref: 'Job', index: true },
+    applicantId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    companyId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    proposedAmount: { type: Number, min: 0 },
+    proposedDuration: { type: Number, min: 1 },
+    coverLetter: { type: String, required: true },
+    attachments: { type: [String], default: [] },
     portfolio: String,
     additionalInfo: String,
     matchScore: { type: Number, default: 0 },
-    matchedSkills: {
-      type: [String],
-      default: [],
-    },
-    missingSkills: {
-      type: [String],
-      default: [],
-    },
+    matchedSkills: { type: [String], default: [] },
+    missingSkills: { type: [String], default: [] },
     resume: String,
-    answers: [
-      {
-        question: String,
-        answer: String,
-      },
-    ],
+    answers: [{ question: String, answer: String }],
     status: {
       type: String,
       enum: [
-        'pending',
-        'reviewed',
-        'shortlisted',
-        'interview_scheduled',
-        'interview_completed',
-        'interview_cancelled',
-        'accepted',
-        'rejected',
-        'withdrawn',
+        'pending', 'reviewed', 'shortlisted',
+        'interview_scheduled', 'interview_completed', 'interview_cancelled',
+        'accepted', 'rejected', 'withdrawn',
       ],
       default: 'pending',
+      index: true,
     },
-    reviewedBy: {
-      type: Schema.Types.ObjectId,
-      ref: 'User',
-    },
+    reviewedBy: { type: Schema.Types.ObjectId, ref: 'User' },
     reviewedAt: Date,
     reviewNotes: String,
     interview: {
       scheduled: { type: Boolean, default: false },
       date: Date,
-      type: {
-        type: String,
-        enum: ['video', 'phone', 'in-person'],
-      },
+      type: { type: String, enum: ['video', 'phone', 'in-person'] },
       link: String,
       notes: String,
       feedback: String,
-      rating: {
-        type: Number,
-        min: 1,
-        max: 5,
-      },
+      rating: { type: Number, min: 1, max: 5 },
     },
     messages: {
       type: [
@@ -168,44 +112,28 @@ const applicationSchema = new Schema<IApplication>(
       ],
       default: [],
     },
-    submittedAt: {
-      type: Date,
-      default: Date.now,
-    },
-    lastUpdated: {
-      type: Date,
-      default: Date.now,
-    },
+    submittedAt: { type: Date, default: Date.now, index: true },
+    lastUpdated: { type: Date, default: Date.now },
     statusHistory: {
       type: [
         {
           status: { type: String, required: true },
           timestamp: { type: Date, default: Date.now },
           notes: String,
-          updatedBy: {
-            type: Schema.Types.ObjectId,
-            ref: 'User',
-          },
+          updatedBy: { type: Schema.Types.ObjectId, ref: 'User' },
         },
       ],
       default: [],
     },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
-applicationSchema.index({ applicantId: 1 });
-applicationSchema.index({ companyId: 1 });
-applicationSchema.index({ projectId: 1 });
-applicationSchema.index({ jobId: 1 });
-applicationSchema.index({ status: 1 });
-applicationSchema.index({ submittedAt: -1 });
 applicationSchema.index(
   { applicantId: 1, projectId: 1, type: 1 },
   { unique: true, partialFilterExpression: { type: 'project', projectId: { $exists: true } } }
 );
+
 applicationSchema.index(
   { applicantId: 1, jobId: 1, type: 1 },
   { unique: true, partialFilterExpression: { type: 'job', jobId: { $exists: true } } }
@@ -216,10 +144,7 @@ applicationSchema.pre('save', function (next) {
 
   if (this.isNew && (!this.statusHistory || this.statusHistory.length === 0)) {
     this.statusHistory = [
-      {
-        status: this.status,
-        timestamp: this.submittedAt || new Date(),
-      },
+      { status: this.status, timestamp: this.submittedAt || new Date() },
     ];
   }
 

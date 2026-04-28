@@ -15,13 +15,11 @@ const updateProjectSchema = z.object({
   summary: z.string().max(200).optional(),
   description: z.string().min(50).max(5000).optional(),
   category: z.string().optional(),
-  skills: z.array(
-    z.object({
-      name: z.string(),
-      level: z.enum(['beginner', 'intermediate', 'advanced']),
-      mandatory: z.boolean(),
-    })
-  ).optional(),
+  skills: z.array(z.object({
+    name: z.string(),
+    level: z.enum(['beginner', 'intermediate', 'advanced']),
+    mandatory: z.boolean(),
+  })).optional(),
   budget: z.object({
     type: z.enum(['fixed', 'hourly', 'milestone']),
     min: z.number().min(0),
@@ -33,14 +31,12 @@ const updateProjectSchema = z.object({
     type: z.enum(['remote', 'onsite', 'hybrid']),
     label: z.string().max(120).optional(),
   }).optional(),
-  milestones: z.array(
-    z.object({
-      title: z.string(),
-      description: z.string().optional(),
-      amount: z.number().min(0),
-      deadline: z.number().min(1),
-    })
-  ).optional(),
+  milestones: z.array(z.object({
+    title: z.string(),
+    description: z.string().optional(),
+    amount: z.number().min(0),
+    deadline: z.number().min(1),
+  })).optional(),
   requirements: z.array(z.string()).optional(),
   experienceLevel: z.enum(['beginner', 'intermediate', 'advanced', 'any']).optional(),
   status: z.enum(['draft', 'open', 'in_progress', 'completed', 'cancelled']).optional(),
@@ -50,36 +46,22 @@ const updateProjectSchema = z.object({
 });
 
 function getSkillNames(skills: unknown): string[] {
-  if (!Array.isArray(skills)) {
-    return [];
-  }
-
+  if (!Array.isArray(skills)) return [];
   return skills
     .map((skill) => {
-      if (typeof skill === 'string') {
-        return skill;
-      }
-
-      if (skill && typeof skill === 'object' && 'name' in skill) {
+      if (typeof skill === 'string') return skill;
+      if (skill && typeof skill === 'object' && 'name' in skill)
         return String((skill as { name?: unknown }).name || '');
-      }
-
       return '';
     })
     .filter(Boolean);
 }
 
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    if (!mongoose.Types.ObjectId.isValid(params.id)) {
-      throw errors.invalidInput('project id');
-    }
+    if (!mongoose.Types.ObjectId.isValid(params.id)) throw errors.invalidInput('project id');
 
     await connectDB();
-
     const session = await getServerSession(authOptions);
 
     const project = await Project.findByIdAndUpdate(
@@ -90,9 +72,7 @@ export async function GET(
       .populate('companyId', 'name avatar companyName bio location')
       .lean();
 
-    if (!project) {
-      throw errors.notFound('Project');
-    }
+    if (!project) throw errors.notFound('Project');
 
     let isSaved = false;
     let hasApplied = false;
@@ -115,36 +95,24 @@ export async function GET(
       const userSkills = getSkillNames(user?.skills);
       const projectSkills = getSkillNames(project.skills);
       const matchingSkills = projectSkills.filter((skill) => userSkills.includes(skill));
-      matchScore = projectSkills.length > 0 ? Math.round((matchingSkills.length / projectSkills.length) * 100) : 0;
+      matchScore = projectSkills.length > 0
+        ? Math.round((matchingSkills.length / projectSkills.length) * 100)
+        : 0;
     }
 
     return successResponse({
-      project: {
-        ...project,
-        _id: project._id.toString(),
-        isSaved,
-        hasApplied,
-        matchScore,
-      },
+      project: { ...project, _id: project._id.toString(), isSaved, hasApplied, matchScore },
     });
   } catch (error) {
     return handleAPIError(error);
   }
 }
 
-export async function PATCH(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session) {
-      throw errors.unauthorized();
-    }
-
-    if (!mongoose.Types.ObjectId.isValid(params.id)) {
-      throw errors.invalidInput('project id');
-    }
+    if (!session) throw errors.unauthorized();
+    if (!mongoose.Types.ObjectId.isValid(params.id)) throw errors.invalidInput('project id');
 
     const body = await req.json();
     const validation = updateProjectSchema.safeParse(body);
@@ -155,50 +123,34 @@ export async function PATCH(
     await connectDB();
 
     const project = await Project.findById(params.id);
-    if (!project) {
-      throw errors.notFound('Project');
-    }
+    if (!project) throw errors.notFound('Project');
 
     if (project.companyId.toString() !== session.user.id && session.user.role !== 'admin') {
       throw errors.forbidden();
     }
 
     Object.entries(validation.data).forEach(([key, value]) => {
-      if (value !== undefined) {
-        (project as unknown as Record<string, unknown>)[key] = value;
-      }
+      if (value !== undefined) (project as any)[key] = value;
     });
 
     await project.save();
 
-    return successResponse({
-      project,
-    });
+    return successResponse({ project });
   } catch (error) {
     return handleAPIError(error);
   }
 }
 
-export async function DELETE(
-  _req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session) {
-      throw errors.unauthorized();
-    }
-
-    if (!mongoose.Types.ObjectId.isValid(params.id)) {
-      throw errors.invalidInput('project id');
-    }
+    if (!session) throw errors.unauthorized();
+    if (!mongoose.Types.ObjectId.isValid(params.id)) throw errors.invalidInput('project id');
 
     await connectDB();
 
     const project = await Project.findById(params.id);
-    if (!project) {
-      throw errors.notFound('Project');
-    }
+    if (!project) throw errors.notFound('Project');
 
     if (project.companyId.toString() !== session.user.id && session.user.role !== 'admin') {
       throw errors.forbidden();
@@ -210,10 +162,7 @@ export async function DELETE(
       SavedProject.deleteMany({ projectId: params.id }),
     ]);
 
-    return successResponse({
-      deleted: true,
-      projectId: params.id,
-    });
+    return successResponse({ deleted: true, projectId: params.id });
   } catch (error) {
     return handleAPIError(error);
   }

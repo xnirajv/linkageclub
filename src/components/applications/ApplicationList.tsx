@@ -12,17 +12,8 @@ interface Application {
   type: 'project' | 'job';
   status: 'pending' | 'shortlisted' | 'accepted' | 'rejected' | 'withdrawn';
   submittedAt: string;
-  projectId?: {
-    _id: string;
-    title: string;
-  };
-  jobId?: {
-    _id: string;
-    title: string;
-    company?: {
-      name: string;
-    };
-  };
+  projectId?: { _id: string; title: string };
+  jobId?: { _id: string; title: string; company?: { name: string } };
 }
 
 interface ApplicationsListProps {
@@ -37,8 +28,8 @@ export function ApplicationsList({ applications, isLoading, type }: Applications
       <div className="space-y-4">
         {[1, 2, 3].map((i) => (
           <Card key={i} className="p-6 animate-pulse">
-            <div className="h-4 bg-charcoal-100 rounded w-1/4 mb-4"></div>
-            <div className="h-4 bg-charcoal-100 rounded w-3/4"></div>
+            <div className="h-4 bg-gray-200 rounded w-1/4 mb-4" />
+            <div className="h-4 bg-gray-200 rounded w-3/4" />
           </Card>
         ))}
       </div>
@@ -48,17 +39,15 @@ export function ApplicationsList({ applications, isLoading, type }: Applications
   if (applications.length === 0) {
     return (
       <Card className="p-12 text-center">
-        <Briefcase className="h-12 w-12 text-charcoal-400 mx-auto mb-4" />
+        <Briefcase className="h-12 w-12 text-gray-400 mx-auto mb-4" />
         <h3 className="text-lg font-medium mb-2">No applications found</h3>
-        <p className="text-charcoal-500 mb-4">
-          {type === 'all' 
+        <p className="text-gray-500 mb-4">
+          {type === 'all'
             ? "You haven't applied to any projects or jobs yet."
             : `No ${type} applications at the moment.`}
         </p>
         {type === 'all' && (
-          <Button asChild>
-            <Link href="/dashboard/student/projects">Browse Projects</Link>
-          </Button>
+          <Button asChild><Link href="/dashboard/student/projects">Browse Projects</Link></Button>
         )}
       </Card>
     );
@@ -70,34 +59,23 @@ export function ApplicationsList({ applications, isLoading, type }: Applications
       case 'shortlisted': return 'bg-blue-100 text-blue-800';
       case 'accepted': return 'bg-green-100 text-green-800';
       case 'rejected': return 'bg-red-100 text-red-800';
-      default: return 'bg-charcoal-100 text-charcoal-900';
+      default: return 'bg-gray-100 text-gray-800';
     }
   };
 
   const getTitle = (app: Application) => {
-    if (app.type === 'project') {
-      return app.projectId?.title || 'Unknown Project';
-    } else {
-      return app.jobId?.title || 'Unknown Job';
-    }
+    if (app.type === 'project') return app.projectId?.title || 'Unknown Project';
+    return app.jobId?.title || 'Unknown Job';
   };
 
   const getCompany = (app: Application) => {
-    if (app.type === 'job') {
-      return app.jobId?.company?.name;
-    }
+    if (app.type === 'job') return app.jobId?.company?.name;
     return null;
   };
 
   const getDetailsHref = (app: Application) => {
-    if (app.type === 'project' && app.projectId?._id) {
-      return `/dashboard/student/projects/${app.projectId._id}`;
-    }
-
-    if (app.type === 'job' && app.jobId?._id) {
-      return `/dashboard/student/jobs/${app.jobId._id}`;
-    }
-
+    if (app.type === 'project' && app.projectId?._id) return `/dashboard/student/projects/${app.projectId._id}`;
+    if (app.type === 'job' && app.jobId?._id) return `/dashboard/student/jobs/${app.jobId._id}`;
     return '/dashboard/student/projects/my-applications';
   };
 
@@ -110,29 +88,20 @@ export function ApplicationsList({ applications, isLoading, type }: Applications
               <div className="flex items-start justify-between">
                 <div>
                   <h3 className="text-lg font-semibold">{getTitle(app)}</h3>
-                  {getCompany(app) && (
-                    <p className="text-sm text-charcoal-600">{getCompany(app)}</p>
-                  )}
+                  {getCompany(app) && <p className="text-sm text-gray-600">{getCompany(app)}</p>}
                 </div>
-                <Badge className={getStatusColor(app.status)}>
-                  {app.status}
-                </Badge>
+                <Badge className={getStatusColor(app.status)}>{app.status}</Badge>
               </div>
-
-              <div className="flex items-center gap-4 mt-3 text-sm text-charcoal-500">
+              <div className="flex items-center gap-4 mt-3 text-sm text-gray-500">
                 <span className="flex items-center gap-1">
                   <Calendar className="h-4 w-4" />
                   Applied {new Date(app.submittedAt).toLocaleDateString()}
                 </span>
                 <span className="capitalize">{app.type}</span>
               </div>
-
               <div className="flex gap-2 mt-4">
                 <Button size="sm" variant="outline" asChild>
-                  <Link href={getDetailsHref(app)}>
-                    <Eye className="mr-2 h-4 w-4" />
-                    View Posting
-                  </Link>
+                  <Link href={getDetailsHref(app)}><Eye className="mr-2 h-4 w-4" />View Posting</Link>
                 </Button>
               </div>
             </div>

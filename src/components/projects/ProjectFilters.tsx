@@ -8,17 +8,12 @@ import { SlidersHorizontal, X } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 
 const CATEGORIES = [
-  'Web Development',
-  'Mobile Development',
-  'Data Science',
-  'AI / ML',
-  'DevOps',
-  'Design',
-  'Content Writing',
-  'Marketing',
-  'Other',
+  'Web Development', 'Mobile Development', 'Data Science', 'AI / ML',
+  'DevOps', 'Design', 'Content Writing', 'Marketing', 'Other',
 ];
+
 const EXPERIENCE_LEVELS = ['beginner', 'intermediate', 'advanced'];
+
 const BUDGET_RANGES = [
   { label: 'Under Rs. 10K', min: 0, max: 10000 },
   { label: 'Rs. 10K - Rs. 30K', min: 10000, max: 30000 },
@@ -47,7 +42,7 @@ export function ProjectFilters({ onFilterChange, className }: ProjectFiltersProp
   const activeCount = (selectedCategory ? 1 : 0) + (selectedLevel ? 1 : 0) + (selectedBudget ? 1 : 0);
 
   const applyFilters = (cat: string, lvl: string, bgt: string) => {
-    const budgetRange = BUDGET_RANGES.find((range) => range.label === bgt);
+    const budgetRange = BUDGET_RANGES.find((r) => r.label === bgt);
     onFilterChange({
       category: cat || undefined,
       experienceLevel: lvl || undefined,
@@ -57,27 +52,25 @@ export function ProjectFilters({ onFilterChange, className }: ProjectFiltersProp
   };
 
   const handleCategoryClick = (cat: string) => {
-    const nextCategory = selectedCategory === cat ? '' : cat;
-    setSelectedCategory(nextCategory);
-    applyFilters(nextCategory, selectedLevel, selectedBudget);
+    const next = selectedCategory === cat ? '' : cat;
+    setSelectedCategory(next);
+    applyFilters(next, selectedLevel, selectedBudget);
   };
 
   const handleLevelClick = (lvl: string) => {
-    const nextLevel = selectedLevel === lvl ? '' : lvl;
-    setSelectedLevel(nextLevel);
-    applyFilters(selectedCategory, nextLevel, selectedBudget);
+    const next = selectedLevel === lvl ? '' : lvl;
+    setSelectedLevel(next);
+    applyFilters(selectedCategory, next, selectedBudget);
   };
 
   const handleBudgetClick = (bgt: string) => {
-    const nextBudget = selectedBudget === bgt ? '' : bgt;
-    setSelectedBudget(nextBudget);
-    applyFilters(selectedCategory, selectedLevel, nextBudget);
+    const next = selectedBudget === bgt ? '' : bgt;
+    setSelectedBudget(next);
+    applyFilters(selectedCategory, selectedLevel, next);
   };
 
   const clearAll = () => {
-    setSelectedCategory('');
-    setSelectedLevel('');
-    setSelectedBudget('');
+    setSelectedCategory(''); setSelectedLevel(''); setSelectedBudget('');
     onFilterChange({});
   };
 
@@ -85,11 +78,9 @@ export function ProjectFilters({ onFilterChange, className }: ProjectFiltersProp
     <div className={cn('space-y-3', className)}>
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)} className="gap-2">
-          <SlidersHorizontal className="h-4 w-4" />
-          Filters
+          <SlidersHorizontal className="h-4 w-4" /> Filters
           {activeCount > 0 && <Badge variant="default">{activeCount}</Badge>}
         </Button>
-
         {selectedCategory && (
           <Badge variant="secondary" className="cursor-pointer gap-1" onClick={() => handleCategoryClick(selectedCategory)}>
             {selectedCategory} <X className="h-3 w-3" />
@@ -106,12 +97,9 @@ export function ProjectFilters({ onFilterChange, className }: ProjectFiltersProp
           </Badge>
         )}
         {activeCount > 0 && (
-          <Button variant="ghost" size="sm" onClick={clearAll} className="text-red-600">
-            Clear all
-          </Button>
+          <Button variant="ghost" size="sm" onClick={clearAll} className="text-red-600">Clear all</Button>
         )}
       </div>
-
       {showFilters && (
         <Card>
           <CardContent className="space-y-4 p-4">
@@ -119,46 +107,23 @@ export function ProjectFilters({ onFilterChange, className }: ProjectFiltersProp
               <p className="mb-2 text-sm font-medium">Category</p>
               <div className="flex flex-wrap gap-2">
                 {CATEGORIES.map((cat) => (
-                  <Badge
-                    key={cat}
-                    variant={selectedCategory === cat ? 'default' : 'outline'}
-                    className="cursor-pointer"
-                    onClick={() => handleCategoryClick(cat)}
-                  >
-                    {cat}
-                  </Badge>
+                  <Badge key={cat} variant={selectedCategory === cat ? 'default' : 'outline'} className="cursor-pointer" onClick={() => handleCategoryClick(cat)}>{cat}</Badge>
                 ))}
               </div>
             </div>
-
             <div>
               <p className="mb-2 text-sm font-medium">Experience Level</p>
               <div className="flex flex-wrap gap-2">
                 {EXPERIENCE_LEVELS.map((lvl) => (
-                  <Badge
-                    key={lvl}
-                    variant={selectedLevel === lvl ? 'default' : 'outline'}
-                    className="cursor-pointer capitalize"
-                    onClick={() => handleLevelClick(lvl)}
-                  >
-                    {lvl}
-                  </Badge>
+                  <Badge key={lvl} variant={selectedLevel === lvl ? 'default' : 'outline'} className="cursor-pointer capitalize" onClick={() => handleLevelClick(lvl)}>{lvl}</Badge>
                 ))}
               </div>
             </div>
-
             <div>
               <p className="mb-2 text-sm font-medium">Budget Range</p>
               <div className="flex flex-wrap gap-2">
                 {BUDGET_RANGES.map((range) => (
-                  <Badge
-                    key={range.label}
-                    variant={selectedBudget === range.label ? 'default' : 'outline'}
-                    className="cursor-pointer"
-                    onClick={() => handleBudgetClick(range.label)}
-                  >
-                    {range.label}
-                  </Badge>
+                  <Badge key={range.label} variant={selectedBudget === range.label ? 'default' : 'outline'} className="cursor-pointer" onClick={() => handleBudgetClick(range.label)}>{range.label}</Badge>
                 ))}
               </div>
             </div>

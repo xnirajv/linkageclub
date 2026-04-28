@@ -10,36 +10,12 @@ export async function GET() {
       {
         $facet: {
           totalProjects: [{ $count: 'count' }],
-          openProjects: [
-            { $match: { status: 'open' } },
-            { $count: 'count' },
-          ],
-          inProgressProjects: [
-            { $match: { status: 'in_progress' } },
-            { $count: 'count' },
-          ],
-          completedProjects: [
-            { $match: { status: 'completed' } },
-            { $count: 'count' },
-          ],
-          averageBudget: [
-            { $group: {
-              _id: null,
-              avg: { $avg: '$budget.max' },
-            }},
-          ],
-          byCategory: [
-            { $group: {
-              _id: '$category',
-              count: { $sum: 1 },
-            }},
-          ],
-          byExperience: [
-            { $group: {
-              _id: '$experienceLevel',
-              count: { $sum: 1 },
-            }},
-          ],
+          openProjects: [{ $match: { status: 'open' } }, { $count: 'count' }],
+          inProgressProjects: [{ $match: { status: 'in_progress' } }, { $count: 'count' }],
+          completedProjects: [{ $match: { status: 'completed' } }, { $count: 'count' }],
+          averageBudget: [{ $group: { _id: null, avg: { $avg: '$budget.max' } } }],
+          byCategory: [{ $group: { _id: '$category', count: { $sum: 1 } } }],
+          byExperience: [{ $group: { _id: '$experienceLevel', count: { $sum: 1 } } }],
         },
       },
     ]);
@@ -57,9 +33,6 @@ export async function GET() {
     return NextResponse.json({ stats: result });
   } catch (error) {
     console.error('Error fetching project stats:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

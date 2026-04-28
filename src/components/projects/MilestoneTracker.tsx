@@ -26,13 +26,9 @@ export function MilestoneTracker({ milestones, projectId, onMilestoneUpdate }: M
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'completed':
-      case 'approved':
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case 'in_progress':
-        return <Clock className="h-4 w-4 text-blue-500" />;
-      default:
-        return <AlertCircle className="h-4 w-4 text-gray-400" />;
+      case 'completed': case 'approved': return <CheckCircle className="h-4 w-4 text-green-500" />;
+      case 'in_progress': return <Clock className="h-4 w-4 text-blue-500" />;
+      default: return <AlertCircle className="h-4 w-4 text-gray-400" />;
     }
   };
 
@@ -48,12 +44,8 @@ export function MilestoneTracker({ milestones, projectId, onMilestoneUpdate }: M
   const handleStartMilestone = async (milestoneId: string) => {
     setLoadingId(milestoneId);
     try {
-      const response = await fetch(`/api/projects/${projectId}/milestones/${milestoneId}/start`, {
-        method: 'POST',
-      });
-      if (response.ok) {
-        onMilestoneUpdate?.();
-      }
+      const response = await fetch(`/api/projects/${projectId}/milestones/${milestoneId}/start`, { method: 'POST' });
+      if (response.ok) onMilestoneUpdate?.();
     } catch (error) {
       console.error('Failed to start milestone:', error);
     } finally {
@@ -73,9 +65,7 @@ export function MilestoneTracker({ milestones, projectId, onMilestoneUpdate }: M
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Project Milestones</CardTitle>
-      </CardHeader>
+      <CardHeader><CardTitle>Project Milestones</CardTitle></CardHeader>
       <CardContent>
         <div className="space-y-4">
           {milestones.map((milestone, index) => (
@@ -94,19 +84,13 @@ export function MilestoneTracker({ milestones, projectId, onMilestoneUpdate }: M
                   {milestone.status.replace('_', ' ')}
                 </Badge>
               </div>
-
               <div className="flex items-center justify-between mt-3 text-sm">
                 <span className="text-gray-500">Amount: ₹{milestone.amount.toLocaleString()}</span>
                 <span className="text-gray-500">Deadline: {milestone.deadline} days</span>
               </div>
-
               {milestone.status === 'pending' && (
                 <div className="mt-3">
-                  <Button 
-                    size="sm" 
-                    onClick={() => handleStartMilestone(milestone._id!)}
-                    disabled={loadingId === milestone._id}
-                  >
+                  <Button size="sm" onClick={() => handleStartMilestone(milestone._id!)} disabled={loadingId === milestone._id}>
                     {loadingId === milestone._id ? 'Starting...' : 'Start Milestone'}
                   </Button>
                 </div>

@@ -19,9 +19,7 @@ const listQuerySchema = z.object({
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session) {
-      throw errors.unauthorized();
-    }
+    if (!session) throw errors.unauthorized();
 
     const queryParams = listQuerySchema.parse({
       page: req.nextUrl.searchParams.get('page') ?? undefined,
@@ -45,21 +43,10 @@ export async function GET(req: NextRequest) {
       query.$or = [{ applicantId: session.user.id }, { companyId: session.user.id }];
     }
 
-    if (queryParams.type !== 'all') {
-      query.type = queryParams.type;
-    }
-
-    if (queryParams.status) {
-      query.status = queryParams.status;
-    }
-
-    if (queryParams.projectId) {
-      query.projectId = queryParams.projectId;
-    }
-
-    if (queryParams.jobId) {
-      query.jobId = queryParams.jobId;
-    }
+    if (queryParams.type !== 'all') query.type = queryParams.type;
+    if (queryParams.status) query.status = queryParams.status;
+    if (queryParams.projectId) query.projectId = queryParams.projectId;
+    if (queryParams.jobId) query.jobId = queryParams.jobId;
 
     const skip = (queryParams.page - 1) * queryParams.limit;
 
@@ -77,10 +64,7 @@ export async function GET(req: NextRequest) {
     ]);
 
     return successResponse({
-      applications: applications.map((application) => ({
-        ...application,
-        _id: application._id.toString(),
-      })),
+      applications: applications.map((app) => ({ ...app, _id: app._id.toString() })),
       pagination: {
         page: queryParams.page,
         limit: queryParams.limit,

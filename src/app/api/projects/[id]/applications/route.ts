@@ -9,26 +9,19 @@ import Application from '@/lib/db/models/application';
 import { errors, handleAPIError, successResponse } from '@/lib/api/errors';
 
 const querySchema = z.object({
-  status: z
-    .enum(['pending', 'reviewed', 'shortlisted', 'interview_scheduled', 'interview_completed', 'interview_cancelled', 'accepted', 'rejected', 'withdrawn'])
-    .optional(),
+  status: z.enum([
+    'pending', 'reviewed', 'shortlisted', 'interview_scheduled',
+    'interview_completed', 'interview_cancelled', 'accepted', 'rejected', 'withdrawn',
+  ]).optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(50).default(20),
 });
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session) {
-      throw errors.unauthorized();
-    }
-
-    if (!mongoose.Types.ObjectId.isValid(params.id)) {
-      throw errors.invalidInput('project id');
-    }
+    if (!session) throw errors.unauthorized();
+    if (!mongoose.Types.ObjectId.isValid(params.id)) throw errors.invalidInput('project id');
 
     const queryParams = querySchema.parse({
       status: req.nextUrl.searchParams.get('status') ?? undefined,
@@ -39,22 +32,14 @@ export async function GET(
     await connectDB();
 
     const project = await Project.findById(params.id).select('companyId title');
-    if (!project) {
-      throw errors.notFound('Project');
-    }
+    if (!project) throw errors.notFound('Project');
 
     if (project.companyId.toString() !== session.user.id && session.user.role !== 'admin') {
       throw errors.forbidden();
     }
 
-    const filter: Record<string, unknown> = {
-      projectId: params.id,
-      type: 'project',
-    };
-
-    if (queryParams.status) {
-      filter.status = queryParams.status;
-    }
+    const filter: Record<string, unknown> = { projectId: params.id, type: 'project' };
+    if (queryParams.status) filter.status = queryParams.status;
 
     const skip = (queryParams.page - 1) * queryParams.limit;
 
@@ -69,14 +54,8 @@ export async function GET(
     ]);
 
     return successResponse({
-      project: {
-        _id: project._id.toString(),
-        title: project.title,
-      },
-      applications: applications.map((application) => ({
-        ...application,
-        _id: application._id.toString(),
-      })),
+      project: { _id: project._id.toString(), title: project.title },
+      applications: applications.map((app) => ({ ...app, _id: app._id.toString() })),
       pagination: {
         page: queryParams.page,
         limit: queryParams.limit,

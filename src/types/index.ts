@@ -1,13 +1,40 @@
 // Export all types from individual files
 export * from './user';
-export * from './project';
 export * from './mentor';
 export * from './assessment';
-export * from './application';
 export * from './community';
 export * from './notification';
 export * from './message';
 export * from './api';
+
+// Resolve ApplicationStatus ambiguity between project.ts and application.ts
+export type { ApplicationStatus } from './project';
+
+// Export project types (exclude conflicting ApplicationStatus)
+export type {
+  ProjectStatus,
+  ProjectVisibility,
+  BudgetType,
+  ExperienceLevel,
+  LocationType,
+  MilestoneStatus,
+  ProjectSkill,
+  ProjectBudget,
+  ProjectLocation,
+  Milestone,
+  ProjectApplication,
+  ProjectReview,
+  Project,
+  ProjectsResponse,
+  ProjectFilters,
+  CreateProjectPayload,
+  ApplyToProjectPayload,
+} from './project';
+
+export { getCompanyName, getCompanyAvatar, getCompanyId } from './project';
+
+// Export application types
+export * from './application';
 
 // Re-export common types
 export type ID = string;
@@ -55,7 +82,7 @@ export interface Image {
   height?: number;
 }
 
-export interface File {
+export interface FileAttachment {
   url: string;
   name: string;
   size: number;
@@ -72,13 +99,7 @@ export interface MetaData {
 export interface Rating {
   average: number;
   count: number;
-  distribution?: {
-    1: number;
-    2: number;
-    3: number;
-    4: number;
-    5: number;
-  };
+  distribution?: { 1: number; 2: number; 3: number; 4: number; 5: number };
 }
 
 export interface Price {

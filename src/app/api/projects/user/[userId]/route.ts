@@ -13,15 +13,7 @@ const querySchema = z.object({
   role: z.enum(['student', 'company']).default('student'),
 });
 
-type ProjectWithApplicationStatus = Record<string, unknown> & {
-  _id: mongoose.Types.ObjectId | string;
-  applicationStatus?: string;
-};
-
-export async function GET(
-  req: NextRequest,
-  { params }: { params: { userId: string } }
-) {
+export async function GET(req: NextRequest, { params }: { params: { userId: string } }) {
   try {
     const session = await getServerSession(authOptions);
 
@@ -40,7 +32,7 @@ export async function GET(
 
     await connectDB();
 
-    let projects: ProjectWithApplicationStatus[] = [];
+    let projects: any[] = [];
 
     if (queryParams.role === 'company') {
       const companyQuery: Record<string, unknown> = { companyId: params.userId };
@@ -51,20 +43,19 @@ export async function GET(
         companyQuery.status = 'completed';
       }
 
-      const foundProjects = await Project.find(companyQuery)
+      projects = await Project.find(companyQuery)
         .populate('companyId', 'name avatar companyName')
         .sort({ createdAt: -1 })
         .lean();
-
-      projects = foundProjects as ProjectWithApplicationStatus[];
     } else {
       const applications = await Application.find({
         applicantId: params.userId,
         type: 'project',
       }).select('projectId status');
 
-      const validApplications = applications.filter((application) => application.projectId);
-      const projectIds = validApplications.map((application) => application.projectId);
+      const projectIds = applications
+        .filter((app) => app.projectId)
+        .map((app) => app.projectId);
 
       if (projectIds.length === 0) {
         return successResponse({ projects: [] });
@@ -84,25 +75,15 @@ export async function GET(
         .lean();
 
       projects = foundProjects.map((project) => {
-        const application = validApplications.find(
-          (item) => item.projectId?.toString() === project._id.toString()
+        const application = applications.find(
+          (app) => app.projectId?.toString() === project._id.toString()
         );
-
-        return {
-          ...(project as ProjectWithApplicationStatus),
-          applicationStatus: application?.status,
-        };
+        return { ...project, _id: project._id.toString(), applicationStatus: application?.status };
       });
     }
 
     return successResponse({
-      projects: projects.map((project) => ({
-        ...project,
-        _id:
-          typeof project._id === 'string'
-            ? project._id
-            : project._id.toString(),
-      })),
+      projects: projects.map((p) => ({ ...p, _id: p._id.toString() })),
     });
   } catch (error) {
     return handleAPIError(error);

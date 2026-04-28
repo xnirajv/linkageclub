@@ -23,9 +23,7 @@ export function SaveButton({ projectId, isSaved = false, onSave }: SaveButtonPro
   }, [isSaved]);
 
   const handleSave = async () => {
-    if (isLoading) {
-      return;
-    }
+    if (isLoading) return;
 
     const previousValue = saved;
     const optimisticValue = !saved;
@@ -39,7 +37,7 @@ export function SaveButton({ projectId, isSaved = false, onSave }: SaveButtonPro
     if (!result.success || !result.data) {
       setSaved(previousValue);
       onSave?.(previousValue);
-      setError(result.error || 'Failed to update saved state');
+      setError(result.error || 'Failed to update');
       setIsLoading(false);
       return;
     }
@@ -57,7 +55,7 @@ export function SaveButton({ projectId, isSaved = false, onSave }: SaveButtonPro
         onClick={handleSave}
         disabled={isLoading}
         aria-pressed={saved}
-        title={saved ? 'Remove from saved projects' : 'Save project'}
+        title={saved ? 'Remove from saved' : 'Save project'}
       >
         {isLoading ? (
           <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />

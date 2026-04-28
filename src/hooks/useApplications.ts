@@ -1,3 +1,5 @@
+'use client';
+
 import useSWR from 'swr';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSWRConfig } from 'swr';
@@ -28,7 +30,7 @@ interface ApplicationResponse {
   application: any;
 }
 
-interface ActionResult<T = undefined> {
+interface ActionResult<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
@@ -56,18 +58,15 @@ export function useApplications(options: UseApplicationsOptions = {}) {
 
   useEffect(() => {
     const previousOptions = previousOptionsRef.current;
-    const keys = Array.from(new Set([...Object.keys(previousOptions), ...Object.keys(options)])) as Array<keyof UseApplicationsOptions>;
-    const hasChanged = keys.some((key) => previousOptions[key] !== options[key]);
+    const keys = Array.from(
+      new Set([...Object.keys(previousOptions), ...Object.keys(options)])
+    ) as Array<keyof UseApplicationsOptions>;
 
-    if (!hasChanged) {
-      return;
-    }
+    const hasChanged = keys.some((key) => previousOptions[key] !== options[key]);
+    if (!hasChanged) return;
 
     previousOptionsRef.current = options;
-    setFilters({
-      ...options,
-      page: options.page ?? 1,
-    });
+    setFilters({ ...options, page: options.page ?? 1 });
   }, [options]);
 
   const queryParams = new URLSearchParams();
@@ -79,29 +78,23 @@ export function useApplications(options: UseApplicationsOptions = {}) {
 
   const { data, error, mutate } = useSWR<ApiEnvelope<ApplicationsResponse>>(
     `/api/applications?${queryParams.toString()}`,
-    fetcher
+    fetcher,
+    { revalidateOnFocus: false }
   );
 
   const updateStatus = useCallback(
-    async (
-      applicationId: string,
-      status: string,
-      notes?: string
-    ): Promise<ActionResult<{ application: any }>> => {
+    async (applicationId: string, status: string, notes?: string): Promise<ActionResult> => {
       try {
-        const response = await apiClient.patch<ApiEnvelope<{ application: any }>>(
+        const response = await apiClient.patch<ApiEnvelope<{ application: unknown }>>(
           `/api/applications/${applicationId}/status`,
           { status, notes }
         );
         await revalidateApplicationKeys(globalMutate, applicationId);
-        return {
-          success: true,
-          data: response.data,
-        };
-      } catch (actionError) {
+        return { success: true, data: response };
+      } catch (error) {
         return {
           success: false,
-          error: actionError instanceof Error ? actionError.message : 'Failed to update status',
+          error: error instanceof Error ? error.message : 'Failed to update status',
         };
       }
     },
@@ -111,16 +104,13 @@ export function useApplications(options: UseApplicationsOptions = {}) {
   const sendMessage = useCallback(
     async (applicationId: string, content: string, attachments?: string[]): Promise<ActionResult> => {
       try {
-        await apiClient.post(`/api/applications/${applicationId}/message`, {
-          content,
-          attachments,
-        });
+        await apiClient.post(`/api/applications/${applicationId}/message`, { content, attachments });
         await revalidateApplicationKeys(globalMutate, applicationId);
         return { success: true };
-      } catch (actionError) {
+      } catch (error) {
         return {
           success: false,
-          error: actionError instanceof Error ? actionError.message : 'Failed to send message',
+          error: error instanceof Error ? error.message : 'Failed to send message',
         };
       }
     },
@@ -128,15 +118,15 @@ export function useApplications(options: UseApplicationsOptions = {}) {
   );
 
   const scheduleInterview = useCallback(
-    async (applicationId: string, interview: any): Promise<ActionResult> => {
+    async (applicationId: string, interview: Record<string, unknown>): Promise<ActionResult> => {
       try {
         await apiClient.post(`/api/applications/${applicationId}/interview`, interview);
         await revalidateApplicationKeys(globalMutate, applicationId);
         return { success: true };
-      } catch (actionError) {
+      } catch (error) {
         return {
           success: false,
-          error: actionError instanceof Error ? actionError.message : 'Failed to schedule interview',
+          error: error instanceof Error ? error.message : 'Failed to schedule interview',
         };
       }
     },
@@ -149,10 +139,10 @@ export function useApplications(options: UseApplicationsOptions = {}) {
         await apiClient.post(`/api/applications/${applicationId}/withdraw`);
         await revalidateApplicationKeys(globalMutate, applicationId);
         return { success: true };
-      } catch (actionError) {
+      } catch (error) {
         return {
           success: false,
-          error: actionError instanceof Error ? actionError.message : 'Failed to withdraw application',
+          error: error instanceof Error ? error.message : 'Failed to withdraw application',
         };
       }
     },
@@ -163,7 +153,7 @@ export function useApplications(options: UseApplicationsOptions = {}) {
     applications: data?.data?.applications || [],
     pagination: data?.data?.pagination,
     isLoading: !error && !data,
-    isError: error,
+    isError: !!error,
     errorMessage: error instanceof Error ? error.message : data?.error,
     filters,
     setFilters,
@@ -178,12 +168,15 @@ export function useApplications(options: UseApplicationsOptions = {}) {
 export function useApplication(id: string) {
   const { data, error, mutate } = useSWR<ApiEnvelope<ApplicationResponse>>(
     id ? `/api/applications/${id}` : null,
-    fetcher
+    fetcher,
+    { revalidateOnFocus: false }
   );
 
   const getMessages = useCallback(async () => {
     try {
-      const response = await apiClient.get<ApiEnvelope<{ messages: any[] }>>(`/api/applications/${id}/messages`);
+      const response = await apiClient.get<ApiEnvelope<{ messages: any[] }>>(
+        `/api/applications/${id}/messages`
+      );
       return response.data?.messages || [];
     } catch {
       return [];
@@ -192,9 +185,12 @@ export function useApplication(id: string) {
 
   const getStatusHistory = useCallback(async () => {
     try {
-      const response = await apiClient.get<ApiEnvelope<{ currentStatus: string; history: any[]; reviewedAt?: string; reviewNotes?: string }>>(
-        `/api/applications/${id}/status`
-      );
+      const response = await apiClient.get<ApiEnvelope<{
+        currentStatus: string;
+        history: any[];
+        reviewedAt?: string;
+        reviewNotes?: string;
+      }>>(`/api/applications/${id}/status`);
       return response.data;
     } catch {
       return null;
@@ -204,7 +200,7 @@ export function useApplication(id: string) {
   return {
     application: data?.data?.application,
     isLoading: !error && !data,
-    isError: error,
+    isError: !!error,
     errorMessage: error instanceof Error ? error.message : data?.error,
     getMessages,
     getStatusHistory,

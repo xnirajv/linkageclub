@@ -12,6 +12,7 @@ const savedProjectSchema = new Schema<ISavedProject>(
       type: Schema.Types.ObjectId,
       ref: 'User',
       required: true,
+      index: true,
     },
     projectId: {
       type: Schema.Types.ObjectId,
@@ -23,9 +24,7 @@ const savedProjectSchema = new Schema<ISavedProject>(
       default: Date.now,
     },
   },
-  {
-    timestamps: false,
-  }
+  { timestamps: false }
 );
 
 savedProjectSchema.index({ userId: 1, projectId: 1 }, { unique: true });

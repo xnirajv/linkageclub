@@ -18,7 +18,7 @@ export default function ActiveProjectPage() {
   if (isLoading) {
     return (
       <DashboardLayout>
-        <div>Loading...</div>
+        <div className="flex items-center justify-center h-64">Loading...</div>
       </DashboardLayout>
     );
   }
@@ -26,7 +26,7 @@ export default function ActiveProjectPage() {
   if (!project) {
     return (
       <DashboardLayout>
-        <div>Project not found</div>
+        <div className="text-center py-12">Project not found</div>
       </DashboardLayout>
     );
   }
@@ -35,10 +35,8 @@ export default function ActiveProjectPage() {
     <DashboardLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-charcoal-950 dark:text-white">
-            {project.title}
-          </h1>
-          <p className="text-charcoal-600 dark:text-charcoal-400">
+          <h1 className="text-2xl font-bold">{project.title}</h1>
+          <p className="text-gray-600">
             Active Project • Started on {new Date(project.startDate || project.createdAt).toLocaleDateString()}
           </p>
         </div>
@@ -46,22 +44,26 @@ export default function ActiveProjectPage() {
         <Card className="p-6">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
             <div>
-              <p className="text-sm text-charcoal-500">Budget</p>
+              <p className="text-sm text-gray-500">Budget</p>
               <p className="text-lg font-semibold">
                 Rs. {project.budget.min.toLocaleString()} - Rs. {project.budget.max.toLocaleString()}
               </p>
             </div>
             <div>
-              <p className="text-sm text-charcoal-500">Duration</p>
+              <p className="text-sm text-gray-500">Duration</p>
               <p className="text-lg font-semibold">{project.duration} days</p>
             </div>
             <div>
-              <p className="text-sm text-charcoal-500">Company</p>
+              <p className="text-sm text-gray-500">Company</p>
               <p className="text-lg font-semibold">{project.company?.name || 'Company'}</p>
             </div>
             <div>
-              <p className="text-sm text-charcoal-500">Progress</p>
-              <p className="text-lg font-semibold">65% Complete</p>
+              <p className="text-sm text-gray-500">Progress</p>
+              <p className="text-lg font-semibold">
+                {project.milestones?.length
+                  ? Math.round((project.milestones.filter((m: any) => m.status === 'approved').length / project.milestones.length) * 100)
+                  : 0}% Complete
+              </p>
             </div>
           </div>
         </Card>
@@ -79,7 +81,7 @@ export default function ActiveProjectPage() {
           </TabsContent>
 
           <TabsContent value="milestones">
-            <MilestoneTracker milestones={project.milestones} projectId={project._id} />
+            <MilestoneTracker milestones={project.milestones as any} projectId={project._id} />
           </TabsContent>
 
           <TabsContent value="chat">
@@ -87,7 +89,7 @@ export default function ActiveProjectPage() {
           </TabsContent>
 
           <TabsContent value="files">
-            <div>Files section coming soon...</div>
+            <div className="text-center py-12 text-gray-500">Files section coming soon...</div>
           </TabsContent>
         </Tabs>
       </div>

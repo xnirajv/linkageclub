@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Project } from '@/types/project';
+import type { Project } from '@/types/project';
 import { ProjectCard } from '@/components/dashboard/student/ProjectCard';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -21,7 +21,13 @@ export function ProjectGrid({
   columns = 2,
 }: ProjectGridProps) {
   if (isLoading) {
-    const gridClass = columns === 1 ? 'grid-cols-1' : columns === 3 ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1 md:grid-cols-2';
+    const gridClass =
+      columns === 1
+        ? 'grid-cols-1'
+        : columns === 3
+          ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+          : 'grid-cols-1 md:grid-cols-2';
+
     return (
       <div className={`grid ${gridClass} gap-6`}>
         {Array.from({ length: 4 }).map((_, i) => (
@@ -45,8 +51,8 @@ export function ProjectGrid({
     columns === 1
       ? 'grid-cols-1'
       : columns === 3
-      ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
-      : 'grid-cols-1 md:grid-cols-2';
+        ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+        : 'grid-cols-1 md:grid-cols-2';
 
   return (
     <div className={`grid ${gridClass} gap-6`}>
