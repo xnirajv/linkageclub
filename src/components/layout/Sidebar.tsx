@@ -1,245 +1,107 @@
 'use client';
 
-import * as React from 'react';
+import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { signOut } from 'next-auth/react';
 import {
-  AlertCircle, Award, BarChart3, Bell, BookOpen, Briefcase,
-  Building, Calendar, DollarSign, FolderOpen, HelpCircle,
-  Home, LogOut, MessageSquare, Settings, Star, Target,
-  TrendingUp, UserPlus, Users, PenSquare, Search,
+  LayoutDashboard, PenSquare, FolderOpen, UserPlus, Briefcase,
+  Search, Building, BarChart3, Users, DollarSign, Bell,
+  MessageSquare, Settings, LogOut, Sparkles, ChevronLeft, ChevronRight,
 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import { cn } from '@/lib/utils/cn';
 import { useProfile } from '@/hooks/useProfile';
 
-interface SidebarItem {
-  title: string;
-  href: string;
-  icon: React.ElementType;
-  badge?: number;
-}
-
-interface SidebarSection {
-  title: string;
-  items: SidebarItem[];
-}
-
 interface SidebarProps {
-  role: 'student' | 'company' | 'mentor' | 'founder' | 'admin';
-  className?: string;
+  role: string;
 }
 
-const getSidebarConfig = (role: string): SidebarSection[] => {
-  const commonItems: SidebarItem[] = [
-    { title: 'Dashboard', href: `/dashboard/${role}`, icon: Home },
-    { title: 'Profile', href: `/dashboard/${role}/profile`, icon: Users },
-    { title: 'Messages', href: '/dashboard/messages', icon: MessageSquare, badge: 3 },
-    { title: 'Notifications', href: `/dashboard/${role}/notifications`, icon: Bell, badge: 5 },
+const getLinks = (role: string) => {
+  if (role === 'company') return [
+    { href: '/dashboard/company', label: 'Overview', icon: LayoutDashboard },
+    { href: '/dashboard/company/post-project', label: 'Post Project', icon: PenSquare },
+    { href: '/dashboard/company/my-projects', label: 'My Projects', icon: FolderOpen },
+    { href: '/dashboard/company/applications', label: 'Applications', icon: UserPlus },
+    { href: '/dashboard/company/jobs', label: 'Jobs', icon: Briefcase },
+    { href: '/dashboard/company/talent-search', label: 'Talent Search', icon: Search },
+    { href: '/dashboard/company/profile', label: 'Profile', icon: Building },
+    { href: '/dashboard/company/analytics', label: 'Analytics', icon: BarChart3 },
+    { href: '/dashboard/company/team', label: 'Team', icon: Users },
+    { href: '/dashboard/company/billing', label: 'Billing', icon: DollarSign },
+    { href: '/dashboard/company/notifications', label: 'Notifications', icon: Bell },
+    { href: '/dashboard/messages', label: 'Messages', icon: MessageSquare },
+    { href: '/dashboard/company/settings', label: 'Settings', icon: Settings },
   ];
-
-  const roleSpecificSections: Record<string, SidebarSection[]> = {
-    student: [
-      {
-        title: 'Growth',
-        items: [
-          { title: 'Projects', href: '/dashboard/student/projects', icon: Briefcase, badge: 2 },
-          { title: 'Assessments', href: '/dashboard/student/assessments', icon: Award },
-          { title: 'Jobs', href: '/dashboard/student/jobs', icon: TrendingUp },
-          { title: 'Learn', href: '/dashboard/student/learn', icon: BookOpen },
-          { title: 'Mentors', href: '/dashboard/student/mentors', icon: Users },
-        ],
-      },
-    ],
-    company: [
-      {
-        title: 'Workspace',
-        items: [
-          { title: 'Post Project', href: '/dashboard/company/post-project', icon: PenSquare },
-          { title: 'My Projects', href: '/dashboard/company/my-projects', icon: FolderOpen, badge: 3 },
-          { title: 'Applications', href: '/dashboard/company/applications', icon: UserPlus, badge: 8 },
-          { title: 'Jobs', href: '/dashboard/company/jobs', icon: Briefcase },
-          { title: 'Talent Search', href: '/dashboard/company/talent-search', icon: Search },
-          { title: 'Company Profile', href: '/dashboard/company/profile', icon: Building },
-          { title: 'Analytics', href: '/dashboard/company/analytics', icon: BarChart3 },
-          { title: 'Team', href: '/dashboard/company/team', icon: Users },
-          { title: 'Billing', href: '/dashboard/company/billing', icon: DollarSign },
-        ],
-      },
-    ],
-    mentor: [
-      {
-        title: 'Mentorship',
-        items: [
-          { title: 'Sessions', href: '/dashboard/mentor/sessions', icon: Calendar, badge: 2 },
-          { title: 'Students', href: '/dashboard/mentor/students', icon: Users },
-          { title: 'Earnings', href: '/dashboard/mentor/earnings', icon: DollarSign },
-          { title: 'Resources', href: '/dashboard/mentor/resources', icon: BookOpen },
-        ],
-      },
-    ],
-    founder: [
-      {
-        title: 'Startup',
-        items: [
-          { title: 'Startup Profile', href: '/dashboard/founder/startup', icon: Building },
-          { title: 'Co-founder Match', href: '/dashboard/founder/cofounder-match', icon: Users },
-          { title: 'Team Building', href: '/dashboard/founder/team-building', icon: UserPlus },
-          { title: 'Investors', href: '/dashboard/founder/investors', icon: Target },
-        ],
-      },
-    ],
-    admin: [
-      {
-        title: 'Operations',
-        items: [
-          { title: 'Users', href: '/dashboard/admin/users', icon: Users, badge: 24 },
-          { title: 'Projects', href: '/dashboard/admin/projects', icon: Briefcase },
-          { title: 'Assessments', href: '/dashboard/admin/assessments', icon: Award },
-          { title: 'Payments', href: '/dashboard/admin/payments', icon: DollarSign },
-          { title: 'Reports', href: '/dashboard/admin/reports', icon: AlertCircle },
-        ],
-      },
-      {
-        title: 'Moderation',
-        items: [
-          { title: 'Queue', href: '/dashboard/admin/moderation', icon: MessageSquare, badge: 7 },
-          { title: 'Disputes', href: '/dashboard/admin/projects/disputes', icon: AlertCircle },
-        ],
-      },
-    ],
-  };
-
-  return [
-    { title: 'Overview', items: commonItems },
-    ...(roleSpecificSections[role] || []),
-    {
-      title: 'Preferences',
-      items: [
-        { title: 'Settings', href: `/dashboard/${role}/settings`, icon: Settings },
-        { title: 'Help', href: '/help', icon: HelpCircle },
-      ],
-    },
-  ];
+  return [{ href: `/dashboard/${role}`, label: 'Dashboard', icon: LayoutDashboard }];
 };
 
-export function Sidebar({ role, className }: SidebarProps) {
+export function Sidebar({ role }: SidebarProps) {
   const pathname = usePathname();
   const { profile } = useProfile();
-  const sections = getSidebarConfig(role);
+  const [collapsed, setCollapsed] = React.useState(false);
+  const links = getLinks(role);
 
-  const displayName = profile?.name || 'User';
-  const displayEmail = profile?.email || 'user@example.com';
+  const name = profile?.name || 'User';
+  const email = profile?.email || 'user@example.com';
+  const initials = name.charAt(0).toUpperCase();
 
   return (
     <aside className={cn(
-      'glass-card fixed inset-y-3 left-3 z-40 hidden w-[290px] overflow-hidden rounded-[32px] lg:block',
-      className
+      'fixed left-0 top-0 z-40 h-screen flex flex-col bg-[#fafafa] dark:bg-[#0a0a0a] border-r border-gray-200 dark:border-gray-800 transition-all duration-200',
+      collapsed ? 'w-[72px]' : 'w-[260px]'
     )}>
-      <div className="flex h-full flex-col">
-        {/* Logo & User Info */}
-        <div className="border-b border-white/45 px-6 pb-5 pt-6 dark:border-white/10">
-          <Link href="/" className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-500 via-info-500 to-secondary-500 text-sm font-bold text-white">
-              IH
-            </div>
-            <div>
-              <div className="text-sm font-semibold uppercase tracking-[0.28em] text-charcoal-900 dark:text-white">
-                InternHub
-              </div>
-              <div className="text-xs text-charcoal-500 dark:text-charcoal-400">
-                Premium workspace
-              </div>
-            </div>
-          </Link>
-
-          <div className="glass-card mt-5 rounded-[26px] p-4">
-            <p className="text-xs uppercase tracking-[0.24em] text-charcoal-400">
-              Signed in as
-            </p>
-            <p className="mt-2 text-sm font-semibold text-charcoal-900 dark:text-white">
-              {displayName}
-            </p>
-            <p className="mt-1 truncate text-xs text-charcoal-500 dark:text-charcoal-400">
-              {displayEmail}
-            </p>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <span className="inline-flex rounded-full bg-secondary-50 px-3 py-1 text-xs font-semibold capitalize text-secondary-800 dark:bg-secondary-900/20 dark:text-secondary-200">
-                {role}
-              </span>
-              {role === 'company' && (
-                <span className="inline-flex rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-700 dark:bg-primary-950/30 dark:text-info-300">
-                  Verified
-                </span>
-              )}
-            </div>
+      {/* Logo */}
+      <div className="flex items-center h-14 px-4 border-b border-gray-200 dark:border-gray-800 gap-3">
+        <Link href="/dashboard" className="flex items-center gap-2.5 overflow-hidden flex-1">
+          <div className="w-7 h-7 rounded-md bg-black dark:bg-white flex items-center justify-center flex-shrink-0">
+            <Sparkles className="h-4 w-4 text-white dark:text-black" />
           </div>
-        </div>
+          {!collapsed && <span className="font-semibold text-sm tracking-tight whitespace-nowrap">InternHub</span>}
+        </Link>
+        <button onClick={() => setCollapsed(!collapsed)} className="w-6 h-6 rounded-md border border-gray-200 dark:border-gray-700 flex items-center justify-center flex-shrink-0 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+          {collapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
+        </button>
+      </div>
 
-        {/* Navigation */}
-        <div className="flex-1 overflow-y-auto px-4 py-5">
-          {sections.map((section) => (
-            <div key={section.title} className="mb-7 last:mb-0">
-              <h4 className="mb-3 px-3 text-[11px] font-semibold uppercase tracking-[0.28em] text-charcoal-400">
-                {section.title}
-              </h4>
-              <div className="space-y-1.5">
-                {section.items.map((item) => {
-                  const Icon = item.icon;
-                  const isActive = pathname === item.href || 
-                    (item.href !== '/dashboard/company' && pathname.startsWith(`${item.href}/`));
+      {/* Nav */}
+      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
+        {links.map((link) => {
+          const Icon = link.icon;
+          const active = pathname === link.href || (link.href !== `/dashboard/${role}` && pathname.startsWith(link.href));
+          return (
+            <Link
+              key={link.href}
+              href={link.href}
+              title={collapsed ? link.label : undefined}
+              className={cn(
+                'flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-all duration-150 group',
+                active
+                  ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm border border-gray-200 dark:border-gray-700'
+                  : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white hover:bg-white/50 dark:hover:bg-gray-800/50'
+              )}
+            >
+              <Icon className={cn('h-4 w-4 flex-shrink-0', active ? 'text-gray-900 dark:text-white' : 'text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-300')} />
+              {!collapsed && <span className="truncate">{link.label}</span>}
+            </Link>
+          );
+        })}
+      </nav>
 
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={cn(
-                        'group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm transition-all duration-300',
-                        isActive
-                          ? 'bg-gradient-to-r from-primary-700 to-info-600 text-white shadow-[0_18px_42px_-24px_rgba(52,74,134,0.85)]'
-                          : 'text-charcoal-700 hover:bg-card/80 hover:text-primary-700 dark:text-charcoal-200 dark:hover:bg-charcoal-800/75 dark:hover:text-info-300'
-                      )}
-                    >
-                      <div className={cn(
-                        'flex h-10 w-10 items-center justify-center rounded-2xl transition',
-                        isActive
-                          ? 'bg-card/14 text-white'
-                          : 'bg-card/65 text-charcoal-700 group-hover:bg-primary-50 group-hover:text-primary-700 dark:bg-charcoal-900/65 dark:text-charcoal-200 dark:group-hover:bg-charcoal-900 dark:group-hover:text-info-300'
-                      )}>
-                        <Icon className="h-4.5 w-4.5" />
-                      </div>
-                      <span className="flex-1 font-medium">{item.title}</span>
-                      {item.badge ? (
-                        <Badge className={cn(
-                          'rounded-full px-2 py-0.5 text-[10px] font-semibold',
-                          isActive ? 'bg-card/16 text-white' : 'bg-secondary-100 text-secondary-900 dark:bg-secondary-900/25 dark:text-secondary-200'
-                        )}>
-                          {item.badge}
-                        </Badge>
-                      ) : null}
-                    </Link>
-                  );
-                })}
-              </div>
+      {/* User */}
+      <div className="border-t border-gray-200 dark:border-gray-800 p-3">
+        <div className={cn('flex items-center gap-2.5 px-2 py-1.5', collapsed && 'justify-center')}>
+          <div className="w-7 h-7 rounded-full bg-black dark:bg-white flex items-center justify-center text-white dark:text-black text-[10px] font-medium flex-shrink-0">{initials}</div>
+          {!collapsed && (
+            <div className="flex-1 min-w-0">
+              <p className="text-[12px] font-medium truncate">{name}</p>
+              <p className="text-[10px] text-gray-400 truncate">{email}</p>
             </div>
-          ))}
+          )}
         </div>
-
-        {/* Footer */}
-        <div className="border-t border-white/45 p-4 dark:border-white/10">
-          <ThemeToggle className="mb-3 w-full" />
-          <Button
-            variant="outline"
-            className="w-full justify-start"
-            onClick={() => signOut({ callbackUrl: '/login' })}
-          >
-            <LogOut className="mr-2 h-4 w-4" />
-            Sign out
-          </Button>
-        </div>
+        <button onClick={() => signOut({ callbackUrl: '/login' })} className={cn('w-full flex items-center gap-2.5 px-2 py-2 mt-1 rounded-lg text-[12px] text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors', collapsed && 'justify-center')}>
+          <LogOut className="h-4 w-4 flex-shrink-0" />
+          {!collapsed && <span>Log out</span>}
+        </button>
       </div>
     </aside>
   );
