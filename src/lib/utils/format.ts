@@ -35,8 +35,9 @@ export function formatRelativeTime(dateString: string): string {
   return `${Math.floor(diffDays / 365)}y ago`;
 }
 
-export function formatDate(dateString: string): string {
-  return new Date(dateString).toLocaleDateString('en-IN', {
+export function formatDate(dateString: string | Date): string {
+  const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
+  return date.toLocaleDateString('en-IN', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
