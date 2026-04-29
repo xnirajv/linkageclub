@@ -1,73 +1,134 @@
 'use client';
 
-import React from 'react';
-import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Clock, DollarSign, Calendar, MapPin, Briefcase, MessageSquare, Users, Loader2, AlertCircle } from 'lucide-react';
-import { useProject } from '@/hooks/useProjects';
+import React, { useState } from 'react';
+import { useParams } from 'next/navigation';
+import { useProjectDetails } from '@/hooks/useProjectDetails';
+import { ProjectHeader } from '@/components/projects/ProjectHeader';
+import { ProjectTabs } from '@/components/projects/ProjectTabs';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
+import Link from 'next/link';
+import { OverviewTab } from '@/components/projects/OverviewTab';
+import { MilestonesTab } from '@/components/projects/MilestonesTab';
 
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(value);
-}
-
-function getStatusBadge(status: string) {
-  const styles: Record<string, string> = { open: 'bg-green-100 text-green-700', in_progress: 'bg-blue-100 text-blue-700', completed: 'bg-purple-100 text-purple-700', draft: 'bg-yellow-100 text-yellow-700', cancelled: 'bg-red-100 text-red-700' };
-  return styles[status] || 'bg-gray-100 text-gray-700';
-}
-
-export default function CompanyProjectDetailPage() {
+export default function ProjectDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const projectId = params.id as string;
-  const { project, isLoading, errorMessage } = useProject(projectId);
+  const { project, isLoading, isError, refetch } = useProjectDetails(projectId);
+  const [activeTab, setActiveTab] = useState('overview');
 
-  if (isLoading) return <div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary-600" /></div>;
-  if (!project) return <div className="text-center py-12"><AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-4" /><p className="text-gray-600">{errorMessage || 'Project not found'}</p><Button asChild variant="outline" className="mt-4"><Link href="/dashboard/company/my-projects">Back to My Projects</Link></Button></div>;
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-20 rounded-xl" />
+        <Skeleton className="h-12 rounded-xl" />
+        <Skeleton className="h-96 rounded-xl" />
+      </div>
+    );
+  }
 
-  const progress = project.milestones?.length ? Math.round((project.milestones.filter((m: any) => m.status === 'approved').length / project.milestones.length) * 100) : 0;
+  if (isError || !project) {
+    return (
+      <Card className="border shadow-sm p-12 text-center">
+        <h2 className="text-xl font-bold mb-2">Project Not Found</h2>
+        <p className="text-gray-500 mb-4">This project doesn&apos;t exist or you don&apos;t have access.</p>
+        <Button asChild variant="outline"><Link href="/dashboard/company/my-projects">← Back to My Projects</Link></Button>
+      </Card>
+    );
+  }
+
+  const badges = {
+    milestones: project.milestones?.filter((m: any) => m.status === 'submitted' || m.status === 'completed').length || 0,
+  };
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => router.back()}><ArrowLeft className="h-4 w-4" /></Button>
-          <div><h1 className="text-2xl font-bold">{project.title}</h1><div className="flex items-center gap-3 mt-1"><Badge className={getStatusBadge(project.status)}>{project.status === 'open' ? 'Active' : project.status}</Badge><span className="text-sm text-gray-500">{progress}% Complete • {project.duration} days</span></div></div>
-        </div>
-        <div className="flex gap-3">
-          <Button asChild variant="outline"><Link href={`/dashboard/company/my-projects/${projectId}/manage`}>Manage Project</Link></Button>
-          <Button asChild variant="outline"><Link href={`/dashboard/company/my-projects/${projectId}/applications`}><Users className="mr-2 h-4 w-4" />Applications ({project.applicationsCount || 0})</Link></Button>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <ProjectHeader project={project} />
+      <ProjectTabs activeTab={activeTab} onTabChange={setActiveTab} badges={badges} />
 
-      <Card><CardContent className="p-4"><div className="flex items-center justify-between mb-2 text-sm"><span className="text-gray-500">Project Progress</span><span className="font-medium">{progress}%</span></div><Progress value={progress} className="h-2" /></CardContent></Card>
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard icon={<DollarSign className="h-5 w-5 text-green-600" />} label="Budget" value={`${formatCurrency(project.budget?.min || 0)} - ${formatCurrency(project.budget?.max || 0)}`} />
-        <StatCard icon={<Clock className="h-5 w-5 text-blue-600" />} label="Duration" value={`${project.duration} days`} />
-        <StatCard icon={<Calendar className="h-5 w-5 text-purple-600" />} label="Posted" value={new Date(project.createdAt).toLocaleDateString()} />
-        <StatCard icon={<Briefcase className="h-5 w-5 text-orange-600" />} label="Category" value={project.category || 'General'} />
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="space-y-6">
-          <Card><CardHeader><CardTitle>Project Description</CardTitle></CardHeader><CardContent><p className="text-gray-600 whitespace-pre-wrap leading-7">{project.description}</p></CardContent></Card>
-          {project.skills?.length > 0 && <Card><CardHeader><CardTitle>Skills Required</CardTitle></CardHeader><CardContent><div className="flex flex-wrap gap-2">{project.skills.map((skill: any, i: number) => (<Badge key={i} variant="secondary" className="text-sm px-3 py-1">{skill.name || skill} {skill.level && `(${skill.level})`}</Badge>))}</div></CardContent></Card>}
-          {project.requirements?.length > 0 && <Card><CardHeader><CardTitle>Requirements</CardTitle></CardHeader><CardContent><ul className="space-y-2">{project.requirements.map((req: string, i: number) => (<li key={i} className="flex items-center gap-2 text-sm text-gray-600"><span className="h-1.5 w-1.5 bg-primary-600 rounded-full" />{req}</li>))}</ul></CardContent></Card>}
-        </div>
-        <div className="space-y-6">
-          {project.milestones?.length > 0 && <Card><CardHeader><CardTitle>Milestones</CardTitle></CardHeader><CardContent className="space-y-3">{project.milestones.map((milestone: any, i: number) => (<div key={i} className="flex items-center justify-between p-3 border rounded-xl"><div><p className="font-medium text-sm">{milestone.title}</p><p className="text-xs text-gray-500">Day {milestone.deadline}</p></div><div className="text-right"><p className="font-medium text-sm">{formatCurrency(milestone.amount)}</p><Badge className={getStatusBadge(milestone.status)}>{milestone.status}</Badge></div></div>))}</CardContent></Card>}
-          {project.location && <Card><CardHeader><CardTitle>Location</CardTitle></CardHeader><CardContent><div className="flex items-center gap-2"><MapPin className="h-5 w-5 text-gray-400" /><span className="text-lg font-medium capitalize">{project.location.type}{project.location.label && ` - ${project.location.label}`}</span></div></CardContent></Card>}
-          <Card><CardHeader><CardTitle>Quick Actions</CardTitle></CardHeader><CardContent className="space-y-2"><Button asChild variant="outline" className="w-full justify-start"><Link href="/dashboard/messages"><MessageSquare className="mr-2 h-4 w-4" />Message</Link></Button><Button variant="outline" className="w-full justify-start" onClick={() => router.push(`/dashboard/company/my-projects/${projectId}/manage`)}>Manage Project</Button></CardContent></Card>
-        </div>
+      <div className="min-h-[500px]">
+        {activeTab === 'overview' && <OverviewTab project={project} onTabChange={setActiveTab} />}
+        {activeTab === 'milestones' && <MilestonesTab project={project} refetch={refetch} />}
+        {activeTab === 'candidate' && <CandidateTab project={project} />}
+        {activeTab === 'communication' && <CommunicationTab project={project} />}
+        {activeTab === 'payments' && <PaymentsTab project={project} />}
       </div>
     </div>
   );
 }
 
-function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-  return <Card><CardContent className="p-4"><div className="flex items-center gap-3"><div className="p-2 bg-gray-100 rounded-lg">{icon}</div><div><p className="text-xs text-gray-500">{label}</p><p className="font-semibold">{value}</p></div></div></CardContent></Card>;
+function CandidateTab({ project }: { project: any }) {
+  const c = project?.candidate;
+  if (!c) return <Card className="border shadow-sm p-12 text-center"><p className="text-gray-500">No candidate hired yet</p></Card>;
+  return (
+    <div className="space-y-6">
+      <Card className="border shadow-sm">
+        <div className="p-6 flex items-start gap-4">
+          <div className="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center text-2xl font-bold">{c.name?.[0]}</div>
+          <div>
+            <h2 className="text-xl font-bold">{c.name}</h2>
+            <p className="text-sm text-gray-500">Trust Score: {c.trustScore}% • {c.location}</p>
+            <div className="flex gap-2 mt-3">
+              <Button size="sm">View Profile</Button>
+              <Button size="sm" variant="outline">Message</Button>
+              <Button size="sm" variant="outline">Rate</Button>
+            </div>
+          </div>
+        </div>
+      </Card>
+      {c.skills?.length > 0 && (
+        <Card className="border shadow-sm"><div className="p-5 border-b"><h3 className="font-semibold">Skills</h3></div><div className="p-5 flex flex-wrap gap-2">{c.skills.map((s: string) => (<span key={s} className="px-3 py-1 bg-gray-100 rounded-full text-sm">{s}</span>))}</div></Card>
+      )}
+    </div>
+  );
+}
+
+function CommunicationTab({ project }: { project: any }) {
+  return (
+    <Card className="border shadow-sm">
+      <div className="p-5 border-b"><h3 className="font-semibold">Communication</h3></div>
+      <div className="p-5 space-y-4">
+        <div className="h-80 bg-gray-50 dark:bg-gray-800 rounded-xl flex items-center justify-center">
+          <p className="text-gray-500">Chat integration coming soon</p>
+        </div>
+        <div className="flex gap-2">
+          <input type="text" placeholder="Type message..." className="flex-1 rounded-xl border px-4 py-2 text-sm" />
+          <Button size="sm">Send</Button>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function PaymentsTab({ project }: { project: any }) {
+  const ps = project?.paymentSummary || {};
+  return (
+    <div className="grid gap-6 md:grid-cols-2">
+      <Card className="border shadow-sm">
+        <div className="p-5 border-b"><h3 className="font-semibold">Payment Summary</h3></div>
+        <div className="p-5 space-y-3 text-sm">
+          <InfoRow label="Total Budget" value={`₹${(ps.totalBudget || 0).toLocaleString()}`} />
+          <InfoRow label="Released" value={<span className="text-green-600">₹{(ps.released || 0).toLocaleString()}</span>} />
+          <InfoRow label="Pending" value={<span className="text-yellow-600">₹{((ps.totalBudget || 0) - (ps.released || 0)).toLocaleString()}</span>} />
+          <InfoRow label="Platform Fee (10%)" value={`₹${(ps.platformFee || 0).toLocaleString()}`} />
+        </div>
+      </Card>
+      <Card className="border shadow-sm">
+        <div className="p-5 border-b"><h3 className="font-semibold">Transactions</h3></div>
+        <div className="p-5">
+          {ps.transactions?.length > 0 ? ps.transactions.map((txn: any) => (
+            <div key={txn._id} className="flex justify-between py-2 border-b last:border-0 text-sm">
+              <div><p className="font-medium">{txn.milestone || txn.type}</p><p className="text-xs text-gray-500">{new Date(txn.date).toLocaleDateString()}</p></div>
+              <span className="font-medium">₹{txn.amount?.toLocaleString()}</span>
+            </div>
+          )) : <p className="text-gray-500 text-sm">No transactions yet</p>}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+function InfoRow({ label, value }: { label: string; value: any }) {
+  return <div className="flex justify-between"><span className="text-gray-500">{label}</span><span className="font-medium">{value}</span></div>;
 }
