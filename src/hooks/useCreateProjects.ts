@@ -52,6 +52,8 @@ interface ProjectStore {
   formData: ProjectFormData;
   errors: Record<string, string>;
   isSubmitting: boolean;
+  lastSavedAt: number | null;
+  hasUnsavedChanges: boolean;
   setCurrentStep: (step: number) => void;
   setProjectId: (id: string) => void;
   setStatus: (status: string) => void;
@@ -67,7 +69,9 @@ interface ProjectStore {
   setErrors: (errors: Record<string, string>) => void;
   clearErrors: () => void;
   setIsSubmitting: (value: boolean) => void;
+  setHasUnsavedChanges: (value: boolean) => void;
   reset: () => void;
+  isFormEmpty: () => boolean;
 }
 
 const initialFormData: ProjectFormData = {
@@ -95,13 +99,15 @@ const initialFormData: ProjectFormData = {
 
 export const useCreateProject = create<ProjectStore>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       currentStep: 1,
       projectId: null,
       status: '',
       formData: { ...initialFormData },
       errors: {},
       isSubmitting: false,
+      lastSavedAt: null,
+      hasUnsavedChanges: false,
 
       setCurrentStep: (step) => set({ currentStep: step }),
       
@@ -113,6 +119,7 @@ export const useCreateProject = create<ProjectStore>()(
         set((state) => ({
           formData: { ...state.formData, [field]: value },
           errors: { ...state.errors, [field]: '' },
+          hasUnsavedChanges: true,
         })),
 
       addSkill: (skill) =>
@@ -121,6 +128,7 @@ export const useCreateProject = create<ProjectStore>()(
             ...state.formData,
             skills: [...state.formData.skills, skill],
           },
+          hasUnsavedChanges: true,
         })),
 
       removeSkill: (index) =>
@@ -129,6 +137,7 @@ export const useCreateProject = create<ProjectStore>()(
             ...state.formData,
             skills: state.formData.skills.filter((_, i) => i !== index),
           },
+          hasUnsavedChanges: true,
         })),
 
       updateSkill: (index, skill) =>
@@ -139,6 +148,7 @@ export const useCreateProject = create<ProjectStore>()(
               i === index ? { ...s, ...skill } : s
             ),
           },
+          hasUnsavedChanges: true,
         })),
 
       addMilestone: () =>
@@ -156,6 +166,7 @@ export const useCreateProject = create<ProjectStore>()(
               },
             ],
           },
+          hasUnsavedChanges: true,
         })),
 
       removeMilestone: (id) =>
@@ -164,6 +175,7 @@ export const useCreateProject = create<ProjectStore>()(
             ...state.formData,
             milestones: state.formData.milestones.filter((m) => m.id !== id),
           },
+          hasUnsavedChanges: true,
         })),
 
       updateMilestone: (id, data) =>
@@ -174,6 +186,7 @@ export const useCreateProject = create<ProjectStore>()(
               m.id === id ? { ...m, ...data } : m
             ),
           },
+          hasUnsavedChanges: true,
         })),
 
       addAttachment: (att) =>
@@ -182,6 +195,7 @@ export const useCreateProject = create<ProjectStore>()(
             ...state.formData,
             attachments: [...state.formData.attachments, att],
           },
+          hasUnsavedChanges: true,
         })),
 
       removeAttachment: (id) =>
@@ -190,6 +204,7 @@ export const useCreateProject = create<ProjectStore>()(
             ...state.formData,
             attachments: state.formData.attachments.filter((a) => a.id !== id),
           },
+          hasUnsavedChanges: true,
         })),
 
       setErrors: (errors) => set({ errors }),
@@ -197,6 +212,14 @@ export const useCreateProject = create<ProjectStore>()(
       clearErrors: () => set({ errors: {} }),
       
       setIsSubmitting: (value) => set({ isSubmitting: value }),
+
+      setHasUnsavedChanges: (value) => set({ hasUnsavedChanges: value }),
+
+      isFormEmpty: () => {
+        const state = get();
+        const fd = state.formData;
+        return !fd.title && !fd.category && !fd.description && !fd.summary;
+      },
 
       reset: () =>
         set({
@@ -206,6 +229,8 @@ export const useCreateProject = create<ProjectStore>()(
           formData: { ...initialFormData },
           errors: {},
           isSubmitting: false,
+          lastSavedAt: null,
+          hasUnsavedChanges: false,
         }),
     }),
     {
@@ -215,12 +240,14 @@ export const useCreateProject = create<ProjectStore>()(
         projectId: state.projectId,
         status: state.status,
         formData: state.formData,
+        lastSavedAt: state.lastSavedAt,
       }),
       merge: (persistedState: any, currentState) => ({
         ...currentState,
         ...persistedState,
         isSubmitting: false,
         errors: {},
+        hasUnsavedChanges: false,
       }),
     }
   )
