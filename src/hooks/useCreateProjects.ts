@@ -210,14 +210,17 @@ export const useCreateProject = create<ProjectStore>()(
     }),
     {
       name: 'create-project-form',
-      // ✅ FIX: Don't persist isSubmitting - always start as false
       partialize: (state) => ({
         currentStep: state.currentStep,
         projectId: state.projectId,
         status: state.status,
         formData: state.formData,
-        // isSubmitting EXCLUDED - fresh page load = fresh button state
-        // errors EXCLUDED - don't persist validation errors
+      }),
+      merge: (persistedState: any, currentState) => ({
+        ...currentState,
+        ...persistedState,
+        isSubmitting: false,
+        errors: {},
       }),
     }
   )

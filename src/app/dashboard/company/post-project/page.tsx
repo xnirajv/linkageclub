@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -22,6 +22,16 @@ export default function PostProjectPage() {
   const store = useCreateProject();
   const { currentStep, formData, projectId, errors, isSubmitting } = store;
   const [previewOpen, setPreviewOpen] = useState(false);
+
+  // PERMANENT FIX: Safety net on every mount
+  useEffect(() => {
+    if (store.isSubmitting) {
+      store.setIsSubmitting(false);
+    }
+    if (Object.keys(store.errors).length > 0) {
+      store.clearErrors();
+    }
+  }, []);
 
   const validateStep = (step: number): boolean => {
     const e: Record<string, string> = {};
@@ -83,7 +93,7 @@ export default function PostProjectPage() {
   const submitProject = async (status: 'draft' | 'open') => {
     store.setIsSubmitting(true);
     try {
-      const pid = projectId || store.projectId;
+      const pid = store.projectId;
       const method = pid ? 'PATCH' : 'POST';
       const endpoint = pid ? `/api/projects/${pid}` : '/api/projects';
       
@@ -96,11 +106,12 @@ export default function PostProjectPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Request failed');
       
-      const newId = data.project?._id || data.data?.project?._id;
+      const newId = data?.project?._id || data?.data?.project?._id || data?._id;
       if (newId) store.setProjectId(newId);
       return { success: true };
     } catch (err: any) {
-      return { success: false, error: err.message };
+      console.error('Submit error:', err);
+      return { success: false, error: err.message || 'Something went wrong' };
     } finally {
       store.setIsSubmitting(false);
     }
@@ -157,7 +168,9 @@ export default function PostProjectPage() {
       <div className="flex items-center justify-between bg-white dark:bg-gray-900 p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm sticky bottom-4">
         <div className="flex gap-3">
           {currentStep > 1 && <Button variant="outline" onClick={goBack}><ArrowLeft className="h-4 w-4 mr-2" />Back</Button>}
-          <Button variant="outline" onClick={handleSaveDraft} disabled={isSubmitting}>{isSubmitting ? 'Saving...' : <><Save className="h-4 w-4 mr-2" />Save Draft</>}</Button>
+          <Button variant="outline" onClick={handleSaveDraft} disabled={isSubmitting}>
+            {isSubmitting ? 'Saving...' : <><Save className="h-4 w-4 mr-2" />Save Draft</>}
+          </Button>
         </div>
         <div className="flex gap-3">
           {currentStep < 4 ? (
@@ -165,7 +178,9 @@ export default function PostProjectPage() {
           ) : (
             <>
               <Button variant="outline" onClick={() => setPreviewOpen(true)}><Eye className="h-4 w-4 mr-2" />Preview</Button>
-              <Button onClick={handlePublish} disabled={isSubmitting}>{isSubmitting ? 'Publishing...' : <><Send className="h-4 w-4 mr-2" />Publish Project</>}</Button>
+              <Button onClick={handlePublish} disabled={isSubmitting}>
+                {isSubmitting ? 'Publishing...' : <><Send className="h-4 w-4 mr-2" />Publish Project</>}
+              </Button>
             </>
           )}
         </div>
@@ -191,7 +206,9 @@ export default function PostProjectPage() {
             </div>
             <div className="flex justify-end gap-3 mt-6">
               <Button variant="outline" onClick={() => setPreviewOpen(false)}>Close</Button>
-              <Button onClick={() => { setPreviewOpen(false); handlePublish(); }} disabled={isSubmitting}>{isSubmitting ? 'Publishing...' : 'Publish'}</Button>
+              <Button onClick={() => { setPreviewOpen(false); handlePublish(); }} disabled={isSubmitting}>
+                {isSubmitting ? 'Publishing...' : 'Publish'}
+              </Button>
             </div>
           </div>
         </div>
