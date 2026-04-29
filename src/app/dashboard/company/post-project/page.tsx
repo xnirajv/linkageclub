@@ -118,44 +118,45 @@ export default function PostProjectPage() {
   });
 
   const submitProject = async (status: 'draft' | 'published') => {
-    if (status === 'published') {
-      store.setIsSubmitting(true);
-    } else {
-      store.setIsSaving(true);
-    }
+  if (status === 'published') {
+    store.setIsSubmitting(true);
+  } else {
+    store.setIsSaving(true);
+  }
+  
+  try {
+    const pid = store.projectId;
     
-    try {
-      const pid = store.projectId;
-      const isPublishDraft = pid && status === 'published';
-      const method = pid ? 'PATCH' : 'POST';
-      const endpoint = isPublishDraft
-        ? `/api/company/projects/${pid}/publish`
-        : '/api/company/projects';
-      
-      const body = isPublishDraft
-        ? { status: 'published' }
-        : buildPayload(status);
+    // ✅ FIX: Use correct API endpoint
+    const endpoint = pid ? `/api/projects/${pid}` : '/api/projects';
+    const method = pid ? 'PATCH' : 'POST';
+    const payload = buildPayload(status === 'published' ? 'published' : 'draft');
 
-      const res = await fetch(endpoint, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
+    const res = await fetch(endpoint, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Request failed');
-
-      const newId = data?.id || data?.project?._id || data?.data?.project?._id;
-      if (newId) store.setProjectId(newId);
-
-      return { success: true, data };
-    } catch (err: any) {
-      return { success: false, error: err.message };
-    } finally {
-      store.setIsSubmitting(false);
-      store.setIsSaving(false);
+    const data = await res.json();
+    
+    if (!res.ok) {
+      console.error('API Error:', data);
+      throw new Error(data.error || data.message || 'Request failed');
     }
-  };
+
+    const newId = data?.project?._id || data?.data?.project?._id || data?._id;
+    if (newId) store.setProjectId(newId);
+
+    return { success: true, data };
+  } catch (err: any) {
+    console.error('Submit error:', err);
+    return { success: false, error: err.message };
+  } finally {
+    store.setIsSubmitting(false);
+    store.setIsSaving(false);
+  }
+};
 
   const handleSaveDraft = async () => {
     const result = await submitProject('draft');
@@ -185,32 +186,37 @@ export default function PostProjectPage() {
   };
 
   const handleFileUpload = async (files: FileList) => {
-    for (const file of Array.from(files)) {
-      const formDataUpload = new FormData();
-      formDataUpload.append('file', file);
-      if (store.projectId) formDataUpload.append('projectId', store.projectId);
+  for (const file of Array.from(files)) {
+    // ✅ Use existing upload API
+    const formDataUpload = new FormData();
+    formDataUpload.append('file', file);
+    if (store.projectId) formDataUpload.append('projectId', store.projectId);
 
-      try {
-        const res = await fetch('/api/company/projects/attachments/upload', {
-          method: 'POST',
-          body: formDataUpload,
+    try {
+      const res = await fetch('/api/uploads/document', {  // ✅ Existing endpoint
+        method: 'POST',
+        body: formDataUpload,
+      });
+      
+      const data = await res.json();
+      
+      if (res.ok) {
+        store.addAttachment({
+          id: data.id || data.attachmentId || Date.now().toString(),
+          fileName: file.name,
+          fileSize: file.size,
+          fileUrl: data.url || data.fileUrl || '',
+          mimeType: file.type,
         });
-        const data = await res.json();
-        if (res.ok) {
-          store.addAttachment({
-            id: data.attachmentId,
-            fileName: data.fileName,
-            fileSize: data.fileSize,
-            fileUrl: data.fileUrl,
-            mimeType: data.mimeType,
-          });
-          toast.success(`${file.name} uploaded`);
-        }
-      } catch {
-        toast.error(`Failed to upload ${file.name}`);
+        toast.success(`${file.name} uploaded`);
+      } else {
+        toast.error(data.error || `Failed to upload ${file.name}`);
       }
+    } catch (err) {
+      toast.error(`Failed to upload ${file.name}`);
     }
-  };
+  }
+};
 
   const goNext = () => {
     if (validateStep(currentStep)) {
@@ -561,7 +567,7 @@ function StepBudget() {
   );
 }
 
-// Step 4: Visibility & Attachments
+// Step 4: Visibility & Attachments 
 function StepVisibility({ fileInputRef, onFileSelect }: { 
   fileInputRef: React.RefObject<HTMLInputElement>; 
   onFileSelect: (files: FileList) => void 
