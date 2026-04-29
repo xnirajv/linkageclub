@@ -71,15 +71,26 @@ interface ProjectStore {
 }
 
 const initialFormData: ProjectFormData = {
-  title: '', category: '', description: '', summary: '',
+  title: '',
+  category: '',
+  description: '',
+  summary: '',
   skills: [{ name: '', proficiency: 'intermediate' }],
-  experienceLevel: '', requirements: [],
-  locationType: '', location: '',
-  budgetType: '', budgetMin: '', budgetMax: '', hourlyRate: '',
-  duration: '', durationUnit: 'days',
+  experienceLevel: '',
+  requirements: [],
+  locationType: '',
+  location: '',
+  budgetType: '',
+  budgetMin: '',
+  budgetMax: '',
+  hourlyRate: '',
+  duration: '',
+  durationUnit: 'days',
   milestones: [],
-  visibility: 'public', attachments: [],
-  isFeatured: false, termsAccepted: false,
+  visibility: 'public',
+  attachments: [],
+  isFeatured: false,
+  termsAccepted: false,
 };
 
 export const useCreateProject = create<ProjectStore>()(
@@ -88,12 +99,14 @@ export const useCreateProject = create<ProjectStore>()(
       currentStep: 1,
       projectId: null,
       status: '',
-      formData: initialFormData,
+      formData: { ...initialFormData },
       errors: {},
       isSubmitting: false,
 
       setCurrentStep: (step) => set({ currentStep: step }),
+      
       setProjectId: (id) => set({ projectId: id }),
+      
       setStatus: (status) => set({ status }),
 
       updateField: (field, value) =>
@@ -104,54 +117,108 @@ export const useCreateProject = create<ProjectStore>()(
 
       addSkill: (skill) =>
         set((state) => ({
-          formData: { ...state.formData, skills: [...state.formData.skills, skill] },
+          formData: {
+            ...state.formData,
+            skills: [...state.formData.skills, skill],
+          },
         })),
 
       removeSkill: (index) =>
         set((state) => ({
-          formData: { ...state.formData, skills: state.formData.skills.filter((_, i) => i !== index) },
+          formData: {
+            ...state.formData,
+            skills: state.formData.skills.filter((_, i) => i !== index),
+          },
         })),
 
       updateSkill: (index, skill) =>
         set((state) => ({
-          formData: { ...state.formData, skills: state.formData.skills.map((s, i) => (i === index ? { ...s, ...skill } : s)) },
+          formData: {
+            ...state.formData,
+            skills: state.formData.skills.map((s, i) =>
+              i === index ? { ...s, ...skill } : s
+            ),
+          },
         })),
 
       addMilestone: () =>
         set((state) => ({
-          formData: { ...state.formData, milestones: [...state.formData.milestones, { id: Date.now().toString(), title: '', amount: 0, deadlineDay: 0, deliverables: '' }] },
+          formData: {
+            ...state.formData,
+            milestones: [
+              ...state.formData.milestones,
+              {
+                id: Date.now().toString(),
+                title: '',
+                amount: 0,
+                deadlineDay: 0,
+                deliverables: '',
+              },
+            ],
+          },
         })),
 
       removeMilestone: (id) =>
         set((state) => ({
-          formData: { ...state.formData, milestones: state.formData.milestones.filter((m) => m.id !== id) },
+          formData: {
+            ...state.formData,
+            milestones: state.formData.milestones.filter((m) => m.id !== id),
+          },
         })),
 
       updateMilestone: (id, data) =>
         set((state) => ({
-          formData: { ...state.formData, milestones: state.formData.milestones.map((m) => (m.id === id ? { ...m, ...data } : m)) },
+          formData: {
+            ...state.formData,
+            milestones: state.formData.milestones.map((m) =>
+              m.id === id ? { ...m, ...data } : m
+            ),
+          },
         })),
 
       addAttachment: (att) =>
         set((state) => ({
-          formData: { ...state.formData, attachments: [...state.formData.attachments, att] },
+          formData: {
+            ...state.formData,
+            attachments: [...state.formData.attachments, att],
+          },
         })),
 
       removeAttachment: (id) =>
         set((state) => ({
-          formData: { ...state.formData, attachments: state.formData.attachments.filter((a) => a.id !== id) },
+          formData: {
+            ...state.formData,
+            attachments: state.formData.attachments.filter((a) => a.id !== id),
+          },
         })),
 
       setErrors: (errors) => set({ errors }),
+      
       clearErrors: () => set({ errors: {} }),
+      
       setIsSubmitting: (value) => set({ isSubmitting: value }),
 
       reset: () =>
         set({
-          currentStep: 1, projectId: null, status: '',
-          formData: initialFormData, errors: {}, isSubmitting: false,
+          currentStep: 1,
+          projectId: null,
+          status: '',
+          formData: { ...initialFormData },
+          errors: {},
+          isSubmitting: false,
         }),
     }),
-    { name: 'create-project-form' }
+    {
+      name: 'create-project-form',
+      // ✅ FIX: Don't persist isSubmitting - always start as false
+      partialize: (state) => ({
+        currentStep: state.currentStep,
+        projectId: state.projectId,
+        status: state.status,
+        formData: state.formData,
+        // isSubmitting EXCLUDED - fresh page load = fresh button state
+        // errors EXCLUDED - don't persist validation errors
+      }),
+    }
   )
 );
