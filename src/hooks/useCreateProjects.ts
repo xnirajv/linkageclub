@@ -4,7 +4,6 @@ import { persist } from 'zustand/middleware';
 interface Skill {
   name: string;
   proficiency: 'beginner' | 'intermediate' | 'advanced';
-  skillId?: string;
 }
 
 interface Milestone {
@@ -27,20 +26,18 @@ interface ProjectFormData {
   title: string;
   category: string;
   description: string;
-  descriptionPlain: string;
   summary: string;
   skills: Skill[];
-  experienceLevel: 'beginner' | 'intermediate' | 'advanced' | 'any' | '';
+  experienceLevel: string;
   requirements: string[];
-  customRequirements: string[];
-  locationType: 'remote' | 'onsite' | 'hybrid' | '';
+  locationType: string;
   location: string;
-  budgetType: 'fixed' | 'hourly' | 'milestone' | '';
+  budgetType: string;
   budgetMin: string;
   budgetMax: string;
   hourlyRate: string;
   duration: string;
-  durationUnit: 'days' | 'weeks' | 'months';
+  durationUnit: 'days' | 'weeks';
   milestones: Milestone[];
   visibility: 'public' | 'private' | 'invite';
   attachments: Attachment[];
@@ -51,13 +48,13 @@ interface ProjectFormData {
 interface ProjectStore {
   currentStep: number;
   projectId: string | null;
-  status: 'draft' | 'published' | '';
+  status: string;
   formData: ProjectFormData;
   errors: Record<string, string>;
   isSubmitting: boolean;
   setCurrentStep: (step: number) => void;
   setProjectId: (id: string) => void;
-  setStatus: (status: 'draft' | 'published') => void;
+  setStatus: (status: string) => void;
   updateField: <K extends keyof ProjectFormData>(field: K, value: ProjectFormData[K]) => void;
   addSkill: (skill: Skill) => void;
   removeSkill: (index: number) => void;
@@ -65,7 +62,7 @@ interface ProjectStore {
   addMilestone: () => void;
   removeMilestone: (id: string) => void;
   updateMilestone: (id: string, data: Partial<Milestone>) => void;
-  addAttachment: (attachment: Attachment) => void;
+  addAttachment: (att: Attachment) => void;
   removeAttachment: (id: string) => void;
   setErrors: (errors: Record<string, string>) => void;
   clearErrors: () => void;
@@ -74,28 +71,15 @@ interface ProjectStore {
 }
 
 const initialFormData: ProjectFormData = {
-  title: '',
-  category: '',
-  description: '',
-  descriptionPlain: '',
-  summary: '',
+  title: '', category: '', description: '', summary: '',
   skills: [{ name: '', proficiency: 'intermediate' }],
-  experienceLevel: '',
-  requirements: [],
-  customRequirements: [],
-  locationType: '',
-  location: '',
-  budgetType: '',
-  budgetMin: '',
-  budgetMax: '',
-  hourlyRate: '',
-  duration: '',
-  durationUnit: 'days',
+  experienceLevel: '', requirements: [],
+  locationType: '', location: '',
+  budgetType: '', budgetMin: '', budgetMax: '', hourlyRate: '',
+  duration: '', durationUnit: 'days',
   milestones: [],
-  visibility: 'public',
-  attachments: [],
-  isFeatured: false,
-  termsAccepted: false,
+  visibility: 'public', attachments: [],
+  isFeatured: false, termsAccepted: false,
 };
 
 export const useCreateProject = create<ProjectStore>()(
@@ -120,84 +104,52 @@ export const useCreateProject = create<ProjectStore>()(
 
       addSkill: (skill) =>
         set((state) => ({
-          formData: {
-            ...state.formData,
-            skills: [...state.formData.skills, skill],
-          },
+          formData: { ...state.formData, skills: [...state.formData.skills, skill] },
         })),
 
       removeSkill: (index) =>
         set((state) => ({
-          formData: {
-            ...state.formData,
-            skills: state.formData.skills.filter((_, i) => i !== index),
-          },
+          formData: { ...state.formData, skills: state.formData.skills.filter((_, i) => i !== index) },
         })),
 
       updateSkill: (index, skill) =>
         set((state) => ({
-          formData: {
-            ...state.formData,
-            skills: state.formData.skills.map((s, i) => (i === index ? { ...s, ...skill } : s)),
-          },
+          formData: { ...state.formData, skills: state.formData.skills.map((s, i) => (i === index ? { ...s, ...skill } : s)) },
         })),
 
       addMilestone: () =>
         set((state) => ({
-          formData: {
-            ...state.formData,
-            milestones: [
-              ...state.formData.milestones,
-              { id: Date.now().toString(), title: '', amount: 0, deadlineDay: 0, deliverables: '' },
-            ],
-          },
+          formData: { ...state.formData, milestones: [...state.formData.milestones, { id: Date.now().toString(), title: '', amount: 0, deadlineDay: 0, deliverables: '' }] },
         })),
 
       removeMilestone: (id) =>
         set((state) => ({
-          formData: {
-            ...state.formData,
-            milestones: state.formData.milestones.filter((m) => m.id !== id),
-          },
+          formData: { ...state.formData, milestones: state.formData.milestones.filter((m) => m.id !== id) },
         })),
 
       updateMilestone: (id, data) =>
         set((state) => ({
-          formData: {
-            ...state.formData,
-            milestones: state.formData.milestones.map((m) =>
-              m.id === id ? { ...m, ...data } : m
-            ),
-          },
+          formData: { ...state.formData, milestones: state.formData.milestones.map((m) => (m.id === id ? { ...m, ...data } : m)) },
         })),
 
-      addAttachment: (attachment) =>
+      addAttachment: (att) =>
         set((state) => ({
-          formData: {
-            ...state.formData,
-            attachments: [...state.formData.attachments, attachment],
-          },
+          formData: { ...state.formData, attachments: [...state.formData.attachments, att] },
         })),
 
       removeAttachment: (id) =>
         set((state) => ({
-          formData: {
-            ...state.formData,
-            attachments: state.formData.attachments.filter((a) => a.id !== id),
-          },
+          formData: { ...state.formData, attachments: state.formData.attachments.filter((a) => a.id !== id) },
         })),
 
       setErrors: (errors) => set({ errors }),
       clearErrors: () => set({ errors: {} }),
       setIsSubmitting: (value) => set({ isSubmitting: value }),
+
       reset: () =>
         set({
-          currentStep: 1,
-          projectId: null,
-          status: '',
-          formData: initialFormData,
-          errors: {},
-          isSubmitting: false,
+          currentStep: 1, projectId: null, status: '',
+          formData: initialFormData, errors: {}, isSubmitting: false,
         }),
     }),
     { name: 'create-project-form' }
