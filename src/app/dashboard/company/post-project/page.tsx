@@ -83,54 +83,53 @@ export default function PostProjectPage() {
   };
 
   const buildPayload = (status: 'draft' | 'published') => {
-    const payload: Record<string, any> = {
-      title: formData.title.trim(),
-      description: formData.description.trim(),
-      category: formData.category,
-      skills: formData.skills
-        .filter(s => s.name && s.name.trim().length > 0)
-        .map(s => ({
-          name: s.name.trim(),
-          level: s.proficiency || 'intermediate',
-          mandatory: true,
-        })),
-      location: {
-        type: (formData.locationType || 'remote') as 'remote' | 'onsite' | 'hybrid',
-        label: formData.locationType === 'remote' ? undefined : (formData.location || 'Remote'),
-      },
+    const validSkills = formData.skills
+      .filter(s => s.name && s.name.trim().length > 0)
+      .map(s => ({
+        name: s.name.trim(),
+        level: s.proficiency || 'intermediate',
+        mandatory: true,
+      }));
 
+    // Ensure at least 1 skill
+    if (validSkills.length === 0) {
+      validSkills.push({ name: 'General', level: 'intermediate', mandatory: true });
+    }
+
+    const payload: any = {
+      title: formData.title.trim(),
+      category: formData.category,
+      description: formData.description.trim(),
+      skills: validSkills,
       budget: {
-        type: (formData.budgetType || 'fixed') as 'fixed' | 'hourly' | 'milestone',
+        type: formData.budgetType || 'fixed',
         min: Number(formData.budgetMin) || 5000,
         max: Number(formData.budgetMax) || 10000,
         currency: 'INR',
       },
-
       duration: Number(formData.duration) || 30,
-      milestones: formData.milestones
+      location: formData.locationType === 'remote'
+        ? { type: 'remote' as const }
+        : { type: (formData.locationType || 'onsite') as 'onsite' | 'hybrid', label: formData.location || '' },
+      requirements: formData.requirements.filter(Boolean),
+      experienceLevel: formData.experienceLevel || 'intermediate',
+      visibility: formData.visibility === 'invite_only' ? 'invite' : (formData.visibility || 'public'),
+      attachments: formData.attachments.map(a => a.fileUrl).filter(Boolean),
+      isFeatured: formData.isFeatured || false,
+    };
+
+    if (formData.summary?.trim()) payload.summary = formData.summary.trim();
+    if (formData.milestones.length > 0) {
+      payload.milestones = formData.milestones
         .filter(m => m.title.trim() && m.amount > 0)
         .map(m => ({
           title: m.title.trim(),
           description: m.deliverables || m.title,
           amount: m.amount,
           deadline: m.deadlineDay || 1,
-        })),
-
-      requirements: formData.requirements.filter(Boolean),
-      experienceLevel: (formData.experienceLevel || 'intermediate') as 'beginner' | 'intermediate' | 'advanced' | 'any',
-      visibility: (formData.visibility === 'invite_only' ? 'invite' : formData.visibility || 'public') as 'public' | 'private' | 'invite',
-      attachments: formData.attachments.map(a => a.fileUrl).filter(Boolean),
-
-      isFeatured: formData.isFeatured || false,
-    };
-    if (formData.summary?.trim()) {
-      payload.summary = formData.summary.trim();
+        }));
     }
-    Object.keys(payload).forEach(key => {
-      if (payload[key] === undefined) delete payload[key];
-    });
 
-    console.log('Clean Payload:', JSON.stringify(payload, null, 2));
     return payload;
   };
 
@@ -146,7 +145,17 @@ export default function PostProjectPage() {
       const endpoint = pid ? `/api/projects/${pid}` : '/api/projects';
       const method = pid ? 'PATCH' : 'POST';
       const payload = buildPayload(status);
-      const body = pid ? { status: status === 'published' ? 'open' : 'draft' } : payload;
+
+      // For new project POST: send full payload
+      // For existing PATCH: send full payload with updated status
+      const body = {
+        ...payload,
+        status: status === 'published' ? 'open' : 'draft',
+      };
+
+      console.log('🚀 Sending to:', endpoint);
+      console.log('📦 Method:', method);
+      console.log('📋 Body:', JSON.stringify(body, null, 2));
 
       const res = await fetch(endpoint, {
         method,
@@ -156,8 +165,9 @@ export default function PostProjectPage() {
 
       const data = await res.json();
 
+      console.log('✅ Response:', data);
+
       if (!res.ok) {
-        console.error('API Error Response:', data);
         throw new Error(data.error || data.message || 'Request failed');
       }
 
@@ -166,14 +176,13 @@ export default function PostProjectPage() {
 
       return { success: true, data };
     } catch (err: any) {
-      console.error('Submit Error:', err);
+      console.error('❌ Error:', err);
       return { success: false, error: err.message };
     } finally {
       store.setIsSubmitting(false);
       store.setIsSaving(false);
     }
   };
-
   const handleSaveDraft = async () => {
     const result = await submitProject('draft');
     if (result.success) {
