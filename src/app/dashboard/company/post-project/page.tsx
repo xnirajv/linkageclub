@@ -82,81 +82,97 @@ export default function PostProjectPage() {
     return Object.keys(e).length === 0;
   };
 
-  const buildPayload = (status: 'draft' | 'published') => ({
-    title: formData.title,
-    category: formData.category.toLowerCase().replace(/\s+/g, '_'),
-    description: formData.description,
-    descriptionPlain: formData.descriptionPlain || formData.description.replace(/<[^>]*>/g, ''),
-    summary: formData.summary || undefined,
-    skills: formData.skills.filter(s => s.name.trim()).map(s => ({
-      name: s.name,
-      proficiency: s.proficiency,
-      skillId: s.skillId || undefined,
-    })),
-    experienceLevel: formData.experienceLevel || 'intermediate',
-    requirements: formData.requirements.filter(Boolean),
-    locationType: formData.locationType,
-    location: formData.location || undefined,
-    budgetType: formData.budgetType || 'fixed',
-    budgetMin: Number(formData.budgetMin) || 0,
-    budgetMax: Number(formData.budgetMax) || 0,
-    hourlyRate: Number(formData.hourlyRate) || 0,
-    duration: Number(formData.duration) || 0,
-    durationUnit: formData.durationUnit,
-    milestones: formData.milestones.filter(m => m.title && m.amount > 0).map(m => ({
-      title: m.title,
-      amount: m.amount,
-      deadlineDay: m.deadlineDay,
-      deliverables: m.deliverables,
-    })),
-    visibility: formData.visibility,
-    attachmentIds: formData.attachments.map(a => a.id),
-    isFeatured: formData.isFeatured,
-    status: status === 'published' ? 'active' : 'draft',
-    termsAccepted: formData.termsAccepted,
-    currency: 'INR',
-  });
+  const buildPayload = (status: 'draft' | 'published') => {
+    const payload: Record<string, any> = {
+      title: formData.title.trim(),
+      description: formData.description.trim(),
+      category: formData.category,
+      skills: formData.skills
+        .filter(s => s.name && s.name.trim().length > 0)
+        .map(s => ({
+          name: s.name.trim(),
+          level: s.proficiency || 'intermediate',
+          mandatory: true,
+        })),
+      location: {
+        type: (formData.locationType || 'remote') as 'remote' | 'onsite' | 'hybrid',
+        label: formData.locationType === 'remote' ? undefined : (formData.location || 'Remote'),
+      },
 
-  const submitProject = async (status: 'draft' | 'published') => {
-  if (status === 'published') {
-    store.setIsSubmitting(true);
-  } else {
-    store.setIsSaving(true);
-  }
-  
-  try {
-    const pid = store.projectId;
-    
-    // ✅ FIX: Use correct API endpoint
-    const endpoint = pid ? `/api/projects/${pid}` : '/api/projects';
-    const method = pid ? 'PATCH' : 'POST';
-    const payload = buildPayload(status === 'published' ? 'published' : 'draft');
+      budget: {
+        type: (formData.budgetType || 'fixed') as 'fixed' | 'hourly' | 'milestone',
+        min: Number(formData.budgetMin) || 5000,
+        max: Number(formData.budgetMax) || 10000,
+        currency: 'INR',
+      },
 
-    const res = await fetch(endpoint, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      duration: Number(formData.duration) || 30,
+      milestones: formData.milestones
+        .filter(m => m.title.trim() && m.amount > 0)
+        .map(m => ({
+          title: m.title.trim(),
+          description: m.deliverables || m.title,
+          amount: m.amount,
+          deadline: m.deadlineDay || 1,
+        })),
+
+      requirements: formData.requirements.filter(Boolean),
+      experienceLevel: (formData.experienceLevel || 'intermediate') as 'beginner' | 'intermediate' | 'advanced' | 'any',
+      visibility: (formData.visibility === 'invite_only' ? 'invite' : formData.visibility || 'public') as 'public' | 'private' | 'invite',
+      attachments: formData.attachments.map(a => a.fileUrl).filter(Boolean),
+
+      isFeatured: formData.isFeatured || false,
+    };
+    if (formData.summary?.trim()) {
+      payload.summary = formData.summary.trim();
+    }
+    Object.keys(payload).forEach(key => {
+      if (payload[key] === undefined) delete payload[key];
     });
 
-    const data = await res.json();
-    
-    if (!res.ok) {
-      console.error('API Error:', data);
-      throw new Error(data.error || data.message || 'Request failed');
+    console.log('Clean Payload:', JSON.stringify(payload, null, 2));
+    return payload;
+  };
+
+  const submitProject = async (status: 'draft' | 'published') => {
+    if (status === 'published') {
+      store.setIsSubmitting(true);
+    } else {
+      store.setIsSaving(true);
     }
 
-    const newId = data?.project?._id || data?.data?.project?._id || data?._id;
-    if (newId) store.setProjectId(newId);
+    try {
+      const pid = store.projectId;
+      const endpoint = pid ? `/api/projects/${pid}` : '/api/projects';
+      const method = pid ? 'PATCH' : 'POST';
+      const payload = buildPayload(status);
+      const body = pid ? { status: status === 'published' ? 'open' : 'draft' } : payload;
 
-    return { success: true, data };
-  } catch (err: any) {
-    console.error('Submit error:', err);
-    return { success: false, error: err.message };
-  } finally {
-    store.setIsSubmitting(false);
-    store.setIsSaving(false);
-  }
-};
+      const res = await fetch(endpoint, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        console.error('API Error Response:', data);
+        throw new Error(data.error || data.message || 'Request failed');
+      }
+
+      const newId = data?.project?._id || data?.data?.project?._id || data?._id;
+      if (newId) store.setProjectId(newId);
+
+      return { success: true, data };
+    } catch (err: any) {
+      console.error('Submit Error:', err);
+      return { success: false, error: err.message };
+    } finally {
+      store.setIsSubmitting(false);
+      store.setIsSaving(false);
+    }
+  };
 
   const handleSaveDraft = async () => {
     const result = await submitProject('draft');
@@ -171,7 +187,7 @@ export default function PostProjectPage() {
 
   const handlePublish = async () => {
     if (!validateStep(4)) return;
-    
+
     const result = await submitProject('published');
     if (result.success) {
       toast.success('Project published successfully!');
@@ -186,37 +202,37 @@ export default function PostProjectPage() {
   };
 
   const handleFileUpload = async (files: FileList) => {
-  for (const file of Array.from(files)) {
-    // ✅ Use existing upload API
-    const formDataUpload = new FormData();
-    formDataUpload.append('file', file);
-    if (store.projectId) formDataUpload.append('projectId', store.projectId);
+    for (const file of Array.from(files)) {
+      // ✅ Use existing upload API
+      const formDataUpload = new FormData();
+      formDataUpload.append('file', file);
+      if (store.projectId) formDataUpload.append('projectId', store.projectId);
 
-    try {
-      const res = await fetch('/api/uploads/document', {  // ✅ Existing endpoint
-        method: 'POST',
-        body: formDataUpload,
-      });
-      
-      const data = await res.json();
-      
-      if (res.ok) {
-        store.addAttachment({
-          id: data.id || data.attachmentId || Date.now().toString(),
-          fileName: file.name,
-          fileSize: file.size,
-          fileUrl: data.url || data.fileUrl || '',
-          mimeType: file.type,
+      try {
+        const res = await fetch('/api/uploads/document', {  // ✅ Existing endpoint
+          method: 'POST',
+          body: formDataUpload,
         });
-        toast.success(`${file.name} uploaded`);
-      } else {
-        toast.error(data.error || `Failed to upload ${file.name}`);
+
+        const data = await res.json();
+
+        if (res.ok) {
+          store.addAttachment({
+            id: data.id || data.attachmentId || Date.now().toString(),
+            fileName: file.name,
+            fileSize: file.size,
+            fileUrl: data.url || data.fileUrl || '',
+            mimeType: file.type,
+          });
+          toast.success(`${file.name} uploaded`);
+        } else {
+          toast.error(data.error || `Failed to upload ${file.name}`);
+        }
+      } catch (err) {
+        toast.error(`Failed to upload ${file.name}`);
       }
-    } catch (err) {
-      toast.error(`Failed to upload ${file.name}`);
     }
-  }
-};
+  };
 
   const goNext = () => {
     if (validateStep(currentStep)) {
@@ -301,7 +317,7 @@ export default function PostProjectPage() {
             <div className="space-y-4">
               <h3 className="text-xl font-bold">{formData.title || 'Untitled'}</h3>
               <p className="text-sm text-gray-500">
-                {formData.category} • {formData.locationType || 'Remote'} • 
+                {formData.category} • {formData.locationType || 'Remote'} •
                 {formData.budgetType === 'hourly' ? ` ₹${formData.hourlyRate}/hr` : ` ₹${Number(formData.budgetMin).toLocaleString() || 0} - ₹${Number(formData.budgetMax).toLocaleString() || 0}`}
                 {' • '}{formData.duration} {formData.durationUnit}
               </p>
@@ -408,7 +424,7 @@ function StepSkills() {
         )}
         {errors.skills && <p className="text-xs text-red-500 mt-1">{errors.skills}</p>}
       </div>
-      
+
       <div>
         <label className="text-sm font-medium mb-2 block">Experience Level *</label>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -419,9 +435,8 @@ function StepSkills() {
             { value: 'any', label: 'Any Level', sub: 'Open to all' },
           ].map(level => (
             <button key={level.value} type="button" onClick={() => updateField('experienceLevel', level.value)}
-              className={`p-3 rounded-xl border text-sm transition-all ${
-                formData.experienceLevel === level.value ? 'border-blue-500 bg-blue-50 text-blue-700 font-medium ring-2 ring-blue-100' : 'border-gray-200 hover:border-blue-300'
-              }`}>
+              className={`p-3 rounded-xl border text-sm transition-all ${formData.experienceLevel === level.value ? 'border-blue-500 bg-blue-50 text-blue-700 font-medium ring-2 ring-blue-100' : 'border-gray-200 hover:border-blue-300'
+                }`}>
               <div className="font-medium">{level.label}</div>
               <div className="text-xs text-gray-500">{level.sub}</div>
             </button>
@@ -450,9 +465,8 @@ function StepSkills() {
         <div className="flex gap-3">
           {['remote', 'onsite', 'hybrid'].map(type => (
             <button key={type} type="button" onClick={() => updateField('locationType', type)}
-              className={`flex-1 p-3 rounded-xl border text-sm capitalize transition-all ${
-                formData.locationType === type ? 'border-blue-500 bg-blue-50 text-blue-700 font-medium' : 'border-gray-200 hover:border-gray-300'
-              }`}>{type}</button>
+              className={`flex-1 p-3 rounded-xl border text-sm capitalize transition-all ${formData.locationType === type ? 'border-blue-500 bg-blue-50 text-blue-700 font-medium' : 'border-gray-200 hover:border-gray-300'
+                }`}>{type}</button>
           ))}
         </div>
         {(formData.locationType === 'onsite' || formData.locationType === 'hybrid') && (
@@ -481,9 +495,8 @@ function StepBudget() {
             { value: 'milestone', label: 'Milestone-Based', desc: 'Best for large projects' },
           ].map(t => (
             <button key={t.value} type="button" onClick={() => updateField('budgetType', t.value)}
-              className={`flex-1 p-4 rounded-xl border text-sm transition-all ${
-                formData.budgetType === t.value ? 'border-blue-500 bg-blue-50 text-blue-700 font-medium' : 'border-gray-200 hover:border-gray-300'
-              }`}>
+              className={`flex-1 p-4 rounded-xl border text-sm transition-all ${formData.budgetType === t.value ? 'border-blue-500 bg-blue-50 text-blue-700 font-medium' : 'border-gray-200 hover:border-gray-300'
+                }`}>
               <div className="font-medium">{t.label}</div>
               <div className="text-xs text-gray-500">{t.desc}</div>
             </button>
@@ -568,9 +581,9 @@ function StepBudget() {
 }
 
 // Step 4: Visibility & Attachments 
-function StepVisibility({ fileInputRef, onFileSelect }: { 
-  fileInputRef: React.RefObject<HTMLInputElement>; 
-  onFileSelect: (files: FileList) => void 
+function StepVisibility({ fileInputRef, onFileSelect }: {
+  fileInputRef: React.RefObject<HTMLInputElement>;
+  onFileSelect: (files: FileList) => void
 }) {
   const { formData, errors, updateField, removeAttachment } = useCreateProject();
 
@@ -584,9 +597,8 @@ function StepVisibility({ fileInputRef, onFileSelect }: {
           { value: 'invite_only', label: 'Invite Only', icon: '✉️', desc: 'Only specific candidates you invite.' },
         ].map(opt => (
           <button key={opt.value} type="button" onClick={() => updateField('visibility', opt.value as any)}
-            className={`w-full text-left p-4 rounded-xl border mb-2 transition-all ${
-              formData.visibility === opt.value ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
-            }`}>
+            className={`w-full text-left p-4 rounded-xl border mb-2 transition-all ${formData.visibility === opt.value ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+              }`}>
             <p className="font-medium text-sm">{opt.icon} {opt.label}</p>
             <p className="text-xs text-gray-500">{opt.desc}</p>
           </button>
