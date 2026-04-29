@@ -4,6 +4,7 @@ import { persist } from 'zustand/middleware';
 interface Skill {
   name: string;
   proficiency: 'beginner' | 'intermediate' | 'advanced';
+  skillId?: string;
 }
 
 interface Milestone {
@@ -26,6 +27,7 @@ interface ProjectFormData {
   title: string;
   category: string;
   description: string;
+  descriptionPlain: string;
   summary: string;
   skills: Skill[];
   experienceLevel: string;
@@ -37,9 +39,9 @@ interface ProjectFormData {
   budgetMax: string;
   hourlyRate: string;
   duration: string;
-  durationUnit: 'days' | 'weeks';
+  durationUnit: 'days' | 'weeks' | 'months';
   milestones: Milestone[];
-  visibility: 'public' | 'private' | 'invite';
+  visibility: 'public' | 'private' | 'invite_only';
   attachments: Attachment[];
   isFeatured: boolean;
   termsAccepted: boolean;
@@ -52,6 +54,7 @@ interface ProjectStore {
   formData: ProjectFormData;
   errors: Record<string, string>;
   isSubmitting: boolean;
+  isSaving: boolean;
   setCurrentStep: (step: number) => void;
   setProjectId: (id: string) => void;
   setStatus: (status: string) => void;
@@ -67,13 +70,16 @@ interface ProjectStore {
   setErrors: (errors: Record<string, string>) => void;
   clearErrors: () => void;
   setIsSubmitting: (value: boolean) => void;
+  setIsSaving: (value: boolean) => void;
   reset: () => void;
+  isFormEmpty: () => boolean;
 }
 
 const initialFormData: ProjectFormData = {
   title: '',
   category: '',
   description: '',
+  descriptionPlain: '',
   summary: '',
   skills: [{ name: '', proficiency: 'intermediate' }],
   experienceLevel: '',
@@ -95,20 +101,19 @@ const initialFormData: ProjectFormData = {
 
 export const useCreateProject = create<ProjectStore>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       currentStep: 1,
       projectId: null,
       status: '',
       formData: { ...initialFormData },
       errors: {},
       isSubmitting: false,
+      isSaving: false,
 
       setCurrentStep: (step) => set({ currentStep: step }),
-      
       setProjectId: (id) => set({ projectId: id }),
-      
       setStatus: (status) => set({ status }),
-
+      
       updateField: (field, value) =>
         set((state) => ({
           formData: { ...state.formData, [field]: value },
@@ -193,10 +198,14 @@ export const useCreateProject = create<ProjectStore>()(
         })),
 
       setErrors: (errors) => set({ errors }),
-      
       clearErrors: () => set({ errors: {} }),
-      
       setIsSubmitting: (value) => set({ isSubmitting: value }),
+      setIsSaving: (value) => set({ isSaving: value }),
+
+      isFormEmpty: () => {
+        const fd = get().formData;
+        return !fd.title && !fd.category && !fd.description;
+      },
 
       reset: () =>
         set({
@@ -206,6 +215,7 @@ export const useCreateProject = create<ProjectStore>()(
           formData: { ...initialFormData },
           errors: {},
           isSubmitting: false,
+          isSaving: false,
         }),
     }),
     {
@@ -220,6 +230,7 @@ export const useCreateProject = create<ProjectStore>()(
         ...currentState,
         ...persistedState,
         isSubmitting: false,
+        isSaving: false,
         errors: {},
       }),
     }
