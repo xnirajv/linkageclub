@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -22,140 +22,11 @@ export default function PostProjectPage() {
   const store = useCreateProject();
   const { currentStep, formData, projectId, errors, isSubmitting } = store;
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [showNewOrExisting, setShowNewOrExisting] = useState(false);
-  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const hasCheckedExistingRef = useRef(false);
 
-  // PERMANENT FIX 1: Check if there's existing draft and ask user
+  // Simple: Reset isSubmitting on mount
   useEffect(() => {
-    if (hasCheckedExistingRef.current) return;
-    hasCheckedExistingRef.current = true;
-
-    // Reset isSubmitting and errors on mount
-    if (store.isSubmitting) {
-      store.setIsSubmitting(false);
-    }
-    if (Object.keys(store.errors).length > 0) {
-      store.clearErrors();
-    }
-
-    // Check if form has existing data (from localStorage)
-    if (!store.isFormEmpty()) {
-      setShowNewOrExisting(true);
-    } else {
-      // Form is empty, reset everything to ensure clean state
-      store.reset();
-    }
+    store.setIsSubmitting(false);
   }, []);
-
-  // PERMANENT FIX 2: Auto-save draft
-  const autoSaveDraft = useCallback(async () => {
-    if (!store.hasUnsavedChanges) return;
-    if (store.isFormEmpty()) return;
-
-    try {
-      const pid = store.projectId;
-      const method = pid ? 'PATCH' : 'POST';
-      const endpoint = pid ? `/api/projects/${pid}` : '/api/projects';
-
-      const payload = {
-        title: formData.title || 'Untitled Draft',
-        category: formData.category || undefined,
-        description: formData.description || undefined,
-        summary: formData.summary || undefined,
-        skills: formData.skills.filter(s => s.name.trim()).map(s => ({
-          name: s.name,
-          level: s.proficiency as 'beginner' | 'intermediate' | 'advanced',
-          mandatory: true,
-        })),
-        experienceLevel: formData.experienceLevel || undefined,
-        location: formData.locationType === 'remote'
-          ? { type: 'remote' as const }
-          : formData.locationType
-          ? { type: formData.locationType as 'onsite' | 'hybrid', label: formData.location }
-          : undefined,
-        budget: formData.budgetType === 'hourly'
-          ? { type: 'hourly' as const, min: Number(formData.hourlyRate) || 0, max: Number(formData.hourlyRate) || 0, currency: 'INR' }
-          : formData.budgetType
-          ? { type: formData.budgetType as 'fixed' | 'milestone', min: Number(formData.budgetMin) || 0, max: Number(formData.budgetMax) || 0, currency: 'INR' }
-          : undefined,
-        duration: Number(formData.duration) || undefined,
-        milestones: formData.milestones.filter(m => m.title && m.amount > 0).map(m => ({
-          title: m.title,
-          description: m.deliverables || m.title,
-          amount: m.amount,
-          deadline: m.deadlineDay,
-        })),
-        requirements: formData.requirements.filter(Boolean),
-        visibility: formData.visibility || 'public',
-        status: 'draft',
-      };
-
-      // Remove undefined values
-      Object.keys(payload).forEach(key => {
-        if (payload[key] === undefined) delete payload[key];
-      });
-
-      const res = await fetch(endpoint, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        const newId = data?.project?._id || data?.data?.project?._id || data?._id;
-        if (newId) store.setProjectId(newId);
-        store.setHasUnsavedChanges(false);
-        console.log('✅ Auto-saved draft');
-      }
-    } catch (err) {
-      console.error('❌ Auto-save failed:', err);
-    }
-  }, [formData, store.projectId, store.hasUnsavedChanges]);
-
-  // Auto-save every 30 seconds if there are unsaved changes
-  useEffect(() => {
-    if (autoSaveTimerRef.current) {
-      clearInterval(autoSaveTimerRef.current);
-    }
-
-    autoSaveTimerRef.current = setInterval(() => {
-      autoSaveDraft();
-    }, 30000); // 30 seconds
-
-    return () => {
-      if (autoSaveTimerRef.current) {
-        clearInterval(autoSaveTimerRef.current);
-      }
-    };
-  }, [autoSaveDraft]);
-
-  // Auto-save when user is about to leave the page
-  useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (store.hasUnsavedChanges && !store.isFormEmpty()) {
-        // Try to save synchronously before unload
-        autoSaveDraft();
-      }
-    };
-
-    const handleRouteChange = () => {
-      if (store.hasUnsavedChanges && !store.isFormEmpty()) {
-        autoSaveDraft();
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      // Save on component unmount (when navigating away)
-      if (store.hasUnsavedChanges && !store.isFormEmpty()) {
-        autoSaveDraft();
-      }
-    };
-  }, [autoSaveDraft, store.hasUnsavedChanges]);
 
   const validateStep = (step: number): boolean => {
     const e: Record<string, string> = {};
@@ -232,11 +103,9 @@ export default function PostProjectPage() {
       
       const newId = data?.project?._id || data?.data?.project?._id || data?._id;
       if (newId) store.setProjectId(newId);
-      store.setHasUnsavedChanges(false);
       return { success: true };
     } catch (err: any) {
-      console.error('Submit error:', err);
-      return { success: false, error: err.message || 'Something went wrong' };
+      return { success: false, error: err.message };
     } finally {
       store.setIsSubmitting(false);
     }
@@ -263,51 +132,8 @@ export default function PostProjectPage() {
     }
   };
 
-  const handleStartNew = () => {
-    store.reset();
-    setShowNewOrExisting(false);
-  };
-
-  const handleContinueExisting = () => {
-    setShowNewOrExisting(false);
-  };
-
   const goNext = () => { if (validateStep(currentStep)) { store.setCurrentStep(currentStep + 1); window.scrollTo(0, 0); } };
   const goBack = () => { if (currentStep > 1) { store.setCurrentStep(currentStep - 1); window.scrollTo(0, 0); } };
-
-  // Show dialog if existing draft found
-  if (showNewOrExisting) {
-    return (
-      <div className="max-w-lg mx-auto mt-20 px-4">
-        <Card className="border-2 border-blue-200 dark:border-blue-800 shadow-lg">
-          <CardContent className="p-8 text-center space-y-6">
-            <div className="text-4xl">📝</div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-              Existing Draft Found
-            </h2>
-            <p className="text-gray-600 dark:text-gray-400">
-              You have an unsaved draft. Would you like to continue where you left off or start fresh?
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button
-                onClick={handleContinueExisting}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 text-lg"
-              >
-                Continue Draft
-              </Button>
-              <Button
-                onClick={handleStartNew}
-                variant="outline"
-                className="px-8 py-3 text-lg"
-              >
-                Start New
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 px-4 py-8">

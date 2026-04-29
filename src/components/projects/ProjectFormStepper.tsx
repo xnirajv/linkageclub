@@ -17,8 +17,6 @@ interface ProjectFormStepperProps {
 }
 
 export function ProjectFormStepper({ currentStep, totalSteps, steps, onStepClick, errors }: ProjectFormStepperProps) {
-  const hasErrors = Object.keys(errors).length > 0;
-  
   return (
     <div className="flex items-center justify-between mb-4">
       {steps.map((step, index) => {
@@ -63,12 +61,6 @@ export function ProjectFormStepper({ currentStep, totalSteps, steps, onStepClick
           </React.Fragment>
         );
       })}
-      
-      {hasErrors && (
-        <div className="fixed top-4 right-4 bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg text-sm z-50">
-          Please fix errors before proceeding
-        </div>
-      )}
     </div>
   );
 }
