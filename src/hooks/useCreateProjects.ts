@@ -122,79 +122,42 @@ export const useCreateProject = create<ProjectStore>()(
 
       addSkill: (skill) =>
         set((state) => ({
-          formData: {
-            ...state.formData,
-            skills: [...state.formData.skills, skill],
-          },
+          formData: { ...state.formData, skills: [...state.formData.skills, skill] },
         })),
 
       removeSkill: (index) =>
         set((state) => ({
-          formData: {
-            ...state.formData,
-            skills: state.formData.skills.filter((_, i) => i !== index),
-          },
+          formData: { ...state.formData, skills: state.formData.skills.filter((_, i) => i !== index) },
         })),
 
       updateSkill: (index, skill) =>
         set((state) => ({
-          formData: {
-            ...state.formData,
-            skills: state.formData.skills.map((s, i) =>
-              i === index ? { ...s, ...skill } : s
-            ),
-          },
+          formData: { ...state.formData, skills: state.formData.skills.map((s, i) => (i === index ? { ...s, ...skill } : s)) },
         })),
 
       addMilestone: () =>
         set((state) => ({
-          formData: {
-            ...state.formData,
-            milestones: [
-              ...state.formData.milestones,
-              {
-                id: Date.now().toString(),
-                title: '',
-                amount: 0,
-                deadlineDay: 0,
-                deliverables: '',
-              },
-            ],
-          },
+          formData: { ...state.formData, milestones: [...state.formData.milestones, { id: Date.now().toString(), title: '', amount: 0, deadlineDay: 0, deliverables: '' }] },
         })),
 
       removeMilestone: (id) =>
         set((state) => ({
-          formData: {
-            ...state.formData,
-            milestones: state.formData.milestones.filter((m) => m.id !== id),
-          },
+          formData: { ...state.formData, milestones: state.formData.milestones.filter((m) => m.id !== id) },
         })),
 
       updateMilestone: (id, data) =>
         set((state) => ({
-          formData: {
-            ...state.formData,
-            milestones: state.formData.milestones.map((m) =>
-              m.id === id ? { ...m, ...data } : m
-            ),
-          },
+          formData: { ...state.formData, milestones: state.formData.milestones.map((m) => (m.id === id ? { ...m, ...data } : m)) },
         })),
 
       addAttachment: (att) =>
         set((state) => ({
-          formData: {
-            ...state.formData,
-            attachments: [...state.formData.attachments, att],
-          },
+          formData: { ...state.formData, attachments: [...state.formData.attachments, att] },
         })),
 
       removeAttachment: (id) =>
         set((state) => ({
-          formData: {
-            ...state.formData,
-            attachments: state.formData.attachments.filter((a) => a.id !== id),
-          },
+          formData: { ...state.formData, attachments: state.formData.attachments.filter((a) => a.id !== id) },
         })),
 
       setErrors: (errors) => set({ errors }),
@@ -209,13 +172,9 @@ export const useCreateProject = create<ProjectStore>()(
 
       reset: () =>
         set({
-          currentStep: 1,
-          projectId: null,
-          status: '',
-          formData: { ...initialFormData },
-          errors: {},
-          isSubmitting: false,
-          isSaving: false,
+          currentStep: 1, projectId: null, status: '',
+          formData: { ...initialFormData }, errors: {},
+          isSubmitting: false, isSaving: false,
         }),
     }),
     {

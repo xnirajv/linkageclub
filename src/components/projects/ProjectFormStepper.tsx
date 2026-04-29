@@ -17,8 +17,6 @@ interface ProjectFormStepperProps {
 }
 
 export function ProjectFormStepper({ currentStep, totalSteps, steps, onStepClick, errors }: ProjectFormStepperProps) {
-  const hasErrors = Object.keys(errors).length > 0;
-
   const getStepErrorMap = () => {
     const map: Record<number, boolean> = {};
     if (errors.title || errors.category || errors.description) map[1] = true;
@@ -31,7 +29,7 @@ export function ProjectFormStepper({ currentStep, totalSteps, steps, onStepClick
   const stepErrors = getStepErrorMap();
 
   return (
-    <div className="flex items-center justify-between mb-6">
+    <div className="flex items-center justify-between mb-8">
       {steps.map((step, index) => {
         const stepNumber = index + 1;
         const isActive = stepNumber === currentStep;
@@ -66,13 +64,9 @@ export function ProjectFormStepper({ currentStep, totalSteps, steps, onStepClick
               }`}>
                 {step.title}
               </span>
-              <span className="text-[10px] text-gray-500 hidden sm:block">{step.subtitle}</span>
             </button>
-
             {!isLast && (
-              <div className={`flex-1 h-0.5 mx-2 transition-colors ${
-                stepNumber < currentStep ? 'bg-green-500' : 'bg-gray-200'
-              }`} />
+              <div className={`flex-1 h-0.5 mx-2 transition-colors ${stepNumber < currentStep ? 'bg-green-500' : 'bg-gray-200'}`} />
             )}
           </React.Fragment>
         );
